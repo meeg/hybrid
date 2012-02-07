@@ -1,0 +1,160 @@
+<input>
+   <config>
+      <DataFile>test.bin</DataFile>
+      <RunRate>100Hz</RunRate>
+      <RunCount>1000</RunCount>
+      <DebugEnable>False</DebugEnable>
+      <cntrlFpga>
+         <ad9252>
+            <ChanPowerDown>False</ChanPowerDown>
+            <ConfigEn>False</ConfigEn>
+            <DcoFcoDrive2x>False</DcoFcoDrive2x>
+            <DutyCycleStabilizer>False</DutyCycleStabilizer>
+            <LowEncodeRate>False</LowEncodeRate>
+            <OutputFormat>OffsetBinary</OutputFormat>
+            <OutputInvert>False</OutputInvert>
+            <OutputMode>LvdsAnsi-644</OutputMode>
+            <OutputPhase>Deg0</OutputPhase>
+            <OutputTermDrive>None</OutputTermDrive>
+            <OutputTestMode>Off</OutputTestMode>
+            <PowerDownMode>ChipRun</PowerDownMode>
+            <ResetPnLongGen>False</ResetPnLongGen>
+            <ResetPnShortGen>False</ResetPnShortGen>
+            <SerialBits>Bits-14</SerialBits>
+            <SerialLsbFirst>False</SerialLsbFirst>
+            <UserPattern1>0x2033</UserPattern1>
+            <UserPattern2>0x2033</UserPattern2>
+            <UserTestMode>OnSingleAlt</UserTestMode>
+            <enabled>False</enabled>
+         </ad9252>
+         <hybrid>
+            <apv25>
+               <CalibInhibit>True</CalibInhibit>
+               <CalGroup>0x0</CalGroup>
+               <Csel>Dly_1x3_125ns</Csel>
+               <Ical>0x1D</Ical>
+               <ImuxIn>0x22</ImuxIn>
+               <Ipcasc>0x34</Ipcasc>
+               <Ipre>0x62</Ipre>
+               <Ipsf>0x22</Ipsf>
+               <Ipsp>0x37</Ipsp>
+               <Isha>0x22</Isha>
+               <Ispare>0x0</Ispare>
+               <Issf>0x22</Issf>
+               <Latency>0x84</Latency>
+               <MuxGain>Mip_1_0mA</MuxGain>
+               <PreampPolarity>NonInverting</PreampPolarity>
+               <ReadOutFrequency>Mhz40</ReadOutFrequency>
+               <ReadOutMode>Peak</ReadOutMode>
+               <TriggerMode>Sample3</TriggerMode>
+               <Vfp>0x1e</Vfp>
+               <Vfs>0x3c</Vfs>
+               <Vpsp>0x0F</Vpsp>
+               <enabled>False</enabled>
+            </apv25>
+            <enabled>False</enabled>
+         </hybrid>
+         <GetTemp>False</GetTemp>
+         <ClockSelect>Internal</ClockSelect>
+         <Adc00Enable>False</Adc00Enable>
+         <Adc01Enable>False</Adc01Enable>
+         <Adc02Enable>True</Adc02Enable>
+         <Adc03Enable>True</Adc03Enable>
+         <Adc04Enable>True</Adc04Enable>
+         <Adc05Enable>False</Adc05Enable>
+         <Adc06Enable>False</Adc06Enable>
+         <Adc07Enable>False</Adc07Enable>
+         <Adc08Enable>False</Adc08Enable>
+         <Adc09Enable>False</Adc09Enable>
+         <Adc10Enable>False</Adc10Enable>
+         <Adc11Enable>False</Adc11Enable>
+         <Adc12Enable>False</Adc12Enable>
+         <Adc13Enable>False</Adc13Enable>
+         <Adc14Enable>False</Adc14Enable>
+         <AdcClkInvert>True</AdcClkInvert>
+         <ApvTrigGenPause>6999999</ApvTrigGenPause>
+         <ApvTrigSource>Software</ApvTrigSource>
+         <ApvTrigType>DoubleCalib</ApvTrigType>
+         <ScratchPad>0xABCDEF01</ScratchPad>
+         <CalDelay>0x81</CalDelay>
+         <FrameDelayA>0x21</FrameDelayA>
+         <FrameDelayB>0x21</FrameDelayB>
+         <InputDelayA>0x21</InputDelayA>
+         <InputDelayB>0x21</InputDelayB>
+         <InputDelayC>0x21</InputDelayC>
+         <InputDelayD>0x21</InputDelayD>
+         <InputDelayE>0x21</InputDelayE>
+         <InputDelayF>0x21</InputDelayF>
+         <InputDelayG>0x21</InputDelayG>
+         <InputDelayH>0x21</InputDelayH>
+         <InputDelayI>0x21</InputDelayI>
+         <InputDelayJ>0x21</InputDelayJ>
+         <InputDelayK>0x21</InputDelayK>
+         <InputDelayL>0x21</InputDelayL>
+         <InputDelayM>0x21</InputDelayM>
+         <InputDelayN>0x21</InputDelayN>
+         <InputDelayO>0x21</InputDelayO>
+         <ad9252 index="0">
+            <enabled>True</enabled>
+         </ad9252>
+         <ad9252 index="1">
+            <enabled>True</enabled>
+         </ad9252>
+         <hybrid index="0">
+            <apv25 index="0">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="1">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="2">
+               <enabled>True</enabled>
+            </apv25>
+            <apv25 index="3">
+               <enabled>True</enabled>
+            </apv25>
+            <apv25 index="4">
+               <enabled>True</enabled>
+            </apv25>
+            <enabled>True</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <apv25 index="0">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="1">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="2">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="3">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="4">
+               <enabled>False</enabled>
+            </apv25>
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <apv25 index="0">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="1">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="2">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="3">
+               <enabled>False</enabled>
+            </apv25>
+            <apv25 index="4">
+               <enabled>False</enabled>
+            </apv25>
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+   </config>
+</input>

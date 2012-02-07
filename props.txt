@@ -1,0 +1,2 @@
+cntrlGui svn+ssh://ppa-pc87444.slac.stanford.edu/afs/slac/g/reseng/svn/repos/gen_daq/trunk/cntrlGui
+generic  svn+ssh://ppa-pc87444.slac.stanford.edu/afs/slac/g/reseng/svn/repos/gen_daq/trunk/generic
