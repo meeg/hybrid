@@ -18,13 +18,13 @@
 #include <iomanip>
 #include <TFile.h>
 #include <TH1F.h>
-//#include <TH2F.h>
+#include <TH2F.h>
 #include <TF1.h>
 #include <TCanvas.h>
 //#include <TMultiGraph.h>
 #include <TApplication.h>
 #include <TGraph.h>
-//#include <TStyle.h>
+#include <TStyle.h>
 #include <stdarg.h>
 #include <TrackerEvent.h>
 #include <TrackerSample.h>
@@ -35,7 +35,7 @@
 #include "Fitter.hh"
 #include "AnalyticFitter.hh"
 #include "LinFitter.hh"
-#include "TMath.h"
+#include <TMath.h>
 using namespace std;
 
 int chanMap[128];
@@ -84,22 +84,24 @@ int main ( int argc, char **argv ) {
 	TH1F *histA[640];
 	TH1F *histT0_err[640];
 	TH1F *histA_err[640];
+	TH2F *histChiProb;
 
 	initChan();
 
 	//gStyle->SetOptStat(kFALSE);
+	gStyle->SetPalette(1,0);
 
 	// Start X11 view
-	   TApplication theApp("App",NULL,NULL);
+	//TApplication theApp("App",NULL,NULL);
 
 	// Root file is the first and only arg
-	if ( argc != 2 ) {
-		cout << "Usage: meeg_baseline data_file\n";
+	if ( argc != 3 ) {
+		cout << "Usage: meeg_t0res data_file baseline_cal\n";
 		return(1);
 	}
 
 	// 2d histogram
-	//histAll = new TH2F("Value_Hist_All","Value_Hist_All",16384,0,16384,640,0,640);
+	histChiProb = new TH2F("Chisq_Prob","Chisq_Prob",640,0,640,200,0,1.0);
 
 	ShapingCurve *myShape[640];
 	Fitter *myFitter[640];
@@ -130,9 +132,9 @@ int main ( int argc, char **argv ) {
 	if (inname.Contains('/')) {
 		inname.Remove(0,inname.Last('/')+1);
 	}
-	cout << "Reading calibration from " << inname+".calib" << endl;
+	cout << "Reading calibration from " << argv[2] << endl;
 	ifstream calfile;
-	calfile.open(inname+".calib");
+	calfile.open(argv[2]);
 
 	while (!calfile.eof()) {
 		calfile >> channel;
@@ -152,7 +154,7 @@ int main ( int argc, char **argv ) {
 
 	double samples[6];
 	Samples *mySamples = new Samples(6,24.0);
-	double fit_par[2], fit_err[2], chisq;
+	double fit_par[2], fit_err[2], chisq, chiprob;
 	int dof;
 
 
@@ -196,18 +198,27 @@ int main ( int argc, char **argv ) {
 					for ( y=0; y < 6; y++ ) {
 						samples[y]*=-1;
 					}
-				mySamples->readEvent(samples,0.0);
-				myFitter[channel]->readSamples(mySamples);
-				myFitter[channel]->doFit();
-				myFitter[channel]->getFitPar(fit_par);
-				myFitter[channel]->getFitErr(fit_err);
-				chisq = myFitter[channel]->getChisq(fit_par);
-				dof = myFitter[channel]->getDOF();
-				histT0[channel]->Fill(fit_par[0]);
-				histT0_err[channel]->Fill(fit_err[0]);
-				histA[channel]->Fill(fit_par[1]);
-				histA_err[channel]->Fill(fit_err[1]);
-				fitfile<<"T0 " << fit_par[0] <<", A " << fit_par[1] << "Fit chisq " << chisq << ", DOF " << dof << ", prob " << TMath::Prob(chisq,dof) << endl;
+				if (sum<0 && abs(sum)>5*grSigma[channel])
+				{
+					mySamples->readEvent(samples,0.0);
+					myFitter[channel]->readSamples(mySamples);
+					myFitter[channel]->doFit();
+					myFitter[channel]->getFitPar(fit_par);
+					myFitter[channel]->getFitErr(fit_err);
+					chisq = myFitter[channel]->getChisq(fit_par);
+					dof = myFitter[channel]->getDOF();
+					histT0[channel]->Fill(fit_par[0]);
+					histT0_err[channel]->Fill(fit_err[0]);
+					histA[channel]->Fill(fit_par[1]);
+					histA_err[channel]->Fill(fit_err[1]);
+					chiprob = TMath::Prob(chisq,dof);
+					fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
+					histChiProb->Fill(channel,chiprob);
+				}
+				else
+				{
+					fitfile << "Pulse below threshold on channel "<<channel<<endl;
+				}
 			}
 		}
 		eventCount++;
@@ -231,18 +242,19 @@ int main ( int argc, char **argv ) {
 		outfile<<grA[channel]<<"\t\t"<<grA_sigma[channel]<<"\t\t"<<grA_err[channel]<<endl;     
 	}
 
-	/*
-	   c1 = new TCanvas("c1","c1");
-	   c1->cd();
-	   histAll->Draw("colz");
-	   */
+	c1 = new TCanvas("c1","c1",1200,900);
+	c1->SetLogz();
+	histChiProb->Draw("colz");
+	sprintf(name,"%s_chiprob.png",inname);
+	c1->SaveAs(name);
 
-	c2 = new TCanvas("c2","c2");
+	/*
+	   c2 = new TCanvas("c2","c2");
 	//c2->Divide(12,11,0.01);
 
 	histT0[300]->Draw();
 	int base = 3 * 128;
-
+	*/
 	/*
 	   for(channel = base; channel < (base+128); channel++) {
 	   c2->cd((channel-base)+1);
@@ -264,7 +276,7 @@ int main ( int argc, char **argv ) {
 	   */
 
 	// Start X-Windows
-	theApp.Run();
+	//	theApp.Run();
 
 	// Close file
 	dataRead.close();

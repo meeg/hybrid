@@ -18,13 +18,13 @@
 #include <iomanip>
 #include <TFile.h>
 #include <TH1F.h>
-//#include <TH2F.h>
+#include <TH2F.h>
 #include <TF1.h>
-//#include <TCanvas.h>
+#include <TCanvas.h>
 //#include <TMultiGraph.h>
 //#include <TApplication.h>
 #include <TGraph.h>
-//#include <TStyle.h>
+#include <TStyle.h>
 #include <stdarg.h>
 #include <TrackerEvent.h>
 #include <TrackerSample.h>
@@ -54,8 +54,8 @@ int convChan ( int chan ) {
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-	//TCanvas         *c1, *c2, *c4, *c5;
-	//TH2F            *histAll;
+	TCanvas         *c1;
+	TH2F            *histAll;
 	TH1F            *histSng[640];
 	double          histMin[640];
 	double          histMax[640];
@@ -78,6 +78,7 @@ int main ( int argc, char **argv ) {
 	initChan();
 
 	//gStyle->SetOptStat(kFALSE);
+	gStyle->SetPalette(1,0);
 
 	// Start X11 view
 	//   TApplication theApp("App",NULL,NULL);
@@ -89,11 +90,11 @@ int main ( int argc, char **argv ) {
 	}
 
 	// 2d histogram
-	//histAll = new TH2F("Value_Hist_All","Value_Hist_All",16384,0,16384,640,0,640);
+	histAll = new TH2F("Value_Hist_All","Value_Hist_All",16384,-0.5,16383.5,640,-0.5,639.5);
 
 	for (channel=0; channel < 640; channel++) {
 		sprintf(name,"%i",channel);
-		histSng[channel] = new TH1F(name,name,16384,0.5,16383.5);
+		histSng[channel] = new TH1F(name,name,16384,-0.5,16383.5);
 		histMin[channel] = 16384;
 		histMax[channel] = 0;
 	}
@@ -103,13 +104,13 @@ int main ( int argc, char **argv ) {
 
 	TString inname=argv[1];
 
-	TString outname=inname.ReplaceAll(".bin",".calib");
-	if (outname.Contains('/')) {
-		outname.Remove(0,outname.Last('/')+1);
+	inname.ReplaceAll(".bin","");
+	if (inname.Contains('/')) {
+		inname.Remove(0,inname.Last('/')+1);
 	}
-	cout << "Writing calibration to " << outname << endl;
+	cout << "Writing calibration to " << inname+".calib" << endl;
 	ofstream outfile;
-	outfile.open(outname);
+	outfile.open(inname+".calib");
 
 	// Process each event
 	eventCount = 0;
@@ -139,7 +140,7 @@ int main ( int argc, char **argv ) {
 					//vlow  = (value >> 1) & 0x1555;
 					//value = vlow | vhigh;
 
-					//histAll->Fill(value,channel);
+					histAll->Fill(value,channel);
 					histSng[channel]->Fill(value);
 
 					if ( value < histMin[channel] ) histMin[channel] = value;
@@ -165,11 +166,13 @@ int main ( int argc, char **argv ) {
 		outfile <<channel<<"\t"<<grMean[channel]<<"\t"<<grSigma[channel]<<endl;     
 	}
 
-	/*
-	   c1 = new TCanvas("c1","c1");
+	   c1 = new TCanvas("c1","c1",1200,900);
 	   c1->cd();
 	   histAll->Draw("colz");
+	   sprintf(name,"%s_baseline.png",inname.Data());
+	   c1->SaveAs(name);
 
+	/*
 	   c2 = new TCanvas("c2","c2");
 	   c2->Divide(12,11,0.01);
 
