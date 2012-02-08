@@ -114,11 +114,11 @@ int main ( int argc, char **argv ) {
 		sprintf(name,"T0err_%i",channel);
 		histT0_err[channel] = new TH1F(name,name,1000,0,10.0);
 		sprintf(name,"A_%i",channel);
-		histA[channel] = new TH1F(name,name,1000,0,16384);
+		histA[channel] = new TH1F(name,name,1000,0,1000.0);
 		sprintf(name,"Aerr_%i",channel);
-		histA_err[channel] = new TH1F(name,name,1000,0,1000);
+		histA_err[channel] = new TH1F(name,name,1000,0,100.0);
 		myShape[channel] = new ShapingCurve(35.0);
-		myFitter[channel] = new LinFitter(myShape[channel],6,1,1.0);
+		myFitter[channel] = new AnalyticFitter(myShape[channel],6,1,1.0);
 	}
 
 	// Attempt to open data file
@@ -142,9 +142,13 @@ int main ( int argc, char **argv ) {
 	}
 	calfile.close();
 
-	cout << "Writing calibration to " << inname+".calib2" << endl;
+	cout << "Writing fit status to " << inname+".fits" << endl;
+	ofstream fitfile;
+	fitfile.open(inname+".fits");
+
+	cout << "Writing T0 calibration to " << inname+".t0" << endl;
 	ofstream outfile;
-	outfile.open(inname+".calib2");
+	outfile.open(inname+".t0");
 
 	double samples[6];
 	Samples *mySamples = new Samples(6,24.0);
@@ -203,7 +207,7 @@ int main ( int argc, char **argv ) {
 				histT0_err[channel]->Fill(fit_err[0]);
 				histA[channel]->Fill(fit_par[1]);
 				histA_err[channel]->Fill(fit_err[1]);
-				outfile<<"T0 " << fit_par[0] <<", A " << fit_par[1] << "Fit chisq " << chisq << ", DOF " << dof << ", prob " << TMath::Prob(chisq,dof) << endl;
+				fitfile<<"T0 " << fit_par[0] <<", A " << fit_par[1] << "Fit chisq " << chisq << ", DOF " << dof << ", prob " << TMath::Prob(chisq,dof) << endl;
 			}
 		}
 		eventCount++;
@@ -223,8 +227,8 @@ int main ( int argc, char **argv ) {
 		grA_sigma[channel] = histA[channel]->GetFunction("gaus")->GetParameter(2);
 		histA_err[channel]->Fit("gaus","Q0");
 		grA_err[channel] = histA_err[channel]->GetFunction("gaus")->GetParameter(1);
-		outfile <<channel<<"\t"<<grT0[channel]<<"\t"<<grT0_sigma[channel]<<"\t"<<grT0_err[channel]<<"\t";
-		outfile<<grA[channel]<<"\t"<<grA_sigma[channel]<<"\t"<<grA_err[channel]<<endl;     
+		outfile <<channel<<"\t"<<grT0[channel]<<"\t\t"<<grT0_sigma[channel]<<"\t\t"<<grT0_err[channel]<<"\t\t";
+		outfile<<grA[channel]<<"\t\t"<<grA_sigma[channel]<<"\t\t"<<grA_err[channel]<<endl;     
 	}
 
 	/*
