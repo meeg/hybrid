@@ -59,6 +59,7 @@ int main ( int argc, char **argv ) {
 	TH1F            *histSng[640];
 	double          histMin[640];
 	double          histMax[640];
+	int hybridMin, hybridMax;
 	//TGraph          *mean;
 	//TGraph          *sigma;
 	double          grChan[640];
@@ -84,14 +85,23 @@ int main ( int argc, char **argv ) {
 	//   TApplication theApp("App",NULL,NULL);
 
 	// Root file is the first and only arg
-	if ( argc != 2 ) {
-		cout << "Usage: meeg_baseline data_file\n";
+	if ( argc != 2 && argc != 3 ) {
+		cout << "Usage: meeg_baseline data_file [sample #]\n";
 		return(1);
 	}
+
+
+	int fit_sample = -1;
+	if (argc==3)
+		fit_sample=atoi(argv[2]);
+
 
 	// 2d histogram
 	histAll = new TH2F("Value_Hist_All","Value_Hist_All",16384,-0.5,16383.5,640,-0.5,639.5);
 
+
+	hybridMin = 16384;
+	hybridMax = 0;
 	for (channel=0; channel < 640; channel++) {
 		sprintf(name,"%i",channel);
 		histSng[channel] = new TH1F(name,name,16384,-0.5,16383.5);
@@ -108,9 +118,18 @@ int main ( int argc, char **argv ) {
 	if (inname.Contains('/')) {
 		inname.Remove(0,inname.Last('/')+1);
 	}
-	cout << "Writing calibration to " << inname+".calib" << endl;
 	ofstream outfile;
+	if (fit_sample==-1)
+	{
+	cout << "Writing calibration to " << inname+".calib" << endl;
 	outfile.open(inname+".calib");
+	}
+	else
+	{
+	cout << "Writing calibration to " << inname+".calib_" <<fit_sample<< endl;
+	sprintf(name,"%s.calib_%d",inname.Data(),fit_sample);
+	outfile.open(name);
+	}
 
 	// Process each event
 	eventCount = 0;
@@ -133,7 +152,8 @@ int main ( int argc, char **argv ) {
 			if ( eventCount > 20 ) {
 
 				avg = 0;
-				for ( y=0; y < 1; y++ ) {
+				for ( y=0; y < 6; y++ ) {
+					if (fit_sample!=-1 && y!=fit_sample) continue;
 					value = sample->value(y);
 
 					//vhigh = (value << 1) & 0x2AAA;
@@ -145,6 +165,8 @@ int main ( int argc, char **argv ) {
 
 					if ( value < histMin[channel] ) histMin[channel] = value;
 					if ( value > histMax[channel] ) histMax[channel] = value;
+					if ( value < hybridMin ) hybridMin = value;
+					if ( value > hybridMax ) hybridMax = value;
 				}
 			}
 		}
@@ -153,6 +175,7 @@ int main ( int argc, char **argv ) {
 	}
 
 	for(channel = 0; channel < 640; channel++) {
+		/*
 		if (histSng[channel]->Fit("gaus","Q0")==0) {
 			grMean[channel]  = histSng[channel]->GetFunction("gaus")->GetParameter(1);
 			grSigma[channel] = histSng[channel]->GetFunction("gaus")->GetParameter(2);
@@ -162,15 +185,22 @@ int main ( int argc, char **argv ) {
 			grMean[channel]  = 0;
 			grSigma[channel] = 1;
 		}
+		*/
+		grMean[channel]  = histSng[channel]->GetMean();
+		grSigma[channel]  = histSng[channel]->GetRMS();
 		grChan[channel]  = channel;
 		outfile <<channel<<"\t"<<grMean[channel]<<"\t"<<grSigma[channel]<<endl;     
 	}
 
-	   c1 = new TCanvas("c1","c1",1200,900);
-	   c1->cd();
-	   histAll->Draw("colz");
-	   sprintf(name,"%s_baseline.png",inname.Data());
-	   c1->SaveAs(name);
+	c1 = new TCanvas("c1","c1",1200,900);
+	c1->cd();
+	histAll->GetXaxis()->SetRangeUser(hybridMin,hybridMax);
+	histAll->Draw("colz");
+	if (fit_sample==-1)
+		sprintf(name,"%s_baseline.png",inname.Data());
+	else 
+		sprintf(name,"%s_baseline_%d.png",inname.Data(),fit_sample);
+	c1->SaveAs(name);
 
 	/*
 	   c2 = new TCanvas("c2","c2");

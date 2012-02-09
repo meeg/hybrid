@@ -60,9 +60,8 @@ int convChan ( int chan ) {
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-	TCanvas         *c1, *c2, *c4, *c5;
+	TCanvas         *c1;
 	//TH2F            *histAll;
-	TH1F            *histSng[640];
 	double          histMin[640];
 	double          histMax[640];
 	//TGraph          *mean;
@@ -80,11 +79,11 @@ int main ( int argc, char **argv ) {
 	uint            eventCount;
 	double          sum;
 	char            name[100];
-	TH1F *histT0[640];
-	TH1F *histA[640];
-	TH1F *histT0_err[640];
-	TH1F *histA_err[640];
-	TH2F *histChiProb;
+	TH1F *histT0[640][2];
+	TH1F *histA[640][2];
+	TH1F *histT0_err[640][2];
+	TH1F *histA_err[640][2];
+	TH2F *histChiProb[2];
 
 	initChan();
 
@@ -101,26 +100,30 @@ int main ( int argc, char **argv ) {
 	}
 
 	// 2d histogram
-	histChiProb = new TH2F("Chisq_Prob","Chisq_Prob",640,0,640,200,0,1.0);
+	histChiProb[0] = new TH2F("Chisq_Prob_Pos","Chisq_Prob_Pos",640,0,640,200,0,1.0);
+	histChiProb[1] = new TH2F("Chisq_Prob_Neg","Chisq_Prob_Neg",640,0,640,200,0,1.0);
 
-	ShapingCurve *myShape[640];
-	Fitter *myFitter[640];
+	ShapingCurve *myShape[640][2];
+	Fitter *myFitter[640][2];
 
 	for (channel=0; channel < 640; channel++) {
+		grChan[channel]=channel;
 		sprintf(name,"%i",channel);
-		histSng[channel] = new TH1F(name,name,16384,-0.5,16383.5);
 		histMin[channel] = 16384;
 		histMax[channel] = 0;
-		sprintf(name,"T0_%i",channel);
-		histT0[channel] = new TH1F(name,name,1000,0,6*24.0);
-		sprintf(name,"T0err_%i",channel);
-		histT0_err[channel] = new TH1F(name,name,1000,0,10.0);
-		sprintf(name,"A_%i",channel);
-		histA[channel] = new TH1F(name,name,1000,0,1000.0);
-		sprintf(name,"Aerr_%i",channel);
-		histA_err[channel] = new TH1F(name,name,1000,0,100.0);
-		myShape[channel] = new ShapingCurve(35.0);
-		myFitter[channel] = new AnalyticFitter(myShape[channel],6,1,1.0);
+		for (int sgn=0;sgn<2;sgn++)
+		{
+			sprintf(name,"T0_%s_%i",sgn?"neg":"pos",channel);
+			histT0[channel][sgn] = new TH1F(name,name,1000,0,6*24.0);
+			sprintf(name,"T0err_%s_%i",sgn?"neg":"pos",channel);
+			histT0_err[channel][sgn] = new TH1F(name,name,1000,0,10.0);
+			sprintf(name,"A_%s_%i",sgn?"neg":"pos",channel);
+			histA[channel][sgn] = new TH1F(name,name,1000,0,1000.0);
+			sprintf(name,"Aerr_%s_%i",sgn?"neg":"pos",channel);
+			histA_err[channel][sgn] = new TH1F(name,name,1000,0,100.0);
+			myShape[channel][sgn] = new ShapingCurve(35.0);
+			myFitter[channel][sgn] = new AnalyticFitter(myShape[channel][sgn],6,1,1.0);
+		}
 	}
 
 	// Attempt to open data file
@@ -140,7 +143,8 @@ int main ( int argc, char **argv ) {
 		calfile >> channel;
 		calfile >> grMean[channel];
 		calfile >> grSigma[channel];
-		myFitter[channel]->setSigmaNoise(grSigma[channel]);
+		myFitter[channel][0]->setSigmaNoise(grSigma[channel]);
+		myFitter[channel][1]->setSigmaNoise(grSigma[channel]);
 	}
 	calfile.close();
 
@@ -148,9 +152,11 @@ int main ( int argc, char **argv ) {
 	ofstream fitfile;
 	fitfile.open(inname+".fits");
 
-	cout << "Writing T0 calibration to " << inname+".t0" << endl;
-	ofstream outfile;
-	outfile.open(inname+".t0");
+	ofstream outfile[2];
+	cout << "Writing T0 calibration to " << inname+".t0_pos" << endl;
+	outfile[0].open(inname+".t0_pos");
+	cout << "Writing T0 calibration to " << inname+".t0_neg" << endl;
+	outfile[1].open(inname+".t0_neg");
 
 	double samples[6];
 	Samples *mySamples = new Samples(6,24.0);
@@ -187,7 +193,6 @@ int main ( int argc, char **argv ) {
 					//value = vlow | vhigh;
 
 					//histAll->Fill(value,channel);
-					histSng[channel]->Fill(value);
 
 					if ( value < histMin[channel] ) histMin[channel] = value;
 					if ( value > histMax[channel] ) histMax[channel] = value;
@@ -198,22 +203,23 @@ int main ( int argc, char **argv ) {
 					for ( y=0; y < 6; y++ ) {
 						samples[y]*=-1;
 					}
-				if (sum<0 && abs(sum)>5*grSigma[channel])
+				if (abs(sum)>5*grSigma[channel])
 				{
+					int sgn = sum>0?0:1;
 					mySamples->readEvent(samples,0.0);
-					myFitter[channel]->readSamples(mySamples);
-					myFitter[channel]->doFit();
-					myFitter[channel]->getFitPar(fit_par);
-					myFitter[channel]->getFitErr(fit_err);
-					chisq = myFitter[channel]->getChisq(fit_par);
-					dof = myFitter[channel]->getDOF();
-					histT0[channel]->Fill(fit_par[0]);
-					histT0_err[channel]->Fill(fit_err[0]);
-					histA[channel]->Fill(fit_par[1]);
-					histA_err[channel]->Fill(fit_err[1]);
+					myFitter[channel][sgn]->readSamples(mySamples);
+					myFitter[channel][sgn]->doFit();
+					myFitter[channel][sgn]->getFitPar(fit_par);
+					myFitter[channel][sgn]->getFitErr(fit_err);
+					chisq = myFitter[channel][sgn]->getChisq(fit_par);
+					dof = myFitter[channel][sgn]->getDOF();
+					histT0[channel][sgn]->Fill(fit_par[0]);
+					histT0_err[channel][sgn]->Fill(fit_err[0]);
+					histA[channel][sgn]->Fill(fit_par[1]);
+					histA_err[channel][sgn]->Fill(fit_err[1]);
 					chiprob = TMath::Prob(chisq,dof);
 					fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
-					histChiProb->Fill(channel,chiprob);
+					histChiProb[sgn]->Fill(channel,chiprob);
 				}
 				else
 				{
@@ -225,29 +231,32 @@ int main ( int argc, char **argv ) {
 
 	}
 
-	double grT0[640], grT0_sigma[640], grT0_err[640];
-	double grA[640], grA_sigma[640], grA_err[640];
-	for(channel = 0; channel < 640; channel++) {
-		histT0[channel]->Fit("gaus","Q0");
-		grT0[channel] = histT0[channel]->GetFunction("gaus")->GetParameter(1);
-		grT0_sigma[channel] = histT0[channel]->GetFunction("gaus")->GetParameter(2);
-		histT0_err[channel]->Fit("gaus","Q0");
-		grT0_err[channel] = histT0_err[channel]->GetFunction("gaus")->GetParameter(1);
-		histA[channel]->Fit("gaus","Q0");
-		grA[channel] = histA[channel]->GetFunction("gaus")->GetParameter(1);
-		grA_sigma[channel] = histA[channel]->GetFunction("gaus")->GetParameter(2);
-		histA_err[channel]->Fit("gaus","Q0");
-		grA_err[channel] = histA_err[channel]->GetFunction("gaus")->GetParameter(1);
-		outfile <<channel<<"\t"<<grT0[channel]<<"\t\t"<<grT0_sigma[channel]<<"\t\t"<<grT0_err[channel]<<"\t\t";
-		outfile<<grA[channel]<<"\t\t"<<grA_sigma[channel]<<"\t\t"<<grA_err[channel]<<endl;     
+	double grT0[640][2], grT0_sigma[640][2], grT0_err[640][2];
+	double grA[640][2], grA_sigma[640][2], grA_err[640][2];
+	for(channel = 0; channel < 640; channel++) for (int sgn=0;sgn<2;sgn++) {
+		histT0[channel][sgn]->Fit("gaus","Q0");
+		grT0[channel][sgn] = histT0[channel][sgn]->GetFunction("gaus")->GetParameter(1);
+		grT0_sigma[channel][sgn] = histT0[channel][sgn]->GetFunction("gaus")->GetParameter(2);
+		histT0_err[channel][sgn]->Fit("gaus","Q0");
+		grT0_err[channel][sgn] = histT0_err[channel][sgn]->GetFunction("gaus")->GetParameter(1);
+		histA[channel][sgn]->Fit("gaus","Q0");
+		grA[channel][sgn] = histA[channel][sgn]->GetFunction("gaus")->GetParameter(1);
+		grA_sigma[channel][sgn] = histA[channel][sgn]->GetFunction("gaus")->GetParameter(2);
+		histA_err[channel][sgn]->Fit("gaus","Q0");
+		grA_err[channel][sgn] = histA_err[channel][sgn]->GetFunction("gaus")->GetParameter(1);
+		outfile[sgn] <<channel<<"\t"<<grT0[channel][sgn]<<"\t\t"<<grT0_sigma[channel][sgn]<<"\t\t"<<grT0_err[channel][sgn]<<"\t\t";
+		outfile[sgn]<<-1.0*grA[channel][sgn]<<"\t\t"<<grA_sigma[channel][sgn]<<"\t\t"<<grA_err[channel][sgn]<<endl;     
 	}
 
 	c1 = new TCanvas("c1","c1",1200,900);
 	c1->SetLogz();
-	histChiProb->Draw("colz");
-	sprintf(name,"%s_chiprob.png",inname);
+	histChiProb[0]->Draw("colz");
+	sprintf(name,"%s_chiprob_pos.png",inname.Data());
 	c1->SaveAs(name);
 
+	histChiProb[1]->Draw("colz");
+	sprintf(name,"%s_chiprob_neg.png",inname.Data());
+	c1->SaveAs(name);
 	/*
 	   c2 = new TCanvas("c2","c2");
 	//c2->Divide(12,11,0.01);
@@ -280,7 +289,8 @@ int main ( int argc, char **argv ) {
 
 	// Close file
 	dataRead.close();
-	outfile.close();
+	outfile[0].close();
+	outfile[1].close();
 	return(0);
 }
 
