@@ -54,8 +54,8 @@ void Fitter::readSamples(Samples *input)
 	{
 		y[i] = input->getSample(i);
 		sigma[i] = sigma_noise;
-		useSample[i] = true;
-		//useSample[i] = (y[i]>3.0*sigma_noise);
+		//useSample[i] = true;
+		useSample[i] = (y[i]>3.0*sigma_noise);
 	}
 
 	startTime = input->getStartTime();

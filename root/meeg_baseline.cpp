@@ -121,13 +121,13 @@ int main ( int argc, char **argv ) {
 	ofstream outfile;
 	if (fit_sample==-1)
 	{
-	cout << "Writing calibration to " << inname+".calib" << endl;
-	outfile.open(inname+".calib");
+	cout << "Writing calibration to " << inname+".base" << endl;
+	outfile.open(inname+".base");
 	}
 	else
 	{
-	cout << "Writing calibration to " << inname+".calib_" <<fit_sample<< endl;
-	sprintf(name,"%s.calib_%d",inname.Data(),fit_sample);
+	cout << "Writing calibration to " << inname+".base_" <<fit_sample<< endl;
+	sprintf(name,"%s.base_%d",inname.Data(),fit_sample);
 	outfile.open(name);
 	}
 
@@ -197,9 +197,9 @@ int main ( int argc, char **argv ) {
 	histAll->GetXaxis()->SetRangeUser(hybridMin,hybridMax);
 	histAll->Draw("colz");
 	if (fit_sample==-1)
-		sprintf(name,"%s_baseline.png",inname.Data());
+		sprintf(name,"%s_base.png",inname.Data());
 	else 
-		sprintf(name,"%s_baseline_%d.png",inname.Data(),fit_sample);
+		sprintf(name,"%s_base_%d.png",inname.Data(),fit_sample);
 	c1->SaveAs(name);
 
 	/*

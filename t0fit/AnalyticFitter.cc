@@ -170,8 +170,9 @@ void AnalyticFitter::doFit()
 	int *start = (int *) calloc(nPeaks, sizeof(int));
 	int *best_start = (int *) calloc(nPeaks, sizeof(int));
 	double chisq, best_chisq;
+	status=0;
 	best_chisq = -1;
-	nSections = 2;
+	nSections = nPeaks;
 	if (nPeaks>1) for (i=2;i<2*nPeaks;i++)
 	{
 		fit_par[i] = 0;
@@ -243,8 +244,8 @@ void AnalyticFitter::mergeSections()
 
 	fit_par[0] = section_par[0];
 	fit_par[1] = section_par[1];
-	fit_err[0] = section_par[0];
-	fit_err[1] = section_par[1];
+	fit_err[0] = section_err[0];
+	fit_err[1] = section_err[1];
 
 	for (i=1;i<nSections;i++)
 	{
