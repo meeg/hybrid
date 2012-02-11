@@ -20,8 +20,9 @@
 #include <TH1F.h>
 #include <TH2F.h>
 #include <TF1.h>
+#include <TROOT.h>
 #include <TCanvas.h>
-//#include <TMultiGraph.h>
+#include <TMultiGraph.h>
 #include <TApplication.h>
 #include <TGraph.h>
 #include <TStyle.h>
@@ -36,6 +37,7 @@
 #include "AnalyticFitter.hh"
 #include "LinFitter.hh"
 #include <TMath.h>
+#include "meeg.hh"
 using namespace std;
 
 int chanMap[128];
@@ -88,12 +90,14 @@ int main ( int argc, char **argv ) {
 	TH1F *histT0_err[2][640];
 	TH1F *histA_err[2][640];
 	TH2F *histChiProb[2];
+	TH2F *histT0_2d[2];
+	TH2F *histA_2d[2];
 
 	initChan();
 
 	//gStyle->SetOptStat(kFALSE);
 	gStyle->SetPalette(1,0);
-
+	gROOT->SetStyle("Plain");
 	// Start X11 view
 	//TApplication theApp("App",NULL,NULL);
 
@@ -110,11 +114,24 @@ int main ( int argc, char **argv ) {
 	// 2d histogram
 	for (int sgn=0;sgn<2;sgn++)
 	{
-		sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
 		if (cal_grp==-1)
+		{
+			sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
 			histChiProb[sgn] = new TH2F(name,name,640,0,640,100,0,1.0);
+			sprintf(name,"T0_%s",sgn?"Neg":"Pos");
+			histT0_2d[sgn] = new TH2F(name,name,640,0,640,1000,0,6*SAMPLE_INTERVAL);
+			sprintf(name,"A_%s",sgn?"Neg":"Pos");
+			histA_2d[sgn] = new TH2F(name,name,640,0,640,1000,0,2000.0);
+		}
 		else
+		{
+			sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
 			histChiProb[sgn] = new TH2F(name,name,80,0,640,100,0,1.0);
+			sprintf(name,"T0_%s",sgn?"Neg":"Pos");
+			histT0_2d[sgn] = new TH2F(name,name,80,0,640,1000,0,3*SAMPLE_INTERVAL);
+			sprintf(name,"A_%s",sgn?"Neg":"Pos");
+			histA_2d[sgn] = new TH2F(name,name,80,0,640,1000,0,2000.0);
+		}
 	}
 
 	for (int n=0;n<(cal_grp==-1?640:80);n++) {
@@ -126,7 +143,7 @@ int main ( int argc, char **argv ) {
 		for (int sgn=0;sgn<2;sgn++)
 		{
 			sprintf(name,"T0_%s_%i",sgn?"neg":"pos",channel);
-			histT0[sgn][n] = new TH1F(name,name,1000,0,6*24.0);
+			histT0[sgn][n] = new TH1F(name,name,1000,0,3*SAMPLE_INTERVAL);
 			sprintf(name,"T0err_%s_%i",sgn?"neg":"pos",channel);
 			histT0_err[sgn][n] = new TH1F(name,name,1000,0,10.0);
 			sprintf(name,"A_%s_%i",sgn?"neg":"pos",channel);
@@ -177,31 +194,18 @@ int main ( int argc, char **argv ) {
 
 	for (int n=0;n<(cal_grp==-1?640:80);n++) for (int sgn=0;sgn<2;sgn++) {
 		channel = cal_grp==-1?n:8*n+cal_grp;
-		//printf("%d, %d, %d, %f, %f\n",sgn, n, channel, calTp[sgn][channel], calSigma[channel]);
 		myShape[sgn][n] = new ShapingCurve(calTp[sgn][channel]);
 		myFitter[sgn][n] = new AnalyticFitter(myShape[sgn][n],6,1,1.0);
 		myFitter[sgn][n]->setSigmaNoise(calSigma[channel]);
 	}
 	double temp_samples[6] = {0.0, 1.0, 2.0, 2.0, 1.0, 1.0};
-	Samples *temp_mySamples = new Samples(6,24.0);
+	Samples *temp_mySamples = new Samples(6,SAMPLE_INTERVAL);
 	temp_mySamples->readEvent(temp_samples,0.0);
-	/*
-	   myFitter[0][10]->setVerbosity(3);
-	   myFitter[0][10]->readSamples(temp_mySamples);
-	   myFitter[0][10]->doFit();
-	   myFitter[0][10]->print_fit();
-	   ShapingCurve *tempShape = new ShapingCurve(35.0);
-	   AnalyticFitter *tempFitter = new AnalyticFitter(tempShape,6,1,1.0);
-	   tempFitter->setSigmaNoise(0.1);
-	   tempFitter->setVerbosity(3);
-	   tempFitter->readSamples(temp_mySamples);
-	   tempFitter->doFit();
-	   tempFitter->print_fit();
-	   return(0);
-	   */
-	//	cout << "Writing fit status to " << inname+".fits" << endl;
-	//	ofstream fitfile;
-	//	fitfile.open(inname+".fits");
+		ofstream fitfile;
+	if (PRINT_T0_FITS) {
+		cout << "Writing fit status to " << inname+".fits" << endl;
+		fitfile.open(inname+".fits");
+	}
 
 	ofstream outfile[2];
 	cout << "Writing T0 calibration to " << inname+".t0_pos" << endl;
@@ -210,7 +214,7 @@ int main ( int argc, char **argv ) {
 	outfile[1].open(inname+".t0_neg");
 
 	double samples[6];
-	Samples *mySamples = new Samples(6,24.0);
+	Samples *mySamples = new Samples(6,SAMPLE_INTERVAL);
 	double fit_par[2], fit_err[2], chisq, chiprob;
 	int dof;
 
@@ -245,7 +249,6 @@ int main ( int argc, char **argv ) {
 					//vlow  = (value >> 1) & 0x1555;
 					//value = vlow | vhigh;
 
-					//histAll->Fill(value,channel);
 
 					if ( value < histMin[n] ) histMin[n] = value;
 					if ( value > histMax[n] ) histMax[n] = value;
@@ -260,18 +263,9 @@ int main ( int argc, char **argv ) {
 				if (abs(sum)>5*calSigma[channel])
 				{
 					int sgn = sum>0?0:1;
-			//		cout<<sum<<"\t"<<sgn<<endl;
-			//		printf("%d, %d, %d\n",sgn, n, channel);
 					mySamples->readEvent(samples,0.0);
-			//		mySamples->print();
 					myFitter[sgn][n]->readSamples(mySamples);
 					myFitter[sgn][n]->doFit();
-			//		if (sgn==1 && n==0) {
-			//			printf("meeg\n");
-			//			myFitter[1][0]->doFit();
-			//		}
-			//		myFitter[sgn][n]->print_fit();
-			//		myFitter[sgn][n]->printResiduals();
 					myFitter[sgn][n]->getFitPar(fit_par);
 					myFitter[sgn][n]->getFitErr(fit_err);
 					chisq = myFitter[sgn][n]->getChisq(fit_par);
@@ -281,7 +275,9 @@ int main ( int argc, char **argv ) {
 					histA[sgn][n]->Fill(fit_par[1]);
 					histA_err[sgn][n]->Fill(fit_err[1]);
 					chiprob = TMath::Prob(chisq,dof);
-					//cout<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
+					if (PRINT_T0_FITS) fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
+					histT0_2d[sgn]->Fill(channel,fit_par[0]);
+					histA_2d[sgn]->Fill(channel,fit_par[1]);
 					histChiProb[sgn]->Fill(channel,chiprob);
 				}
 				else
@@ -314,110 +310,89 @@ int main ( int argc, char **argv ) {
 
 	c1 = new TCanvas("c1","c1",1200,900);
 	//c1->SetLogz();
-	TGraph * graph;
+	TGraph *graph, *graph2;
 	for (int sgn=0;sgn<2;sgn++)
 	{
 		histChiProb[sgn]->Draw("colz");
 		sprintf(name,"%s_t0_chiprob_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
+		histT0_2d[sgn]->Draw("colz");
+		sprintf(name,"%s_t0_T0_hist_%s.png",inname.Data(),sgn?"neg":"pos");
+		c1->SaveAs(name);
+
 		c1->Clear();
 		graph = new TGraph(cal_grp==-1?640:80,grChan,grT0[sgn]);
 		sprintf(name,"T0_%s",sgn?"neg":"pos");
 		graph->SetTitle(name);
+		graph->GetXaxis()->SetRangeUser(0,640);
 		graph->Draw("a*");
 		sprintf(name,"%s_t0_T0_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
-		c1->Clear();
 		graph = new TGraph(cal_grp==-1?640:80,grChan,grT0_err[sgn]);
+		graph->SetName("graph");
 		sprintf(name,"T0_err_%s",sgn?"neg":"pos");
 		graph->SetTitle(name);
-		graph->Draw("a*");
-		sprintf(name,"%s_t0_T0_err_%s.png",inname.Data(),sgn?"neg":"pos");
-		c1->SaveAs(name);
+		graph->SetMarkerColor(2);
+
+		graph2 = new TGraph(cal_grp==-1?640:80,grChan,grT0_sigma[sgn]);
+		graph2->SetName("graph2");
+		sprintf(name,"T0_spread_%s",sgn?"neg":"pos");
+		graph2->SetTitle(name);
+		graph2->SetMarkerColor(4);
 
 		c1->Clear();
-		graph = new TGraph(cal_grp==-1?640:80,grChan,grT0_sigma[sgn]);
-		sprintf(name,"T0_sigma_%s",sgn?"neg":"pos");
-		graph->SetTitle(name);
 		graph->Draw("a*");
+		graph2->Draw("*");
+
+		graph->GetYaxis()->SetRangeUser(0,2.0);
+		graph->GetXaxis()->SetRangeUser(0,640);
+		c1->BuildLegend();
 		sprintf(name,"%s_t0_T0_sigma_%s.png",inname.Data(),sgn?"neg":"pos");
+		c1->SaveAs(name);
+
+		histA_2d[sgn]->Draw("colz");
+		sprintf(name,"%s_t0_A_hist_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
 		c1->Clear();
 		graph = new TGraph(cal_grp==-1?640:80,grChan,grA[sgn]);
 		sprintf(name,"A_%s",sgn?"neg":"pos");
 		graph->SetTitle(name);
+		graph->GetXaxis()->SetRangeUser(0,640);
 		graph->Draw("a*");
 		sprintf(name,"%s_t0_A_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
-		c1->Clear();
 		graph = new TGraph(cal_grp==-1?640:80,grChan,grA_err[sgn]);
+		graph->SetName("graph");
 		sprintf(name,"A_err_%s",sgn?"neg":"pos");
 		graph->SetTitle(name);
-		graph->Draw("a*");
-		sprintf(name,"%s_t0_A_err_%s.png",inname.Data(),sgn?"neg":"pos");
-		c1->SaveAs(name);
+		graph->SetMarkerColor(2);
+
+		graph2 = new TGraph(cal_grp==-1?640:80,grChan,grA_sigma[sgn]);
+		graph2->SetName("graph2");
+		sprintf(name,"A_spread_%s",sgn?"neg":"pos");
+		graph2->SetTitle(name);
+		graph2->SetMarkerColor(4);
 
 		c1->Clear();
-		graph = new TGraph(cal_grp==-1?640:80,grChan,grA_sigma[sgn]);
-		sprintf(name,"A_sigma_%s",sgn?"neg":"pos");
-		graph->SetTitle(name);
 		graph->Draw("a*");
+		graph2->Draw("*");
+		graph->GetXaxis()->SetRangeUser(0,640);
+		graph->GetYaxis()->SetRangeUser(0,50.0);
+		c1->BuildLegend();
 		sprintf(name,"%s_t0_A_sigma_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
-
 	}
-	/*
-	   c1->Clear();
-	   histA[304][0]->Draw();
-	   c1->SaveAs("histA.png");
-	   c1->Clear();
-	   histA_err[304][0]->Draw();
-	   c1->SaveAs("histA_err.png");
-	   c1->Clear();
-	   histT0[304][0]->Draw();
-	   c1->SaveAs("histT0.png");
-	   c1->Clear();
-	   histT0_err[304][0]->Draw();
-	   c1->SaveAs("histT0_err.png");
-	   */
-
-	/*
-	   c2 = new TCanvas("c2","c2");
-	//c2->Divide(12,11,0.01);
-
-	histT0[300]->Draw();
-	int base = 3 * 128;
-	*/
-	/*
-	   for(channel = base; channel < (base+128); channel++) {
-	   c2->cd((channel-base)+1);
-	//	histSng[channel]->GetXaxis()->SetRangeUser(histMin[channel],histMax[channel]);
-	//	histSng[channel]->Draw();
-	histT0[channel]->Draw();
-	}
-	*/
-	/*
-	   c4 = new TCanvas("c4","c4");
-	   c4->cd();
-	   mean = new TGraph(640,grChan,grMean);
-	   mean->Draw("a*");
-
-	   c5 = new TCanvas("c5","c5");
-	   c5->cd();
-	   sigma = new TGraph(640,grChan,grSigma);
-	   sigma->Draw("a*");
-	   */
 
 	// Start X-Windows
 	//	theApp.Run();
 
 	// Close file
 	dataRead.close();
-	//	fitfile.close();
+	if (PRINT_T0_FITS) fitfile.close();
 	outfile[0].close();
 	outfile[1].close();
 	return(0);

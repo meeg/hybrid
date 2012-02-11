@@ -20,6 +20,7 @@
 #include <TH1F.h>
 #include <TH2F.h>
 #include <TF1.h>
+#include <TROOT.h>
 #include <TCanvas.h>
 //#include <TMultiGraph.h>
 //#include <TApplication.h>
@@ -30,6 +31,7 @@
 #include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
+#include "meeg.hh"
 using namespace std;
 
 int chanMap[128];
@@ -59,8 +61,8 @@ int main ( int argc, char **argv ) {
 	TH1F            *histSng[640];
 	double          histMin[640];
 	double          histMax[640];
-	int hybridMin, hybridMax;
-	//TGraph          *mean;
+	uint hybridMin, hybridMax;
+	TGraph          *graph;
 	//TGraph          *sigma;
 	double          grChan[640];
 	double          grMean[640];
@@ -80,6 +82,7 @@ int main ( int argc, char **argv ) {
 
 	//gStyle->SetOptStat(kFALSE);
 	gStyle->SetPalette(1,0);
+	gROOT->SetStyle("Plain");
 
 	// Start X11 view
 	//   TApplication theApp("App",NULL,NULL);
@@ -121,14 +124,14 @@ int main ( int argc, char **argv ) {
 	ofstream outfile;
 	if (fit_sample==-1)
 	{
-	cout << "Writing calibration to " << inname+".base" << endl;
-	outfile.open(inname+".base");
+		cout << "Writing calibration to " << inname+".base" << endl;
+		outfile.open(inname+".base");
 	}
 	else
 	{
-	cout << "Writing calibration to " << inname+".base_" <<fit_sample<< endl;
-	sprintf(name,"%s.base_%d",inname.Data(),fit_sample);
-	outfile.open(name);
+		cout << "Writing calibration to " << inname+".base_" <<fit_sample<< endl;
+		sprintf(name,"%s.base_%d",inname.Data(),fit_sample);
+		outfile.open(name);
 	}
 
 	// Process each event
@@ -176,16 +179,16 @@ int main ( int argc, char **argv ) {
 
 	for(channel = 0; channel < 640; channel++) {
 		/*
-		if (histSng[channel]->Fit("gaus","Q0")==0) {
-			grMean[channel]  = histSng[channel]->GetFunction("gaus")->GetParameter(1);
-			grSigma[channel] = histSng[channel]->GetFunction("gaus")->GetParameter(2);
-		}
-		else {
-			cout << "Could not fit channel " << channel << endl;
-			grMean[channel]  = 0;
-			grSigma[channel] = 1;
-		}
-		*/
+		   if (histSng[channel]->Fit("gaus","Q0")==0) {
+		   grMean[channel]  = histSng[channel]->GetFunction("gaus")->GetParameter(1);
+		   grSigma[channel] = histSng[channel]->GetFunction("gaus")->GetParameter(2);
+		   }
+		   else {
+		   cout << "Could not fit channel " << channel << endl;
+		   grMean[channel]  = 0;
+		   grSigma[channel] = 1;
+		   }
+		   */
 		grMean[channel]  = histSng[channel]->GetMean();
 		grSigma[channel]  = histSng[channel]->GetRMS();
 		grChan[channel]  = channel;
@@ -202,28 +205,27 @@ int main ( int argc, char **argv ) {
 		sprintf(name,"%s_base_%d.png",inname.Data(),fit_sample);
 	c1->SaveAs(name);
 
-	/*
-	   c2 = new TCanvas("c2","c2");
-	   c2->Divide(12,11,0.01);
+	c1->Clear();
+	graph = new TGraph(640,grChan,grMean);
+	graph->SetTitle("base_pedestal");
+	graph->GetXaxis()->SetRangeUser(0,640);
+	graph->Draw("a*");
+	if (fit_sample==-1)
+		sprintf(name,"%s_base_pedestal.png",inname.Data());
+	else 
+		sprintf(name,"%s_base_pedestal_%d.png",inname.Data(),fit_sample);
+	c1->SaveAs(name);
 
-	   int base = 3 * 128;
-
-	   for(channel = base; channel < (base+128); channel++) {
-	   c2->cd((channel-base)+1);
-	   histSng[channel]->GetXaxis()->SetRangeUser(histMin[channel],histMax[channel]);
-	   histSng[channel]->Draw();
-	   }
-
-	   c4 = new TCanvas("c4","c4");
-	   c4->cd();
-	   mean = new TGraph(640,grChan,grMean);
-	   mean->Draw("a*");
-
-	   c5 = new TCanvas("c5","c5");
-	   c5->cd();
-	   sigma = new TGraph(640,grChan,grSigma);
-	   sigma->Draw("a*");
-	   */
+	c1->Clear();
+	graph = new TGraph(640,grChan,grSigma);
+	graph->SetTitle("base_noise");
+	graph->GetXaxis()->SetRangeUser(0,640);
+	graph->Draw("a*");
+	if (fit_sample==-1)
+		sprintf(name,"%s_base_noise.png",inname.Data());
+	else 
+		sprintf(name,"%s_base_noise_%d.png",inname.Data(),fit_sample);
+	c1->SaveAs(name);
 
 	// Start X-Windows
 	//theApp.Run();
@@ -232,5 +234,5 @@ int main ( int argc, char **argv ) {
 	dataRead.close();
 	outfile.close();
 	return(0);
-}
+	}
 
