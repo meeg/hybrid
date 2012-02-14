@@ -37,8 +37,10 @@
 #include "AnalyticFitter.hh"
 #include "LinFitter.hh"
 #include <TMath.h>
-#include "meeg.hh"
+#include <unistd.h>
 using namespace std;
+
+#define SAMPLE_INTERVAL 25.0
 
 int chanMap[128];
 
@@ -62,6 +64,9 @@ int convChan ( int chan ) {
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
+	int c;
+	bool print_fit_status = false;
+	int cal_grp = -1;
 	TCanvas         *c1;
 	//TH2F            *histAll;
 	double          histMin[640];
@@ -93,6 +98,28 @@ int main ( int argc, char **argv ) {
 	TH2F *histT0_2d[2];
 	TH2F *histA_2d[2];
 
+	while ((c = getopt(argc,argv,"hfg:")) !=-1)
+		switch (c)
+		{
+			case 'h':
+				printf("-h: print this help\n");
+				printf("-f: print fit status to .fits\n");
+				printf("-g: force use of specified cal group\n");
+				return(0);
+				break;
+			case 'f':
+				print_fit_status = true;
+				break;
+			case 'g':
+				cal_grp = atoi(optarg);
+				break;
+			case '?':
+				printf("Invalid option or missing option argument; -h to list options\n");
+				return(1);
+			default:
+				abort();
+		}
+
 	initChan();
 
 	//gStyle->SetOptStat(kFALSE);
@@ -102,14 +129,24 @@ int main ( int argc, char **argv ) {
 	//TApplication theApp("App",NULL,NULL);
 
 	// Root file is the first and only arg
-	if ( argc != 4 && argc != 5 ) {
-		cout << "Usage: meeg_t0res data_file baseline_cal tp_cal [cal_group]\n";
+	if ( argc-optind!=3 ) {
+		cout << "Usage: meeg_t0res data_file baseline_cal tp_cal\n";
 		return(1);
 	}
 
-	int cal_grp = -1;
-	if (argc==5)
-		cal_grp=atoi(argv[4]);
+	// Attempt to open data file
+	if ( ! dataRead.open(argv[optind]) ) return(2);
+
+	dataRead.next(&event);
+	dataRead.dumpConfig();
+	dataRead.dumpStatus();
+
+	if (cal_grp==-1)
+	{
+		cal_grp = atoi(dataRead.getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
+		cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
+	}
+
 
 	// 2d histogram
 	for (int sgn=0;sgn<2;sgn++)
@@ -153,10 +190,8 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
-	// Attempt to open data file
-	if ( ! dataRead.open(argv[1]) ) return(2);
 
-	TString inname=argv[1];
+	TString inname=argv[optind];
 
 	inname.ReplaceAll(".bin","");
 	if (inname.Contains('/')) {
@@ -166,7 +201,7 @@ int main ( int argc, char **argv ) {
 
 	for (int sgn=0;sgn<2;sgn++)
 	{
-		sprintf(name,"%s_%s",argv[3],sgn?"neg":"pos");
+		sprintf(name,"%s_%s",argv[optind+2],sgn?"neg":"pos");
 		cout << "Reading Tp calibration from "<<name<<endl;
 		calfile.open(name);
 		while (!calfile.eof()) {
@@ -180,8 +215,8 @@ int main ( int argc, char **argv ) {
 		calfile.close();
 	}
 
-	cout << "Reading baseline calibration from " << argv[2] << endl;
-	calfile.open(argv[2]);
+	cout << "Reading baseline calibration from " << argv[optind+1] << endl;
+	calfile.open(argv[optind+1]);
 	while (!calfile.eof()) {
 		calfile >> channel;
 		calfile >> calMean[channel];
@@ -202,7 +237,7 @@ int main ( int argc, char **argv ) {
 	Samples *temp_mySamples = new Samples(6,SAMPLE_INTERVAL);
 	temp_mySamples->readEvent(temp_samples,0.0);
 		ofstream fitfile;
-	if (PRINT_T0_FITS) {
+	if (print_fit_status) {
 		cout << "Writing fit status to " << inname+".fits" << endl;
 		fitfile.open(inname+".fits");
 	}
@@ -222,8 +257,7 @@ int main ( int argc, char **argv ) {
 	// Process each event
 	eventCount = 0;
 
-	while ( dataRead.next(&event) ) {
-
+	do {
 		for (x=0; x < event.count(); x++) {
 
 			// Get sample
@@ -275,7 +309,7 @@ int main ( int argc, char **argv ) {
 					histA[sgn][n]->Fill(fit_par[1]);
 					histA_err[sgn][n]->Fill(fit_err[1]);
 					chiprob = TMath::Prob(chisq,dof);
-					if (PRINT_T0_FITS) fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
+					if (print_fit_status) fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
 					histT0_2d[sgn]->Fill(channel,fit_par[0]);
 					histA_2d[sgn]->Fill(channel,fit_par[1]);
 					histChiProb[sgn]->Fill(channel,chiprob);
@@ -288,7 +322,7 @@ int main ( int argc, char **argv ) {
 		}
 		eventCount++;
 
-	}
+	} while ( dataRead.next(&event) );
 
 	double grT0[2][640], grT0_sigma[2][640], grT0_err[2][640];
 	double grA[2][640], grA_sigma[2][640], grA_err[2][640];
@@ -392,7 +426,7 @@ int main ( int argc, char **argv ) {
 
 	// Close file
 	dataRead.close();
-	if (PRINT_T0_FITS) fitfile.close();
+	if (print_fit_status) fitfile.close();
 	outfile[0].close();
 	outfile[1].close();
 	return(0);

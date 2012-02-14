@@ -31,7 +31,7 @@
 #include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
-#include "meeg.hh"
+#include <unistd.h>
 using namespace std;
 
 int chanMap[128];
@@ -56,6 +56,8 @@ int convChan ( int chan ) {
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
+	int c;
+	int fit_sample = -1;
 	TCanvas         *c1;
 	TH2F            *histAll;
 	TH1F            *histSng[640];
@@ -78,6 +80,24 @@ int main ( int argc, char **argv ) {
 	double          avg;
 	char            name[100];
 
+	while ((c = getopt(argc,argv,"hs:")) !=-1)
+		switch (c)
+		{
+			case 'h':
+				printf("-h: print this help\n");
+				printf("-s: only read specified sample\n");
+				return(0);
+				break;
+			case 's':
+				fit_sample = atoi(optarg);
+				break;
+			case '?':
+				printf("Invalid option or missing option argument; -h to list options\n");
+				return(1);
+			default:
+				abort();
+		}
+
 	initChan();
 
 	//gStyle->SetOptStat(kFALSE);
@@ -88,15 +108,10 @@ int main ( int argc, char **argv ) {
 	//   TApplication theApp("App",NULL,NULL);
 
 	// Root file is the first and only arg
-	if ( argc != 2 && argc != 3 ) {
-		cout << "Usage: meeg_baseline data_file [sample #]\n";
+	if ( argc-optind != 1 ) {
+		cout << "Usage: meeg_baseline data_file\n";
 		return(1);
 	}
-
-
-	int fit_sample = -1;
-	if (argc==3)
-		fit_sample=atoi(argv[2]);
 
 
 	// 2d histogram
@@ -113,9 +128,9 @@ int main ( int argc, char **argv ) {
 	}
 
 	// Attempt to open data file
-	if ( ! dataRead.open(argv[1]) ) return(2);
+	if ( ! dataRead.open(argv[optind]) ) return(2);
 
-	TString inname=argv[1];
+	TString inname=argv[optind];
 
 	inname.ReplaceAll(".bin","");
 	if (inname.Contains('/')) {
