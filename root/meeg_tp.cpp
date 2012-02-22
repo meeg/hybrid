@@ -32,8 +32,11 @@
 #include <Data.h>
 #include <DataRead.h>
 #include <TMath.h>
+#include <TMultiGraph.h>
 #include <TGraphErrors.h>
 #include <unistd.h>
+#include "meeg_utils.hh"
+
 using namespace std;
 
 #define SAMPLE_INTERVAL 25.0
@@ -57,49 +60,6 @@ int convChan ( int chan ) {
 }
 */
 
-void plotResults(char *name, char *filename, int n, double *x, double *y, TCanvas *canvas)
-{
-	int grpN[8]={0};
-	double grpX[8][640];
-	double grpY[8][640];
-	double min, max;
-	min=y[0];
-	max=y[0];
-	TGraph *graph[8];
-	int k;
-	char nameN[100];
-	for (int i = 0; i<n;i++)
-	{
-		k=((int)floor(x[i]+0.5))%8;
-		grpX[k][grpN[k]]=x[i];
-		grpY[k][grpN[k]]=y[i];
-		if (y[i]<min) min=y[i];
-		if (y[i]>max) max=y[i];
-		grpN[k]++;
-	}
-	canvas->Clear();
-	for (int i=0;i<8;i++)
-	{
-		graph[i] = new TGraph(grpN[i],grpX[i],grpY[i]);
-		sprintf(nameN,"%s_%d",name,i);
-		graph[i]->SetTitle(nameN);
-		graph[i]->SetName(nameN);
-		graph[i]->SetMarkerColor(i+1);
-		if (i==0)
-		{
-			graph[i]->SetName(name);
-			graph[i]->Draw("a*");
-			graph[i]->GetXaxis()->SetRangeUser(0,640);
-			graph[i]->GetYaxis()->SetRangeUser(min,max);
-		}
-		else graph[i]->Draw("*");
-	}
-	canvas->SaveAs(filename);
-	for (int i=0;i<8;i++)
-	{
-		delete graph[i];
-	}
-}
 
 // Process the data
 // Pass root file to open as first and only arg.
@@ -108,6 +68,8 @@ int main ( int argc, char **argv ) {
 	bool plot_tp_fits = false;
 	bool plot_fit_results = false;
 	bool force_cal_grp = false;
+	bool use_baseline_cal = false;
+	ifstream calfile;
 	TString inname = "";
 	int cal_grp = -1;
 	int cal_delay = 0;
@@ -140,8 +102,10 @@ int main ( int argc, char **argv ) {
 	double grA[2][640];
 	double grT0[2][640];
 	double grChisq[2][640];
+	double          calMean[640] = {0.0};
+	double          calSigma[640] = {1.0};
 
-	while ((c = getopt(argc,argv,"hfrgo:")) !=-1)
+	while ((c = getopt(argc,argv,"hfrg:o:b:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -150,6 +114,7 @@ int main ( int argc, char **argv ) {
 				printf("-g: force use of specified cal group\n");
 				printf("-r: plot fit results\n");
 				printf("-o: use specified output filename\n");
+				printf("-b: use specified baseline cal file\n");
 				return(0);
 				break;
 			case 'f':
@@ -165,6 +130,17 @@ int main ( int argc, char **argv ) {
 			case 'o':
 				inname = optarg;
 				break;
+			case 'b':
+				use_baseline_cal = true;
+				cout << "Reading baseline calibration from " << optarg << endl;
+				calfile.open(optarg);
+				while (!calfile.eof()) {
+					calfile >> channel;
+					calfile >> calMean[channel];
+					calfile >> calSigma[channel];
+				}
+				calfile.close();
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
@@ -175,7 +151,7 @@ int main ( int argc, char **argv ) {
 
 	//initChan();
 
-	//gStyle->SetOptStat(kFALSE);
+	gStyle->SetOptStat("nemrou");
 	gStyle->SetPalette(1,0);
 	gROOT->SetStyle("Plain");
 
@@ -189,11 +165,14 @@ int main ( int argc, char **argv ) {
 	}
 
 
-	if (inname == "") inname=argv[optind];
+	if (inname == "")
+	{
+		inname=argv[optind];
 
-	inname.ReplaceAll(".bin","");
-	if (inname.Contains('/')) {
-		inname.Remove(0,inname.Last('/')+1);
+		inname.ReplaceAll(".bin","");
+		if (inname.Contains('/')) {
+			inname.Remove(0,inname.Last('/')+1);
+		}
 	}
 
 	ofstream tpfile[2];
@@ -224,6 +203,8 @@ int main ( int argc, char **argv ) {
 		dataRead.next(&event);
 		dataRead.dumpConfig();
 		//dataRead.dumpStatus();
+		//for (uint i=0;i<4;i++)
+		//	printf("Temperature #%d: %f\n",i,event.temperature(i));
 
 		if (!force_cal_grp)
 		{
@@ -315,8 +296,9 @@ int main ( int argc, char **argv ) {
 
 	double chanNoise[2][640]={{0.0}};
 	double chanChan[640];
-	TH1S *histSamples1D = new TH1S("h1","h1",16384,-0.5,16383.5);
+	//TH1S *histSamples1D = new TH1S("h1","h1",16384,-0.5,16383.5);
 	TH2S *histSamples;
+	double A, T0, Tp, A0;
 
 	for (int i=0;i<640;i++) chanChan[i] = i;
 
@@ -324,14 +306,27 @@ int main ( int argc, char **argv ) {
 		ni=0;
 		for (int i=0;i<48;i++) if (allSamples[sgn][channel][i]!=NULL) 
 		{
-			histSamples1D->Reset();
+			int nsamples = 0;
+			double rms;
+			doStats(16384, histMin[channel], histMax[channel], allSamples[sgn][channel][i], nsamples, yi[ni], rms);
+			ey[ni] = rms/sqrt((double)nsamples);
+			chanNoise[sgn][channel]+=rms;
+
+			//printf("array: %f, %f, %f\n",yi[ni], sqrt(meansq-mean*mean), ey[ni]);
+
+			/*
+			   histSamples1D->Reset();
+			//printf("TH!: %f, %f\n", histSamples1D->GetEntries(),(histSamples1D->GetRMS()*histSamples1D->GetRMS()-yi[ni]*yi[ni]));
 			for (int j=histMin[channel];j<=histMax[channel];j++)
 			{
-				histSamples1D->Fill(j,allSamples[sgn][channel][i][j]);
+			histSamples1D->SetBinContent(j+1,allSamples[sgn][channel][i][j]);
 			}
 			chanNoise[sgn][channel]+=histSamples1D->GetRMS();
 			yi[ni]  = histSamples1D->GetMean();
 			ey[ni]  = histSamples1D->GetRMS()/sqrt(histSamples1D->GetEntries());
+			printf("TH!: %f, %f, %f\n",yi[ni], histSamples1D->GetRMS(), ey[ni]);
+			*/
+
 			ti[ni] = (i-8)*delay_step;
 			ni++;
 			//if (histSamples1D->Fit("gaus","Q0")==0) {
@@ -346,12 +341,7 @@ int main ( int argc, char **argv ) {
 		}
 		if (ni==0) continue;
 		chanNoise[sgn][channel]/=ni;
-		shapefile[sgn]<<channel<<"\t"<<ni;
-		for (int i=0;i<ni;i++)
-		{
-			shapefile[sgn]<<"\t"<<ti[i]<<"\t"<<yi[i]<<"\t"<<ey[i];
-		}
-		shapefile[sgn]<<endl;
+
 		if (plot_tp_fits)
 		{
 			sprintf(name,"samples_%s_%i",sgn?"neg":"pos",channel);
@@ -374,16 +364,23 @@ int main ( int argc, char **argv ) {
 		else shapingFunction->SetParameter(0,TMath::MinElement(ni,yi)-yi[0]);
 		shapingFunction->SetParameter(1,12.0);
 		shapingFunction->SetParameter(2,50.0);
-		shapingFunction->SetParameter(3,yi[0]);
+		if (use_baseline_cal) shapingFunction->FixParameter(3,calMean[channel]);
+		else shapingFunction->FixParameter(3,yi[0]);
 		if (ni>0)
 		{
-			if (fitcurve->Fit(shapingFunction,plot_tp_fits?"Q":"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
+			if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
 			{
+				fitcurve->Fit(shapingFunction,"Q0","",grT0[sgn][nChan[sgn]]+10.0,5*SAMPLE_INTERVAL);
+				//shapingFunction->ReleaseParameter(3);
 				grChan[sgn][nChan[sgn]]=channel;
-				grA[sgn][nChan[sgn]]=shapingFunction->GetParameter(0);
+				A = shapingFunction->GetParameter(0);
+				T0 = shapingFunction->GetParameter(1);
+				Tp = shapingFunction->GetParameter(2);
+				A0 = shapingFunction->GetParameter(3);
+				grA[sgn][nChan[sgn]]=A;
 				if (sgn==1) grA[sgn][nChan[sgn]]*=-1;
-				grT0[sgn][nChan[sgn]]=shapingFunction->GetParameter(1);
-				grTp[sgn][nChan[sgn]]=shapingFunction->GetParameter(2);
+				grT0[sgn][nChan[sgn]]=T0;
+				grTp[sgn][nChan[sgn]]=Tp;
 				grChisq[sgn][nChan[sgn]]=shapingFunction->GetChisquare();
 				nChan[sgn]++;
 			}
@@ -394,11 +391,20 @@ int main ( int argc, char **argv ) {
 		}
 		if (plot_tp_fits)
 		{
+			shapingFunction->SetRange(-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+			shapingFunction->Draw("LSAME");
 			sprintf(name,"%s_tp_%s_%i.png",inname.Data(),sgn?"neg":"pos",channel);
 			c1->SaveAs(name);
 			delete histSamples;
 		}
 		delete fitcurve;
+
+		shapefile[sgn]<<channel<<"\t"<<ni;
+		for (int i=0;i<ni;i++)
+		{
+			shapefile[sgn]<<"\t"<<ti[i]-T0<<"\t"<<(yi[i]-A0)/A<<"\t"<<ey[i]/A;
+		}
+		shapefile[sgn]<<endl;
 	}
 	for (int sgn=0;sgn<2;sgn++)
 	{

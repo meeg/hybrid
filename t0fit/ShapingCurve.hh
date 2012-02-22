@@ -9,10 +9,10 @@ class ShapingCurve
 	protected:
 		double shapingTime;
 	public:
-		double getHeight(double time); //normalized so peak height = 1
-		double getSlope(double time); //used for fitting
-		double getPeak(); //used for fitting
-		double getSignal(double time, int n, double *par);
+		virtual double getHeight(double time); //normalized so peak height = 1
+		virtual double getSlope(double time); //used for fitting
+		virtual double getPeak(); //used for fitting
+		virtual double getSignal(double time, int n, double *par);
 };
 
 #endif

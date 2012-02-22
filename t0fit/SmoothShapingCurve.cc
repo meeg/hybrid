@@ -1,6 +1,7 @@
 #include "SmoothShapingCurve.hh"
 
 #include <math.h>
+#include <TMath.h>
 
 
 SmoothShapingCurve::SmoothShapingCurve(double sTime) : ShapingCurve(sTime)
@@ -14,6 +15,11 @@ SmoothShapingCurve::SmoothShapingCurve(double sTime) : ShapingCurve(sTime)
 		y[i] = templateCurve->getHeight(0.1*sTime*(i-20));
 	}
 	theSpline = new TSpline3("curve",x,y,100,"");
+}
+
+SmoothShapingCurve::SmoothShapingCurve(int ni, double *ti, double *yi) : ShapingCurve(ti[TMath::LocMax(ni, yi)])
+{
+	theSpline = new TSpline3("curve", ti, yi, ni, "b1e1", 0.0, 0.0);
 }
 
 SmoothShapingCurve::~SmoothShapingCurve()
