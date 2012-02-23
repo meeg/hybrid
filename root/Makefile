@@ -1,5 +1,5 @@
 # Variables
-CFLAGS  := -g -Wall `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I. -pg
+CFLAGS  := -g -Wall `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I.
 LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lgsl -lgslcblas
 CC      := g++
 BIN     := $(PWD)/../bin
