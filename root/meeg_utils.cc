@@ -35,6 +35,12 @@ void doStats(int n, int nmin, int nmax, int *y, int &count, double &center, doub
 			mean += i*y[i];
 			meansq += pow(i,2)*y[i];
 		}
+	if (count==0)
+	{
+		center = 0;
+		spread = 0;
+		return;
+	}
 	mean /= count;
 	meansq /= count;
 	spread = sqrt(meansq-mean*mean);

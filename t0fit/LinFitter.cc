@@ -336,19 +336,21 @@ void LinFitter::doGridFit()
 	min = (double *) calloc(nPeaks, sizeof(double));
 	max = (double *) calloc(nPeaks, sizeof(double));
 	int i,j,k;
-	double chisq, best_chisq;
+	double chisq, best_chisq, last_chisq;
 	for (i=0;i<nPeaks;i++)
 	{
 		min[i] = -96.0;
 		max[i] = 120.0;
 	}
 
+	best_chisq=-1;
 	for (j=0;j<7;j++)
 	{
 		for (i=0;i<nPeaks;i++)
 		{
 			guess_t[i] = max[i];
 		}
+		last_chisq = best_chisq;
 		best_chisq = -1;
 		if (verbose>2)
 		{
@@ -378,13 +380,14 @@ void LinFitter::doGridFit()
 		}
 		if (verbose>2)
 		{
-			printf("Best chisq %lf, times:",best_chisq);
+			printf("Step %d: Best chisq %lf, improvement %f, times:",j,best_chisq,last_chisq-best_chisq);
 			for (i=0;i<nPeaks;i++)
 			{
 				printf("\t%lf",fit_t[i]);
 			}
 			printf("\n");
 		}
+		if (last_chisq!=-1 && last_chisq!=best_chisq && last_chisq-best_chisq<0.01) break;
 		/*
 		if (nPeaks>1)
 		{

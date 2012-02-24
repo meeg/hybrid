@@ -102,8 +102,8 @@ int main ( int argc, char **argv ) {
 	double grA[2][640];
 	double grT0[2][640];
 	double grChisq[2][640];
-	double          calMean[640] = {0.0};
-	double          calSigma[640] = {1.0};
+	double          calMean[640][7] = {{0.0}};
+	double          calSigma[640][7] = {{1.0}};
 
 	while ((c = getopt(argc,argv,"hfrg:o:b:")) !=-1)
 		switch (c)
@@ -136,8 +136,11 @@ int main ( int argc, char **argv ) {
 				calfile.open(optarg);
 				while (!calfile.eof()) {
 					calfile >> channel;
-					calfile >> calMean[channel];
-					calfile >> calSigma[channel];
+					for (int i=0;i<7;i++)
+					{
+						calfile >> calMean[channel][i];
+						calfile >> calSigma[channel][i];
+					}
 				}
 				calfile.close();
 				break;
@@ -151,9 +154,10 @@ int main ( int argc, char **argv ) {
 
 	//initChan();
 
-	gStyle->SetOptStat("nemrou");
-	gStyle->SetPalette(1,0);
 	gROOT->SetStyle("Plain");
+	//gStyle->SetOptStat("nemrou");
+	gStyle->SetOptStat(0);
+	gStyle->SetPalette(1,0);
 
 	// Start X11 view
 	//TApplication theApp("App",NULL,NULL);
@@ -268,7 +272,8 @@ int main ( int argc, char **argv ) {
 						sum+=value;
 					}
 					sum-=6*sample->value(0);
-					int sgn = sum>0?0:1;
+					//int sgn = sum>0?0:1;
+					int sgn = eventCount%2;
 					for ( y=0; y < 6; y++ ) {
 						if (allSamples[sgn][channel][8*y+8-cal_delay]==NULL)
 						{
@@ -309,6 +314,10 @@ int main ( int argc, char **argv ) {
 			int nsamples = 0;
 			double rms;
 			doStats(16384, histMin[channel], histMax[channel], allSamples[sgn][channel][i], nsamples, yi[ni], rms);
+			//if (use_baseline_cal && channel==256 && sgn==0) printf("%f, ",yi[ni]);
+			if (use_baseline_cal) yi[ni] -= calMean[channel][i/8];
+
+			//if (use_baseline_cal && channel==256 && sgn==0) printf("%f, %f\n",yi[ni],calMean[channel][i/8]);
 			ey[ni] = rms/sqrt((double)nsamples);
 			chanNoise[sgn][channel]+=rms;
 
@@ -345,17 +354,29 @@ int main ( int argc, char **argv ) {
 		if (plot_tp_fits)
 		{
 			sprintf(name,"samples_%s_%i",sgn?"neg":"pos",channel);
-			histSamples = new TH2S(name,name,48,-8.5*delay_step,39.5*delay_step,16384,-0.5,16383.5);
+			sprintf(name2,"APV25 pulse shape, channel %d, %s pulses;Time [ns];Amplitude [ADC counts]",channel,sgn?"negative":"positive");
+			if (use_baseline_cal)
+				histSamples = new TH2S(name,name2,48,-8.5*delay_step,39.5*delay_step,16384,-0.5-calMean[channel][6],16383.5-calMean[channel][6]);
+			else 
+				histSamples = new TH2S(name,name2,48,-8.5*delay_step,39.5*delay_step,16384,-0.5,16383.5);
 			c1->Clear();
 			for (int i=0;i<48;i++) if (allSamples[sgn][channel][i]!=NULL) 
 			{
 				for (int j=histMin[channel];j<=histMax[channel];j++)
 				{
-					histSamples->Fill((i-8)*delay_step,j,allSamples[sgn][channel][i][j]);
+					if (use_baseline_cal)
+						histSamples->Fill((i-8)*delay_step,j-calMean[channel][i/8],allSamples[sgn][channel][i][j]);
+					else
+						histSamples->Fill((i-8)*delay_step,j,allSamples[sgn][channel][i][j]);
 				}
 			}
-			histSamples->GetYaxis()->SetRangeUser(histMin[channel],histMax[channel]);
+			if (use_baseline_cal)
+				histSamples->GetYaxis()->SetRangeUser(histMin[channel]-calMean[channel][6],histMax[channel]-calMean[channel][6]);
+			else
+				histSamples->GetYaxis()->SetRangeUser(histMin[channel],histMax[channel]);
 			histSamples->Draw("colz");
+			histSamples->GetYaxis()->SetTitleOffset(1.4);
+			c1->SetLeftMargin(0.15);
 		}
 
 		fitcurve = new TGraphErrors(ni,ti,yi,NULL,ey);
@@ -364,13 +385,14 @@ int main ( int argc, char **argv ) {
 		else shapingFunction->SetParameter(0,TMath::MinElement(ni,yi)-yi[0]);
 		shapingFunction->SetParameter(1,12.0);
 		shapingFunction->SetParameter(2,50.0);
-		if (use_baseline_cal) shapingFunction->FixParameter(3,calMean[channel]);
-		else shapingFunction->FixParameter(3,yi[0]);
+		//if (use_baseline_cal) shapingFunction->FixParameter(3,calMean[channel][6]);
+		shapingFunction->FixParameter(3,yi[0]);
 		if (ni>0)
 		{
 			if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
 			{
-				fitcurve->Fit(shapingFunction,"Q0","",grT0[sgn][nChan[sgn]]+10.0,5*SAMPLE_INTERVAL);
+				if (ni>6)
+					fitcurve->Fit(shapingFunction,"Q0","",grT0[sgn][nChan[sgn]]+20.0,5*SAMPLE_INTERVAL);
 				//shapingFunction->ReleaseParameter(3);
 				grChan[sgn][nChan[sgn]]=channel;
 				A = shapingFunction->GetParameter(0);
@@ -415,24 +437,31 @@ int main ( int argc, char **argv ) {
 		for (int i=0;i<640;i++) noisefile[sgn]<<i<<"\t"<<chanNoise[sgn][i]<<endl;
 	}
 
+	gStyle->SetOptStat("nemrou");
+	c1->UseCurrentStyle();
 	if (plot_fit_results) for (int sgn=0;sgn<2;sgn++)
 	{
+		c1->SetLogy(0);
 		sprintf(name,"A_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_tp_A_%s.png",inname.Data(),sgn?"neg":"pos");
 		plotResults(name, name2, nChan[sgn], grChan[sgn], grA[sgn], c1);
 
+		c1->SetLogy(0);
 		sprintf(name,"T0_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_tp_T0_%s.png",inname.Data(),sgn?"neg":"pos");
 		plotResults(name, name2, nChan[sgn], grChan[sgn], grT0[sgn], c1);
 
+		c1->SetLogy(0);
 		sprintf(name,"Tp_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_tp_Tp_%s.png",inname.Data(),sgn?"neg":"pos");
 		plotResults(name, name2, nChan[sgn], grChan[sgn], grTp[sgn], c1);
 
+		c1->SetLogy(1);
 		sprintf(name,"Chisq_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_tp_Chisq_%s.png",inname.Data(),sgn?"neg":"pos");
 		plotResults(name, name2, nChan[sgn], grChan[sgn], grChisq[sgn], c1);
 
+		c1->SetLogy(0);
 		sprintf(name,"Noise_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_tp_Noise_%s.png",inname.Data(),sgn?"neg":"pos");
 		plotResults(name, name2, 640, chanChan, chanNoise[sgn], c1);

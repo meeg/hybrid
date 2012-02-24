@@ -41,6 +41,7 @@
 #include <TMath.h>
 #include "meeg_utils.hh"
 #include <unistd.h>
+#include <TMVA/TSpline1.h>
 using namespace std;
 
 #define SAMPLE_INTERVAL 25.0
@@ -73,6 +74,8 @@ int main ( int argc, char **argv ) {
 	bool ignore_cal_grp = false;
 	bool use_shape = false;
 	bool shift_t0 = false;
+	bool use_dist = false;
+	double dist_window;
 	int single_channel = -1;
 	TString inname = "";
 	int cal_grp = -1;
@@ -88,8 +91,8 @@ int main ( int argc, char **argv ) {
 	double          grChan[2][640];
 	double grT0[2][640], grT0_sigma[2][640], grT0_err[2][640];
 	double grA[2][640], grA_sigma[2][640], grA_err[2][640];
-	double          calMean[640] = {0.0};
-	double          calSigma[640] = {1.0};
+	double          calMean[640][7] = {{0.0}};
+	double          calSigma[640][7] = {{1.0}};
 	double calTp[2][640] = {{0.0}};
 	double calA[2][640] = {{0.0}};
 	double calT0[2][640] = {{0.0}};
@@ -122,9 +125,11 @@ int main ( int argc, char **argv ) {
 	int minA[2] = {16384, 16384};
 	double maxT0[2] = {0.0, 0.0};
 	double minT0[2] = {0.0, 0.0};
+	TGraph *T0_dist[2];
+	double T0_dist_b[2],T0_dist_m[2];
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:")) !=-1)
+	while ((c = getopt(argc,argv,"hfsg:o:auc:d:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -136,6 +141,7 @@ int main ( int argc, char **argv ) {
 				printf("-o: use specified output filename\n");
 				printf("-s: shift T0 by value from Tp cal file\n");
 				printf("-u: use .shape cal instead of .tp\n");
+				printf("-d: read and use .dist file, starting T0 window at specified value\n");
 				return(0);
 				break;
 			case 'f':
@@ -160,6 +166,10 @@ int main ( int argc, char **argv ) {
 			case 'o':
 				inname = optarg;
 				break;
+			case 'd':
+				dist_window = atof(optarg);
+				use_dist=true;
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
@@ -169,9 +179,11 @@ int main ( int argc, char **argv ) {
 
 	initChan();
 
-	gStyle->SetOptStat("nemrou");
-	gStyle->SetPalette(1,0);
 	gROOT->SetStyle("Plain");
+	gStyle->SetOptStat("emrou");
+	gStyle->SetPalette(1,0);
+	gStyle->SetStatW(0.2);                
+	gStyle->SetStatH(0.1);                
 	c1 = new TCanvas("c1","c1",1200,900);
 	//c1->SetLogz();
 	// Start X11 view
@@ -188,13 +200,17 @@ int main ( int argc, char **argv ) {
 	calfile.open(argv[optind]);
 	while (!calfile.eof()) {
 		calfile >> channel;
-		calfile >> calMean[channel];
-		calfile >> calSigma[channel];
+		for (int i=0;i<7;i++)
+		{
+			calfile >> calMean[channel][i];
+			calfile >> calSigma[channel][i];
+		}
 	}
 	calfile.close();
 
 	optind++;
 	for (int sgn=0;sgn<2;sgn++)
+	{
 		if (use_shape)
 		{
 			int ni;
@@ -233,8 +249,7 @@ int main ( int argc, char **argv ) {
 				ni+=j+1;
 
 				myShape[sgn][channel] = new SmoothShapingCurve(ni,ti,yi);
-				myFitter[sgn][channel] = new LinFitter(myShape[sgn][channel],6,1,1.0);
-				myFitter[sgn][channel]->setSigmaNoise(calSigma[channel]);
+				myFitter[sgn][channel] = new LinFitter(myShape[sgn][channel],6,1,TMath::Mean(6,calSigma[channel]));
 
 
 				if (single_channel!=-1 && channel==single_channel)
@@ -264,10 +279,50 @@ int main ( int argc, char **argv ) {
 				//myShape[sgn][channel] = new SmoothShapingCurve(calTp[sgn][channel]);
 				//myFitter[sgn][channel] = new LinFitter(myShape[sgn][channel],6,1,calSigma[channel]);
 				myShape[sgn][channel] = new ShapingCurve(calTp[sgn][channel]);
-				myFitter[sgn][channel] = new AnalyticFitter(myShape[sgn][channel],6,1,calSigma[channel]);
+				myFitter[sgn][channel] = new AnalyticFitter(myShape[sgn][channel],6,1,TMath::Mean(6,calSigma[channel]));
 			}
 			calfile.close();
 		}
+
+		if (use_dist)
+		{
+			int ni = 0;
+			double ti[500], integral[500], amplitude[500];
+			sprintf(name,"%s.dist_%s",argv[optind],sgn?"neg":"pos");
+			cout << "Reading T0-A calibration from "<<name<<endl;
+			/*
+			   ti[0] = -100.0;
+			   integral[0] = -100.0;
+			   amplitude[0] = 0.0;
+			   ni++;
+			   */
+			calfile.open(name);
+			while (!calfile.eof()) {
+				calfile >> ti[ni];
+				calfile >> amplitude[ni];
+				calfile >> integral[ni];
+				ni++;
+			}
+			ni--;
+			calfile.close();
+			/*
+			   ti[ni] = ti[ni-1]+100.0;
+			   integral[ni] = integral[ni-1]*2;
+			   amplitude[ni] = 0.0;
+			   ni++;
+			   */
+			//sprintf(name,"T0_dist_%s",sgn?"neg":"pos");
+			//T0_dist[sgn] = new TSpline3(name,ti,integral,ni);
+			T0_dist[sgn] = new TGraph(ni,ti,integral);
+			T0_dist_m[sgn] = SAMPLE_INTERVAL/(T0_dist[sgn]->Eval(dist_window+SAMPLE_INTERVAL) - T0_dist[sgn]->Eval(dist_window));
+			T0_dist_b[sgn] = dist_window - T0_dist[sgn]->Eval(dist_window)*T0_dist_m[sgn];
+
+			c1->Clear();
+			T0_dist[sgn]->Draw("al");
+			sprintf(name,"T0_dist_%s.png",sgn?"neg":"pos");
+			c1->SaveAs(name);
+		}
+	}
 	optind++;
 
 
@@ -346,6 +401,12 @@ int main ( int argc, char **argv ) {
 	cout << "Writing pulse shape to " << inname+".shape_neg" << endl;
 	outshapefile[1].open(inname+".shape_neg");
 
+	ofstream outdistfile[2];
+	cout << "Writing T0 and A distribution to " << inname+".dist_pos" << endl;
+	outdistfile[0].open(inname+".dist_pos");
+	cout << "Writing T0 and A distribution to " << inname+".dist_neg" << endl;
+	outdistfile[1].open(inname+".dist_neg");
+
 	double samples[6];
 	Samples *mySamples = new Samples(6,SAMPLE_INTERVAL);
 	double fit_par[2], fit_err[2], chisq, chiprob;
@@ -413,11 +474,11 @@ int main ( int argc, char **argv ) {
 						if ( value < histMin[n] ) histMin[n] = value;
 						if ( value > histMax[n] ) histMax[n] = value;
 						samples[y] = value;
-						samples[y] -= calMean[channel];
+						samples[y] -= calMean[channel][y];
 						//samples[y] -= sample->value(0);
 						sum+=samples[y];
-						if (samples[y]>5*calSigma[channel]) samplesAbove++;
-						if (samples[y]<-5*calSigma[channel]) samplesBelow++;
+						if (samples[y]>5*calSigma[channel][y]) samplesAbove++;
+						if (samples[y]<-5*calSigma[channel][y]) samplesBelow++;
 					}
 					if (sum<0)
 						for ( y=0; y < 6; y++ ) {
@@ -433,6 +494,17 @@ int main ( int argc, char **argv ) {
 						myFitter[sgn][n]->getFitErr(fit_err);
 						chisq = myFitter[sgn][n]->getChisq(fit_par);
 						dof = myFitter[sgn][n]->getDOF();
+
+						if (use_dist)
+						{
+							if (fit_par[0]>dist_window && fit_par[0]<dist_window+SAMPLE_INTERVAL)
+							{
+								fit_par[0] = T0_dist_m[sgn]*T0_dist[sgn]->Eval(fit_par[0]) + T0_dist_b[sgn];
+							}
+							else continue;
+						}
+
+
 						histT0[sgn][n]->Fill(fit_par[0]);
 						histT0_err[sgn][n]->Fill(fit_err[0]);
 						histA[sgn][n]->Fill(fit_par[1]);
@@ -564,19 +636,43 @@ int main ( int argc, char **argv ) {
 		   */
 
 		T0_A[sgn]->GetYaxis()->SetRangeUser(minA[sgn],maxA[sgn]);
-		T0_A[sgn]->GetXaxis()->SetRangeUser(minT0[sgn],maxT0[sgn]);
+		T0_A[sgn]->GetXaxis()->SetRangeUser(minT0[sgn]-5.0,maxT0[sgn]+5.0);
 		T0_A[sgn]->Draw("colz");
 		sprintf(name,"%s_t0_T0_A_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
+
+		tempArray = new int[T0_A[sgn]->GetNbinsY()];
+		int count_integral = 0;
+		for (int i=0;i<T0_A[sgn]->GetNbinsX();i++)
+		{
+			for (int j=0;j<T0_A[sgn]->GetNbinsY();j++) tempArray[j] = T0_A[sgn]->GetBinContent(i+1,j+1);
+
+			doStats(T0_A[sgn]->GetNbinsY(),0,T0_A[sgn]->GetNbinsY()-1,tempArray,count,center,spread);
+			count_integral+=count;
+			if (count>0)
+			{
+				outdistfile[sgn] << T0_A[sgn]->GetXaxis()->GetBinCenter(1)+i*T0_A[sgn]->GetXaxis()->GetBinWidth(1) << "\t";
+				outdistfile[sgn] << T0_A[sgn]->GetYaxis()->GetBinCenter(1)+center*T0_A[sgn]->GetYaxis()->GetBinWidth(1) << "\t";
+				outdistfile[sgn] << count_integral << "\t";
+				outdistfile[sgn] << endl;
+			}
+		}
+		outdistfile[sgn].close();
+
+
+
+
 
 		histChiProb[sgn]->Draw("colz");
 		sprintf(name,"%s_t0_chiprob_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
+		histT0_2d[sgn]->GetYaxis()->SetRangeUser(minT0[sgn]-5.0,maxT0[sgn]+5.0);
 		histT0_2d[sgn]->Draw("colz");
 		sprintf(name,"%s_t0_T0_hist_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
+		histA_2d[sgn]->GetYaxis()->SetRangeUser(minA[sgn],maxA[sgn]);
 		histA_2d[sgn]->Draw("colz");
 		sprintf(name,"%s_t0_A_hist_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
