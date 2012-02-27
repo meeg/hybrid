@@ -14,9 +14,9 @@
 // 04/12/2011: created
 //----------------------------------------------------------------------------
 #include <UdpLink.h>
-#include <PgpLink.h>
-#include <Tracker.h>
-#include <CodaServer.h>
+#include <TrackerLink.h>
+#include <TrackerFull.h>
+#include <ControlServer.h>
 #include <Device.h>
 #include <iomanip>
 #include <fstream>
@@ -34,11 +34,11 @@ void sigTerm (int) {
 }
 
 int main (int argc, char **argv) {
-   PgpLink       pgpLink; 
-   UdpLink       udpLink; 
+   //UdpLink       udpLink; 
+   TrackerLink   udpLink; 
    CommLink      commLink; 
-   Tracker       *tracker;
-   CodaServer    cntrlServer;
+   TrackerFull   *tracker;
+   ControlServer cntrlServer;
    string        xmlTest;
    int           pid;
 
@@ -48,28 +48,22 @@ int main (int argc, char **argv) {
 
    try {
 
-      if ( argc > 1 ) {
-
-         // Create and setup PGP link
-         tracker = new Tracker(&commLink);
-         commLink.setDebug(true);
-         commLink.open();
-         cout << "Using debug interface" << endl;
-
-      } else {
-
-         tracker = new Tracker(&udpLink);
-         udpLink.setMaxRxTx(500000);
-         udpLink.setDebug(true);
-         udpLink.open(8192,1,"192.168.0.16");
-         udpLink.openDataNet("127.0.0.1",8099);
-         usleep(100);
-         cout << "Using UDP interface" << endl;
-      }
+      tracker = new TrackerFull(&udpLink);
+      udpLink.setMaxRxTx(500000);
+      udpLink.setDebug(true);
+      udpLink.open(8192,8,"192.168.1.23",
+                          "192.168.1.16",
+                          "192.168.1.17",
+                          "192.168.1.18",
+                          "192.168.1.19",
+                          "192.168.1.20",
+                          "192.168.1.21",
+                          "192.168.1.22");
+      usleep(100);
+      cout << "Using UDP interface" << endl;
 
       // Setup control server
-      cntrlServer.setDebug(true);
-      cntrlServer.setupCommLink(&udpLink);
+      //cntrlServer.setDebug(true);
       cntrlServer.startListen(8093);
       cntrlServer.setSystem(tracker);
 

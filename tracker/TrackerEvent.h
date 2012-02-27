@@ -12,24 +12,37 @@
 //-----------------------------------------------------------------------------
 // Modification history :
 // 08/26/2011: created
+// 02/14/2012: Updates to match FPGA. Added hooks for future TI frames.
 //----------------------------------------------------------------------------
 // Description :
 // Event Container
 // Event Data consists of the following: Z[xx:xx] = Zeros
 //    Frame Size = 1 x 32-bits (32-bit dwords)
 //    Header = 8 x 32-bits
-//       Header[0] = Z[19:0], SampleSize[3:0], Revision[7:0]
-//       Header[1] = FpgaAddress[31:0]
-//       Header[2] = Sequence[31:0]
-//       Header[3] = TriggerCode[31:0]
-//       Header[4] = TempB[15:0], TempA[15:0]
-//       Header[5] = TempD[15:0], TempC[15:0]
-//       Header[6] = Z[31:0]
-//       Header[7] = Z[31:0]
+//       Header[0] = T[0], Z[14:0], FpgaAddress[15:0] - T = 1 For TI FPGA
+//       Header[1] = Sequence[31:0]
+//
+//    The rest of the event header depends on the T flag, For T = 0:
+//
+//       Header[2] = TempB[15:0], TempA[15:0]
+//       Header[3] = TempD[15:0], TempC[15:0]
+//       Header[4] = TempF[15:0], TempE[15:0]
+//       Header[5] = TempH[15:0], TempG[15:0]
+//       Header[6] = TempJ[15:0], TempI[15:0]
+//       Header[7] = TempL[15:0], TempK[15:0]
 //
 //       Samples... (See TrackerSample.h)
 //
-//   Tail = 1 x 32-bits
+//    For T = 1:
+//
+//       Header[2] = TBD, Waiting for clarification from JLAB
+//       Header[3] = TBD, Waiting for clarification from JLAB
+//       Header[4] = TBD, Waiting for clarification from JLAB
+//       Header[5] = TBD, Waiting for clarification from JLAB
+//       Header[6] = TBD, Waiting for clarification from JLAB
+//       Header[7] = TBD, Waiting for clarification from JLAB
+//
+//    Tail = 1 x 32-bits
 //       Should be zero
 //-----------------------------------------------------------------------------
 // Copyright (c) 2011 by SLAC. All rights reserved.
@@ -90,11 +103,8 @@ class TrackerEvent : public Data {
       //! Deconstructor
       ~TrackerEvent ();
 
-      //! Get sample size value from header.
-      /*!
-       * Returns sample size.
-      */
-      uint sampleSize ( );
+      //! Is frame TI frame?
+      bool isTiFrame ( );
 
       //! Get FpgaAddress value from header.
       /*!
@@ -108,16 +118,16 @@ class TrackerEvent : public Data {
       */
       uint sequence ( );
 
-      //! Get trigger value from header.
+      //! Get trigger block from header.
       /*!
-       * Returns trigger value
+       * Returns trigger block
       */
-      uint trigger ( );
+      uint * tiData ( );
 
       //! Get temperature values from header.
       /*!
        * Returns temperature value.
-       * \param index temperature index, 0-3.
+       * \param index temperature index, 0-11.
       */
       double temperature ( uint index );
 

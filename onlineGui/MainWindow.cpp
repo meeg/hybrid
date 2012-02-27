@@ -63,6 +63,8 @@ class ColorMap: public QwtLinearColorMap {
 MainWindow::MainWindow ( QWidget *parent ) : QWidget (parent) {
    this->setWindowTitle("Tracker Online");
    dCount_ = 0;
+   fpga_   = 0;
+   hybrid_ = 0;
 
    QVBoxLayout *top = new QVBoxLayout;
    this->setLayout(top);
@@ -125,6 +127,32 @@ MainWindow::MainWindow ( QWidget *parent ) : QWidget (parent) {
    countBox_ = new QLineEdit("0 Events");
    countBox_->setReadOnly(true);
    hbox->addWidget(countBox_);
+
+   hbox->addWidget(new QLabel("Fpga Select:"));
+   fpgaSelect_ = new QSpinBox();
+   fpgaSelect_->setMinimum(0);
+   fpgaSelect_->setMaximum(7);
+   connect(fpgaSelect_,SIGNAL(valueChanged(int)),this,SLOT(clearPressed())); 
+   hbox->addWidget(fpgaSelect_);
+
+   hbox->addWidget(new QLabel("Hybrid Select:"));
+   hybridSelect_ = new QSpinBox();
+   hybridSelect_->setMinimum(0);
+   hybridSelect_->setMaximum(3);
+   connect(hybridSelect_,SIGNAL(valueChanged(int)),this,SLOT(clearPressed())); 
+   hbox->addWidget(hybridSelect_);
+
+   autoEnable_ = new QCheckBox("Auto Z");
+   autoEnable_->setChecked(true);
+   connect(autoEnable_,SIGNAL(stateChanged(int)),this,SLOT(reDraw())); 
+   hbox->addWidget(autoEnable_);
+   
+   hbox->addWidget(new QLabel("Z Max:"));
+   maxCount_ = new QSpinBox();
+   maxCount_->setMinimum(1);
+   maxCount_->setMaximum(10000);
+   connect(maxCount_,SIGNAL(valueChanged(int)),this,SLOT(reDraw())); 
+   hbox->addWidget(maxCount_);
 
    QPushButton *btn = new QPushButton("Reset Plot");
    connect(btn,SIGNAL(pressed()),this,SLOT(clearPressed())); 
@@ -216,15 +244,20 @@ void MainWindow::rxData (uint size, uint *data) {
    dCount_++;
 
    for (x=0; x < event_.count(); x++) {
+      if ( fpga_ == event_.fpgaAddress() ) {
 
-      // Get sample
-      sample  = event_.sample(x);
-      channel = (sample->apv() * 128) + sample->channel();
+         // Get sample
+         sample  = event_.sample(x);
 
-      // Get sub samples
-      for (y=0; y < 6; y++) {
-         value = sample->value(y);
-         data_.fill(value,channel);
+         if ( hybrid_ == sample->hybrid() ) {
+            channel = (sample->apv() * 128) + (127-sample->channel());
+
+            // Get sub samples
+            for (y=0; y < 6; y++) {
+               value = sample->value(y);
+               data_.fill(value,channel);
+            }
+         }
       }
    }
 }
@@ -232,18 +265,25 @@ void MainWindow::rxData (uint size, uint *data) {
 void MainWindow::clearPressed() {
    data_.init();
    dCount_ = 0;
-   plot_->setAxisScale(QwtPlot::yLeft,0,(128*5-1));   
-   plot_->setAxisScale(QwtPlot::xBottom,0,16383);
-   plot_->updateAxes();
+   fpga_   = fpgaSelect_->value();
+   hybrid_ = hybridSelect_->value();
+   //plot_->setAxisScale(QwtPlot::yLeft,0,(128*5-1));   
+   //plot_->setAxisScale(QwtPlot::xBottom,0,16383);
+   //plot_->updateAxes();
    reDraw();
 }
 
 void MainWindow::reDraw() {
    QString count;
 
-   const QwtInterval zInterval = hist_->data()->interval( Qt::ZAxis );
+   if ( autoEnable_->isChecked() ) data_.setMax(0);
+   else data_.setMax(maxCount_->value());
+
+   QwtInterval zInterval = hist_->data()->interval( Qt::ZAxis );
+
    QwtScaleWidget *rightAxis = plot_->axisWidget( QwtPlot::yRight );
    rightAxis->setColorMap( zInterval, new ColorMap() );
+
    plot_->setAxisScale( QwtPlot::yRight, zInterval.minValue(), zInterval.maxValue() );
    plot_->replot();
 

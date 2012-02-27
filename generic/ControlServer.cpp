@@ -21,13 +21,22 @@ using namespace std;
 ControlServer::ControlServer ( ) {
    debug_      = false;
    servFd_     = -1;
-   connFd_     = -1;
    port_       = 0;
    system_     = NULL;
 
-   rxData_.str("");
+   for ( uint x=0; x < MaxClients_; x++ ) {
+      connFd_[x] = -1;
+      rxData_[x].str("");
+   }
    bzero((char *) &servAddr_,sizeof(servAddr_));
    bzero((char *) &connAddr_,sizeof(connAddr_));
+
+   // Attempt to open and init shared memory
+   if ( (smemFd_ = controlCmdOpenAndMap ( &smem_ )) < 0 ) 
+      throw string("ControlServer::ControlServer -> Failed to open shared memory");
+
+   // Init shared memory
+   controlCmdInit(smem_);
 }
 
 // DeConstructor
@@ -75,10 +84,13 @@ void ControlServer::startListen ( int port ) {
 
 // Close tcpip listen socket
 void ControlServer::stopListen ( ) {
+   uint x;
 
-   if ( connFd_ >= 0 ) close(connFd_);
+   for ( x=0; x < MaxClients_; x++ ) {
+      if ( connFd_[x] >= 0 ) close(connFd_[x]);
+      connFd_[x] = -1;
+   }
    if ( servFd_ >= 0 ) close(servFd_);
-   connFd_ = -1;
    servFd_ = -1;
 
    // Debug
@@ -96,7 +108,8 @@ void ControlServer::receive ( uint timeout ) {
    char           buffer[9001];
    int            ret;
    stringstream   msg;
-   int            x;
+   uint           x;
+   int            y;
    string         pmsg;
 
    // Setup for listen call
@@ -105,11 +118,13 @@ void ControlServer::receive ( uint timeout ) {
       FD_SET(servFd_,&fdset);
       if ( servFd_ > maxFd ) maxFd = servFd_;
    }
-   if ( connFd_ >= 0 ) {
-      FD_SET(connFd_,&fdset);
-      if ( connFd_ > maxFd ) maxFd = connFd_;
+   for ( x=0; x < MaxClients_; x++ ) {
+      if ( connFd_[x] >= 0 ) {
+         FD_SET(connFd_[x],&fdset);
+         if ( connFd_[x] > maxFd ) maxFd = connFd_[x];
+      }
+      else rxData_[x].str("");
    }
-   else rxData_.str("");
 
    // Call select
    tval.tv_sec  = 0;
@@ -129,58 +144,80 @@ void ControlServer::receive ( uint timeout ) {
             cout << "ControlServer::receive -> Failed to accept on socket" << endl;
       } else {
 
-         // Client already connected
-         if ( connFd_ >= 0 ) {
+         // Find empty client
+         for ( x=0; x < MaxClients_; x++ ) {
+            if ( connFd_[x] == -1 ) break;
+         }
+
+         // Out of clients
+         if ( x == MaxClients_ ) {
             if ( debug_ ) cout << "ControlServer::receive -> Rejected connection" << endl;
             close(newFd);
          }
          else {
             if ( debug_ ) cout << "ControlServer::receive -> Accepted new connection" << endl;
-            connFd_ = newFd;
+            connFd_[x] = newFd;
 
             msg.str("");
             msg << system_->structureString(false);
             msg << "\f";
-            write(connFd_,msg.str().c_str(),msg.str().length());
+            write(connFd_[x],msg.str().c_str(),msg.str().length());
+            msg.str("");
+            msg << "<system>" << endl;
+            msg << system_->configString(false);
+            msg << system_->statusString(false);
+            msg << "</system>" << endl;
+            msg << "\f";
+            write(connFd_[x],msg.str().c_str(),msg.str().length());
          }
       }
    }
 
    // client socket is ready
-   if ( ret > 0 && connFd_ >= 0 && FD_ISSET(connFd_,&fdset) ) {
+   for ( x=0; x < MaxClients_; x++ ) {
+      if ( ret > 0 && connFd_[x] >= 0 && FD_ISSET(connFd_[x],&fdset) ) {
 
-      // Read data
-      ret = read(connFd_,buffer,9000);
+         // Read data
+         ret = read(connFd_[x],buffer,9000);
 
-      // Connection is lost
-      if ( ret <= 0 ) {
-         if ( debug_ ) cout << "ControlServer::receive -> Closing connection" << endl;
+         // Connection is lost
+         if ( ret <= 0 ) {
+            if ( debug_ ) cout << "ControlServer::receive -> Closing connection" << endl;
 
-         // Reset
-         rxData_.str("");
+            // Reset
+            rxData_[x].str("");
 
-         // Close socket
-         close(connFd_);
-         connFd_ = -1;
-      }
-
-      // Process each byte
-      for (x=0; x<ret; x++) {
-         if ( buffer[x] == '\f' || buffer[x] == 0x4 ) {
-
-            // Send to top level
-            if ( system_ != NULL ) {
-               if ( debug_ ) {
-                  cout << "ControlServer::receive -> Processing message: " << endl;
-                  cout << rxData_.str() << endl;
-               }
-               system_->parseXmlString (rxData_.str()); 
-               if ( debug_ ) cout << "ControlServer::receive -> Done Processing message" << endl;
-            }
-            rxData_.str("");
+            // Close socket
+            close(connFd_[x]);
+            connFd_[x] = -1;
          }
-         else rxData_ << buffer[x];
+
+         // Process each byte
+         for (y=0; y<ret; y++) {
+            if ( buffer[y] == '\f' || buffer[y] == 0x4 ) {
+
+               // Send to top level
+               if ( system_ != NULL ) {
+                  if ( debug_ ) {
+                     cout << "ControlServer::receive -> Processing message: " << endl;
+                     cout << rxData_[x].str() << endl;
+                  }
+                  system_->parseXmlString (rxData_[x].str()); 
+                  if ( debug_ ) cout << "ControlServer::receive -> Done Processing message" << endl;
+               }
+               rxData_[x].str("");
+            }
+            else rxData_[x] << buffer[y];
+         }
       }
+   }
+
+   // Shared memory commands
+   if ( controlCmdPending(smem_) ) {
+      if ( debug_ ) cout << "ControlServer::receive -> Processing shared memory message: " << endl;
+      system_->parseXmlString(controlCmdBuffer(smem_));
+      controlCmdAck(smem_);
+      if ( debug_ ) cout << "CodaServer::receive -> Done Processing shared memory message: " << endl;
    }
 
    // Poll
@@ -191,7 +228,10 @@ void ControlServer::receive ( uint timeout ) {
       msg.str("");
       msg << pmsg;
       msg << "\f";
-      write(connFd_,msg.str().c_str(),msg.str().length());
+
+      for ( x=0; x < MaxClients_; x++ ) {
+         if ( connFd_[x] >= 0 ) write(connFd_[x],msg.str().c_str(),msg.str().length());
+      }
    }
 }
 

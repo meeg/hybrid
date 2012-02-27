@@ -37,6 +37,7 @@ int UdpLink::udpRx (uint *idx, uint *buffer, uint size, uint *vc, uint *err ) {
    int             ret;
    uint            udpAddrLength;
    unsigned char   qbuffer[9000];
+   uint            *quint;
    bool            rSof;
    bool            rEof;
    uint            udpx;
@@ -55,7 +56,7 @@ int UdpLink::udpRx (uint *idx, uint *buffer, uint size, uint *vc, uint *err ) {
       if ( rcount == 0 ) {
 
          // Attempt each host
-         for (*idx=0; *idx < udpCount_; *idx++) {
+         for ((*idx)=0; (*idx) < udpCount_; (*idx)++) {
             if ( udpFd_[*idx] > 0 ) 
                ret = recvfrom(udpFd_[*idx],&qbuffer,9000,0,(struct sockaddr *)(&(udpAddr_[*idx])),&udpAddrLength);
             if ( ret > 0 ) break;
@@ -82,22 +83,27 @@ int UdpLink::udpRx (uint *idx, uint *buffer, uint size, uint *vc, uint *err ) {
             udpcnt += (qbuffer[udpx]     ) & 0xFF;
             udpcnt -= 1;
             udpx++;
-
+/*
+            cout << "Got Frame."
+                 << " idx=" << dec << *idx
+                 << " SOF=" << dec << rSof
+                 << " EOF=" << dec << rEof
+                 << " vc=" << dec << *vc
+                 << " udpCnt=" << dec << udpcnt << endl;
+*/
             // Bad size
             if ( udpcnt > 4001 ) break;
 
-            // Copy payload
-            for ( x=0; x < udpcnt; x = x+2 ) {
-               buffer[rcount]  = (qbuffer[udpx] << 24) & 0xFF000000;
-               udpx++;
-               buffer[rcount] += (qbuffer[udpx] << 16) & 0x00FF0000;
-               udpx++;
-               buffer[rcount] += (qbuffer[udpx] <<  8) & 0x0000FF00;
-               udpx++;
-               buffer[rcount] += (qbuffer[udpx]      ) & 0x000000FF;
-               udpx++;
+            // Setup integer pointer
+            quint = (uint *)(&(qbuffer[udpx]));
+
+            // Copy payload integer by integer
+            for ( x=0; x < (udpcnt/2); x++ ) {
+               buffer[rcount] = ntohl(quint[x]);
                rcount++;
             }
+            udpx += (udpcnt*2);
+
          }
       }
       else {
@@ -116,35 +122,46 @@ int UdpLink::udpRx (uint *idx, uint *buffer, uint size, uint *vc, uint *err ) {
 // UDP transmitter
 int UdpLink::udpTx (uint idx, uint *buffer, uint size, uint vc ) {
    unsigned char byteData[9000];
-   uint          i,y;
+   uint          x;
    int           ret;
    uint          usize;
+   uint          *uintData;
+   uint          txcnt;
+   uint          tsize;
 
-   if ( (size*4) > 9000 ) return(0);
    if ( idx >= udpCount_ ) return(0);
-   usize = size * 2;
 
-   // Setup header
-   byteData[0]  = 0xC0; // SOF & EOF
-   byteData[0] += (vc << 4) & 0x30;
-   byteData[0] += (usize >> 8) & 0xF;
-   byteData[1]  = usize & 0xFF;
+   txcnt = 0;
+   while ( txcnt < size ) {
 
-   // Setup payload
-   y = 2;
-   for (i=0; i < size; i++) {
-      byteData[y] = (buffer[i] >> 24 ) & 0xFF;
-      y++;
-      byteData[y] = (buffer[i] >> 16 ) & 0xFF;
-      y++;
-      byteData[y] = (buffer[i] >>  8 ) & 0xFF;
-      y++;
-      byteData[y] = (buffer[i]       ) & 0xFF;
-      y++;
+      if ( ((size-txcnt) * 4) > 8000 ) {
+         usize = 4000;
+         tsize = 2000;
+      }
+      else {
+         usize = (size-txcnt) * 2;
+         tsize = (size-txcnt);
+      }
+
+      // Setup header
+      byteData[0]  = 0;
+      if ( txcnt == 0 ) byteData[0] |= 0x80; // SOF
+      if ( (txcnt + tsize) >= size ) byteData[0] |= 0x40; // EOF
+      byteData[0] += (vc << 4) & 0x30;
+      byteData[0] += (usize >> 8) & 0xF;
+      byteData[1]  = usize & 0xFF;
+
+      // Setup integer pointer
+      uintData = (uint *)(&(byteData[2]));
+
+      // Copy payload integer by integer
+      for ( x=0; x < tsize; x++ ) uintData[x] = htonl(buffer[txcnt+x]);
+
+      if (udpFd_[idx] > 0 ) 
+         ret = sendto(udpFd_[idx],byteData,(tsize*4)+2,0,(struct sockaddr *)(&(udpAddr_[idx])),sizeof(struct sockaddr_in));
+
+      txcnt += tsize;
    }
-
-   if (udpFd_[idx] > 0 ) 
-      ret = sendto(udpFd_[idx],byteData,y,0,(struct sockaddr *)(&(udpAddr_[idx])),sizeof(struct sockaddr_in));
    return(ret);
 }
 
@@ -231,8 +248,8 @@ void UdpLink::ioHandler() {
                        << " Word0 Got 0x" << hex << rxBuff_[0]
                        << " Word1 Exp 0x" << hex << txBuff_[1]
                        << " Word1 Got 0x" << hex << rxBuff_[1]
-                       << " ExpSize=" << regReqEntry_->size()
-                       << " GotSize=" << (rxRet-3) 
+                       << " ExpSize=" << dec << regReqEntry_->size()
+                       << " GotSize=" << dec << (rxRet-3) 
                        << " DataMaskRx=0x" << hex << rxMask
                        << " DataMask=0x" << hex << dataMask_ << endl;
                }
@@ -256,7 +273,8 @@ void UdpLink::ioHandler() {
 
          // Read is always small
          else {
-            txBuff_[2]  = regReqEntry_->size()-1;
+            txBuff_[2]  = (regReqEntry_->size()-1) & 0x3FF;
+            txBuff_[2] |= (txBuff_[2] << 16);
             txBuff_[3]  = 0;
          }
  
@@ -264,7 +282,7 @@ void UdpLink::ioHandler() {
          txVc   = (regReqEntry_->address()>>24) & 0xF;
 
          // Send data
-         txRet = udpTx(regReqDest_,txBuff_, 4, txVc);
+         txRet = udpTx(regReqDest_,txBuff_, (regReqWrite_)?regReqEntry_->size()+3:4, txVc);
          if ( txRet > 0 ) txPend = true;
 
          // Match request count
@@ -285,7 +303,7 @@ void UdpLink::ioHandler() {
          cmdVc   = (cmdReqEntry_->opCode()>>8)  & 0xF;
 
          // Send data
-         cmdRet = udpTx(regReqDest_,cmdBuff, 4, cmdVc);
+         cmdRet = udpTx(cmdReqDest_,cmdBuff, 4, cmdVc);
 
          // Match request count
          lastCmdCnt = cmdReqCnt_;
@@ -306,7 +324,7 @@ void UdpLink::ioHandler() {
          runVc   = (runReqEntry_->opCode()>>8)  & 0xF;
 
          // Send data
-         runRet = udpTx(regReqDest_,runBuff, 4, runVc);
+         runRet = udpTx(runReqDest_,runBuff, 4, runVc);
 
          // Match request count
          lastRunCnt = runReqCnt_;

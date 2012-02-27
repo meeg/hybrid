@@ -1,4 +1,3 @@
-//-----------------------------------------------------------------------------
 // File          : CommLink.cpp
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 04/12/2011
@@ -35,6 +34,14 @@ void * CommLink::ioRun ( void *t ) {
    pthread_exit(NULL);
 }
 
+// RX Thread
+void * CommLink::rxRun ( void *t ) {
+   CommLink *ti;
+   ti = (CommLink *)t;
+   ti->rxHandler();
+   pthread_exit(NULL);
+}
+
 // Data Thread
 void * CommLink::dataRun ( void *t ) {
    CommLink *ti;
@@ -65,8 +72,10 @@ void CommLink::ioHandler() {
       if ( lastRunCnt != runReqCnt_ ) lastRunCnt = runReqCnt_;
       usleep(1);
    }
-   pthread_exit(NULL);
 }
+
+// Dummy RX routine
+void CommLink::rxHandler() { }
 
 // Data routine
 void CommLink::dataHandler() {
@@ -137,6 +146,7 @@ void CommLink::dataHandler() {
             dataFileCount_++;
          }
          dataRxCount_++;
+         delete dat;
 
          // Debug once a second
          if ( debug_ ) {
@@ -148,11 +158,9 @@ void CommLink::dataHandler() {
                ltime = ctime;
             }
          }
-         delete dat;
       }
       else usleep(1);
    }
-   pthread_exit(NULL);
 }
 
 // Constructor
@@ -215,6 +223,14 @@ void CommLink::open () {
       throw(err.str());
    }
 
+   // Start rx thread
+   if ( pthread_create(&rxThread_,NULL,rxRun,this) ) {
+      err << "CommLink::open -> Failed to create rxThread" << endl;
+      if ( debug_ ) cout << err.str();
+      close();
+      throw(err.str());
+   }
+
    // Start data thread
    if ( pthread_create(&dataThread_,NULL,dataRun,this) ) {
       err << "CommLink::open -> Failed to create dataThread" << endl;
@@ -233,7 +249,7 @@ void CommLink::close () {
    // Stop the thread
    runEnable_ = false;
 
-   usleep(100);
+   usleep(1000);
 
    // Wait for thread to stop
    //pthread_join(ioThread_, NULL);

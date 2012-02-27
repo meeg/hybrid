@@ -14,7 +14,7 @@
 gui.setRunParameters("100Hz",4000);
 gui.setRunWait(1000);
 
-var pre = "13";
+var pre = "00";
 print("Starting Calibration. Base=" + pre);
 
 // Before run callback
@@ -32,13 +32,13 @@ gui.run = function () {
    if ( gui.iter() == 8 ) {
       gui.setValue("cntrlFpga:hybrid:apv25:CalibInhibit","True");
       gui.setValue("cntrlFpga:hybrid:apv25:CalGroup","0");
-      gui.openFile("data/" + pre + "_baseline.bin");
+      gui.openFile("../data/" + pre + "_baseline.bin");
       print("Running baseline");
    }
    else {
       gui.setValue("cntrlFpga:hybrid:apv25:CalibInhibit","False");
       gui.setValue("cntrlFpga:hybrid:apv25:CalGroup",gui.iter());
-      gui.openFile("data/" + pre + "_cal_" + gui.iter() + ".bin");
+      gui.openFile("../data/" + pre + "_cal_" + gui.iter() + ".bin");
       print("Running cal. Group: " + gui.iter());
    }
 

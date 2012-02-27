@@ -19,6 +19,7 @@
 #include <Register.h>
 #include <Variable.h>
 #include <Command.h>
+#include <string.h>
 #include <sstream>
 #include <iostream>
 #include <string>
@@ -43,6 +44,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("Apv25Reset",      0x01000004));
    addRegister(new Register("ApvSyncStatus",   0x01000008));
    addRegister(new Register("ApvHardReset",    0x01000009));
+   addRegister(new Register("TholdEnable",     0x0100000A));
    addRegister(new Register("ApvTrigGenPause", 0x0100000B));
    addRegister(new Register("ApvTrigSrcType",  0x0100000C));
    addRegister(new Register("ClockSelect",     0x0100000E));
@@ -65,6 +67,26 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("InputDelayO",     0x0100002e));
    addRegister(new Register("FrameDelayA",     0x01000030));
    addRegister(new Register("FrameDelayB",     0x01000031));
+   addRegister(new Register("AdcClkDelay",     0x01000032));
+
+   addRegister(new Register("ThresholdA",      0x01200000, 640)); // Hybrid 0
+   addRegister(new Register("ThresholdB",      0x01200400, 640)); // Hybrid 1
+   addRegister(new Register("ThresholdC",      0x01200800, 640)); // Hybrid 2
+
+   // Init thresholds for testing. Will result in sample 3,4,5 matching
+   // for channels 126 & 127
+   for (uint fpga=0; fpga < Threshold::FpgaCount; fpga++) {
+      for (uint hyb=0; hyb < Threshold::HybridCount; hyb++) {
+         for (uint apv=0; apv < Threshold::ApvCount; apv++) {
+            for (uint chan=0; chan < Threshold::ChanCount; chan++) {
+               thold_.threshData[fpga][hyb][apv][chan] = 0x0000037d;
+            }
+         }
+      }
+   }
+   memcpy(registers_["ThresholdA"]->data(),thold_.threshData[index][0],640*4);
+   memcpy(registers_["ThresholdB"]->data(),thold_.threshData[index][1],640*4);
+   memcpy(registers_["ThresholdC"]->data(),thold_.threshData[index][2],640*4);
 
    // Setup variables
    addVariable(new Variable("FpgaVersion", Variable::Status));
@@ -140,6 +162,10 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addVariable(new Variable("TisClkEn",Variable::Configuration));
    variables_["TisClkEn"]->setDescription("TIS Clock Enable");
    variables_["TisClkEn"]->setTrueFalse();
+
+   addVariable(new Variable("TholdEnable",Variable::Configuration));
+   variables_["TholdEnable"]->setDescription("Threshold Enable");
+   variables_["TholdEnable"]->setTrueFalse();
 
    addVariable(new Variable("ApvSyncDetect", Variable::Status));
    variables_["ApvSyncDetect"]->setDescription("APV sync detect status. 8-bit mask.\n"
@@ -278,6 +304,11 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
 
    addVariable(new Variable("FramePolB", Variable::Status));
    variables_["FramePolB"]->setDescription("ADC Frame 1 polarity.");
+
+   addVariable(new Variable("AdcClkDelay", Variable::Configuration));
+   variables_["AdcClkDelay"]->setDescription("ADC Output Clock Delay.");
+   variables_["AdcClkDelay"]->setRange(0,63);
+   variables_["AdcClkDelay"]->setComp(0,78,0,"pS");
 
    // Commands
    addCommand(new Command("ApvSWTrig",0x0));
@@ -452,6 +483,12 @@ void CntrlFpga::readConfig ( ) {
    readRegister(registers_["FrameDelayB"]);
    variables_["FrameDelayB"]->setInt(registers_["FrameDelayB"]->get(0,0x3F));
 
+   readRegister(registers_["AdcClkDelay"]);
+   variables_["AdcClkDelay"]->setInt(registers_["AdcClkDelay"]->get(0,0x3F));
+
+   readRegister(registers_["TholdEnable"]);
+   variables_["TholdEnable"]->setInt(registers_["TholdEnable"]->get(0,0x1));
+
    // Sub devices
    Device::readConfig();
    REGISTER_UNLOCK
@@ -553,6 +590,17 @@ void CntrlFpga::writeConfig ( bool force ) {
    registers_["FrameDelayB"]->set(variables_["FrameDelayB"]->getInt(),0,0x3F);
    writeRegister(registers_["FrameDelayB"],force);
 
+   registers_["AdcClkDelay"]->set(variables_["AdcClkDelay"]->getInt(),0,0x3F);
+   writeRegister(registers_["AdcClkDelay"],force);
+
+   registers_["TholdEnable"]->set(variables_["TholdEnable"]->getInt(),0,0x1);
+   writeRegister(registers_["TholdEnable"],force);
+
+   // Threshold data
+   writeRegister(registers_["ThresholdA"],force);
+   writeRegister(registers_["ThresholdB"],force);
+   writeRegister(registers_["ThresholdC"],force);
+
    // Sub devices
    Device::writeConfig(force);
    REGISTER_UNLOCK
@@ -587,6 +635,11 @@ void CntrlFpga::verifyConfig ( ) {
    verifyRegister(registers_["InputDelayO"]);
    verifyRegister(registers_["FrameDelayA"]);
    verifyRegister(registers_["FrameDelayB"]);
+   verifyRegister(registers_["AdcClkDelay"]);
+   verifyRegister(registers_["TholdEnable"]);
+   verifyRegister(registers_["ThresholdA"]);
+   verifyRegister(registers_["ThresholdB"]);
+   verifyRegister(registers_["ThresholdC"]);
 
    Device::verifyConfig();
    REGISTER_UNLOCK

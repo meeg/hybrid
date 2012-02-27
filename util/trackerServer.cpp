@@ -14,7 +14,8 @@
 // 04/12/2011: created
 //----------------------------------------------------------------------------
 #include <UdpLink.h>
-#include <TrackerTis.h>
+#include <PgpLink.h>
+#include <Tracker.h>
 #include <ControlServer.h>
 #include <Device.h>
 #include <iomanip>
@@ -33,12 +34,12 @@ void sigTerm (int) {
 }
 
 int main (int argc, char **argv) {
+   PgpLink       pgpLink; 
    UdpLink       udpLink; 
    CommLink      commLink; 
-   TrackerTis    *trackerTis;
+   Tracker       *tracker;
    ControlServer cntrlServer;
    string        xmlTest;
-   int           pid;
 
    // Catch signals
    signal (SIGINT,&sigTerm);
@@ -49,7 +50,7 @@ int main (int argc, char **argv) {
       if ( argc > 1 ) {
 
          // Create and setup PGP link
-         trackerTis = new TrackerTis(&commLink);
+         tracker = new Tracker(&commLink);
          commLink.setDebug(true);
          commLink.open();
          cout << "Using debug interface" << endl;
@@ -57,10 +58,18 @@ int main (int argc, char **argv) {
       } else {
 
          // Create and setup PGP link
-         trackerTis = new TrackerTis(&udpLink);
+         //tracker = new Tracker(&pgpLink);
+         //pgpLink.setMaxRxTx(500000);
+         //pgpLink.setDebug(true);
+         //pgpLink.open("/dev/pgpcard0");
+         //usleep(100);
+         //cout << "Using PGP interface" << endl;
+
+         tracker = new Tracker(&udpLink);
          udpLink.setMaxRxTx(500000);
          udpLink.setDebug(true);
-         udpLink.open(8192,1,"192.168.1.16");
+         udpLink.open(8192,1,"192.168.0.16");
+         udpLink.openDataNet("127.0.0.1",8099);
          usleep(100);
          cout << "Using UDP interface" << endl;
       }
@@ -68,35 +77,12 @@ int main (int argc, char **argv) {
       // Setup control server
       //cntrlServer.setDebug(true);
       cntrlServer.startListen(8092);
-      cntrlServer.setSystem(trackerTis);
+      cntrlServer.setSystem(tracker);
 
-      // Fork and start gui
-      stop = false;
-      switch (pid = fork()) {
-
-         // Error
-         case -1:
-            cout << "Error occured in fork!" << endl;
-            return(1);
-            break;
-
-         // Child
-         case 0:
-            cout << "Starting GUI" << endl;
-            system("cntrlGui");
-            cout << "Gui stopped" << endl;
-            kill(getppid(),SIGINT);
-            break;
-
-         // Server
-         default:
-            while ( ! stop ) cntrlServer.receive(100);
-            kill(pid,SIGINT);
-            sleep(1);
-            cntrlServer.stopListen();
-            cout << "Stopped gui server" << endl;
-            break;
-      }
+      // Start listen
+      while ( ! stop ) cntrlServer.receive(100);
+      cntrlServer.stopListen();
+      cout << "Stopped gui server" << endl;
 
    } catch ( string error ) {
       cout << "Caught Error: " << endl;

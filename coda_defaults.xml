@@ -1,4 +1,4 @@
-<input>
+<system>
    <config>
       <DataFile>test.bin</DataFile>
       <RunRate>100Hz</RunRate>
@@ -55,7 +55,7 @@
             <enabled>False</enabled>
          </hybrid>
          <GetTemp>False</GetTemp>
-         <ClockSelect>Internal</ClockSelect>
+         <ClockSelect>External</ClockSelect>
          <Adc00Enable>True</Adc00Enable>
          <Adc01Enable>True</Adc01Enable>
          <Adc02Enable>True</Adc02Enable>
@@ -74,8 +74,8 @@
          <AdcClkDelay>13</AdcClkDelay>
          <AdcClkInvert>False</AdcClkInvert>
          <ApvTrigGenPause>6999999</ApvTrigGenPause>
-         <ApvTrigSource>Software</ApvTrigSource>
-         <ApvTrigType>DoubleCalib</ApvTrigType>
+         <ApvTrigSource>External</ApvTrigSource>
+         <ApvTrigType>Test</ApvTrigType>
          <ScratchPad>0xABCDEF01</ScratchPad>
          <CalDelay>0x81</CalDelay>
          <FrameDelayA>0x21</FrameDelayA>
@@ -95,13 +95,12 @@
          <InputDelayM>0x21</InputDelayM>
          <InputDelayN>0x21</InputDelayN>
          <InputDelayO>0x21</InputDelayO>
-         <ad9252 index="0">
+         <TholdEnable>True</TholdEnable>
+         <enabled>True</enabled>
+         <ad9252>
             <enabled>False</enabled>
          </ad9252>
-         <ad9252 index="1">
-            <enabled>False</enabled>
-         </ad9252>
-         <hybrid index="0">
+         <hybrid>
             <apv25 index="0">
                <enabled>True</enabled>
             </apv25>
@@ -117,45 +116,135 @@
             <apv25 index="4">
                <enabled>True</enabled>
             </apv25>
+            <enabled>False</enabled>
+         </hybrid>
+      </cntrlFpga>
+      <tisFpga>
+         <ExtEnable>True</ExtEnable>
+         <FeReady>True</FeReady>
+         <ScratchPad>0x0</ScratchPad>
+         <TisEnable>True</TisEnable>
+         <TisClkInt>False</TisClkInt>
+         <SyncDelay>0x5</SyncDelay>
+         <TisLoopback>False</TisLoopback>
+         <IntTrigCount>160000</IntTrigCount>
+         <IntTrigPeriod>5000</IntTrigPeriod>
+         <enabled>True</enabled>
+         <ad9510>
+            <Divider5Bypass>True</Divider5Bypass>
+            <Divider5Force>False</Divider5Force>
+            <Divider5HighCycles>0</Divider5HighCycles>
+            <Divider5LowCycles>0</Divider5LowCycles>
+            <Divider5NoSync>False</Divider5NoSync>
+            <Divider5Phase>0</Divider5Phase>
+            <Divider5StartHigh>False</Divider5StartHigh>
+            <Divider6Bypass>True</Divider6Bypass>
+            <Divider6Force>False</Divider6Force>
+            <Divider6HighCycles>0</Divider6HighCycles>
+            <Divider6LowCycles>0</Divider6LowCycles>
+            <Divider6NoSync>False</Divider6NoSync>
+            <Divider6Phase>0</Divider6Phase>
+            <Divider6StartHigh>False</Divider6StartHigh>
+            <Divider7Bypass>True</Divider7Bypass>
+            <Divider7Force>False</Divider7Force>
+            <Divider7HighCycles>0</Divider7HighCycles>
+            <Divider7LowCycles>0</Divider7LowCycles>
+            <Divider7NoSync>False</Divider7NoSync>
+            <Divider7Phase>0</Divider7Phase>
+            <Divider7StartHigh>False</Divider7StartHigh>
             <enabled>True</enabled>
+         </ad9510>
+      </tisFpga>
+      <cntrlFpga index="0">
+         <hybrid index="0">
+            <enabled>False</enabled>
          </hybrid>
          <hybrid index="1">
-            <apv25 index="0">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="1">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="2">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="3">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="4">
-               <enabled>False</enabled>
-            </apv25>
-            <enabled>True</enabled>
+            <enabled>False</enabled>
          </hybrid>
          <hybrid index="2">
-            <apv25 index="0">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="1">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="2">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="3">
-               <enabled>False</enabled>
-            </apv25>
-            <apv25 index="4">
-               <enabled>False</enabled>
-            </apv25>
-            <enabled>True</enabled>
+            <enabled>False</enabled>
          </hybrid>
          <enabled>True</enabled>
       </cntrlFpga>
+      <cntrlFpga index="1">
+         <hybrid index="0">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+      <cntrlFpga index="2">
+         <hybrid index="0">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+      <cntrlFpga index="3">
+         <hybrid index="0">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+      <cntrlFpga index="4">
+         <hybrid index="0">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+      <cntrlFpga index="5">
+         <hybrid index="0">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+      <cntrlFpga index="6">
+         <hybrid index="0">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="1">
+            <enabled>False</enabled>
+         </hybrid>
+         <hybrid index="2">
+            <enabled>False</enabled>
+         </hybrid>
+         <enabled>True</enabled>
+      </cntrlFpga>
+      <tisFpga index="0">
+         <enabled>True</enabled>
+         <ad9510 index="0">
+            <enabled>True</enabled>
+         </ad9510>
+      </tisFpga>
    </config>
-</input>
+</system>
+

@@ -17,10 +17,14 @@
 #define __CNTRL_FPGA_H__
 
 #include <Device.h>
+#include <Threshold.h>
 using namespace std;
 
 //! Class to contain APV25 
 class CntrlFpga : public Device {
+
+      // Threshold data
+      Threshold thold_;
 
    public:
 

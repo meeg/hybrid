@@ -43,7 +43,10 @@ TisFpga::TisFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("TisLoopback",     0x01000007));
    addRegister(new Register("FeReady",         0x01000008));
    addRegister(new Register("TisReady",        0x01000009));
-   addRegister(new Register("SyncDelay",       0x0100000A));
+   addRegister(new Register("TisClkInt",       0x0100000A));
+   addRegister(new Register("SyncDelay",       0x0100000B));
+   addRegister(new Register("IntTrigCount",    0x0100000C));
+   addRegister(new Register("IntTrigPeriod",   0x0100000D));
 
    // Setup variables
    addVariable(new Variable("FpgaVersion", Variable::Status));
@@ -84,14 +87,34 @@ TisFpga::TisFpga ( uint destination, uint index, Device *parent ) :
    variables_["TisReady"]->setDescription("TIS Logic Is Ready");
    variables_["TisReady"]->setTrueFalse();
 
+   addVariable(new Variable("TisClkInt", Variable::Configuration));
+   variables_["TisClkInt"]->setDescription("Use internal ti clock");
+   variables_["TisClkInt"]->setTrueFalse();
+
    addVariable(new Variable("SyncDelay", Variable::Configuration));
    variables_["SyncDelay"]->setDescription("SYNC Input Delay");
    variables_["SyncDelay"]->setRange(0,63);
    variables_["SyncDelay"]->setComp(0,78,0,"pS");
 
+   addVariable(new Variable("IntTrigCount", Variable::Configuration));
+   variables_["IntTrigCount"]->setDescription("Internal trigger count");
+   variables_["IntTrigCount"]->setComp(0,1,0,"");
+   variables_["IntTrigCount"]->setRange(0,0x7FFFFFFF);
+
+   addVariable(new Variable("IntTrigPeriod", Variable::Configuration));
+   variables_["IntTrigPeriod"]->setDescription("Internal trigger period");
+   variables_["IntTrigPeriod"]->setComp(0,8e-9,0,"S");
+   variables_["IntTrigPeriod"]->setRange(0,0x7FFFFFFF);
+
    // Commands
-   addCommand(new Command("TisSWTrig",0x0));
+   addCommand(new Command("TisSWTrig",0x02));
    commands_["TisSWTrig"]->setDescription("Generate TIS software trigger.");
+
+   addCommand(new Command("IntTrigStart",0x04));
+   commands_["IntTrigStart"]->setDescription("Start internal trigger sequence.");
+
+   addCommand(new Command("TrigAck",0x01));
+   commands_["TrigAck"]->setDescription("Ack block of triggers.");
 
    addCommand(new Command("TrigCntRst"));
    commands_["TrigCntRst"]->setDescription("Reset Trigger Counter.");
@@ -158,8 +181,17 @@ void TisFpga::readConfig () {
    readRegister(registers_["FeReady"]);
    variables_["FeReady"]->setInt(registers_["FeReady"]->get());
 
+   readRegister(registers_["TisClkInt"]);
+   variables_["TisClkInt"]->setInt(registers_["TisClkInt"]->get());
+
    readRegister(registers_["SyncDelay"]);
    variables_["SyncDelay"]->setInt(registers_["SyncDelay"]->get());
+
+   readRegister(registers_["IntTrigCount"]);
+   variables_["IntTrigCount"]->setInt(registers_["IntTrigCount"]->get());
+
+   readRegister(registers_["IntTrigPeriod"]);
+   variables_["IntTrigPeriod"]->setInt(registers_["IntTrigPeriod"]->get());
 
    // Sub devices
    Device::readConfig();
@@ -186,8 +218,17 @@ void TisFpga::writeConfig ( bool force ) {
    registers_["FeReady"]->set(variables_["FeReady"]->getInt());
    writeRegister(registers_["FeReady"],force);
 
+   registers_["TisClkInt"]->set(variables_["TisClkInt"]->getInt());
+   writeRegister(registers_["TisClkInt"],force);
+
    registers_["SyncDelay"]->set(variables_["SyncDelay"]->getInt());
    writeRegister(registers_["SyncDelay"],force);
+
+   registers_["IntTrigCount"]->set(variables_["IntTrigCount"]->getInt());
+   writeRegister(registers_["IntTrigCount"],force);
+
+   registers_["IntTrigPeriod"]->set(variables_["IntTrigPeriod"]->getInt());
+   writeRegister(registers_["IntTrigPeriod"],force);
 
    // Sub devices
    Device::writeConfig(force);
@@ -202,7 +243,10 @@ void TisFpga::verifyConfig () {
    verifyRegister(registers_["TisEnable"]);
    verifyRegister(registers_["TisLoopback"]);
    verifyRegister(registers_["FeReady"]);
+   verifyRegister(registers_["TisClkInt"]);
    verifyRegister(registers_["SyncDelay"]);
+   verifyRegister(registers_["IntTrigCount"]);
+   verifyRegister(registers_["IntTrigPeriod"]);
    Device::verifyConfig();
    REGISTER_UNLOCK
 }

@@ -88,10 +88,12 @@ class CommLink {
       uint      cfgRespCnt_;
 
       // Thread pointers
+      pthread_t rxThread_;
       pthread_t ioThread_;
       pthread_t dataThread_;
 
       // Thread Routines
+      static void *rxRun ( void *t );
       static void *ioRun ( void *t );
       static void *dataRun ( void *t );
 
@@ -99,7 +101,7 @@ class CommLink {
       bool runEnable_;
 
       // Data routine
-      void dataHandler();
+      virtual void dataHandler();
 
       // Stat counters
       uint   dataFileCount_;
@@ -109,7 +111,8 @@ class CommLink {
       uint   errorCount_;
       uint   unexpCount_;
 
-      // IO handling routine
+      // IO handling routines
+      virtual void rxHandler();
       virtual void ioHandler();
 
       // Max RX/Tx size
@@ -249,4 +252,6 @@ class CommLink {
       void addStatus ( string status );
 
 };
+
 #endif
+

@@ -3,7 +3,7 @@ CC     := g++
 DEF    :=
 BIN    := $(PWD)/bin
 OBJ    := $(PWD)/.obj
-CFLAGS := -Wall `xml2-config --cflags` -I$(PWD)/generic -I$(PWD)/tracker -I$(PWD)/offline
+CFLAGS := -Wall `xml2-config --cflags` -I$(PWD)/generic -I$(PWD)/tracker -I$(PWD)/offline -I$(PWD)/driver -fpermissive
 LFLAGS := `xml2-config --libs` -lpthread -lrt
 
 # Generic Sources
@@ -48,7 +48,7 @@ $(OBJ)/%.o: $(TRK_DIR)/%.cpp $(TRK_DIR)/%.h
 
 # Comile utilities
 $(BIN)/%: $(UTL_DIR)/%.cpp $(GEN_OBJ) $(TRK_OBJ)
-	$(CC) $(CFLAGS) $(LFLAGS) $(DEF) $(OBJ)/* -o $@ $<
+	$(CC) $(CFLAGS) $(DEF) $(OBJ)/* -o $@ $< $(LFLAGS) 
 
 # Compile gui
 gui:

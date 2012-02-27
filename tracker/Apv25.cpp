@@ -254,14 +254,14 @@ void Apv25::readConfig (  ) {
    variables_["TriggerMode"]->setInt(registers_["Mode"]->get(1,0x1));
 
    readRegister(registers_["Csel"]);
-   if      ( registers_["Csel"]->get(0,0x1) == 1 ) variables_["Csel"]->setInt(1);
-   else if ( registers_["Csel"]->get(1,0x1) == 1 ) variables_["Csel"]->setInt(2);
-   else if ( registers_["Csel"]->get(2,0x1) == 1 ) variables_["Csel"]->setInt(3);
-   else if ( registers_["Csel"]->get(3,0x1) == 1 ) variables_["Csel"]->setInt(4);
-   else if ( registers_["Csel"]->get(4,0x1) == 1 ) variables_["Csel"]->setInt(5);
-   else if ( registers_["Csel"]->get(5,0x1) == 1 ) variables_["Csel"]->setInt(6);
-   else if ( registers_["Csel"]->get(6,0x1) == 1 ) variables_["Csel"]->setInt(7);
-   else if ( registers_["Csel"]->get(7,0x1) == 1 ) variables_["Csel"]->setInt(8);
+   if      ( registers_["Csel"]->get(0,0x1) == 0 ) variables_["Csel"]->setInt(1);
+   else if ( registers_["Csel"]->get(1,0x1) == 0 ) variables_["Csel"]->setInt(2);
+   else if ( registers_["Csel"]->get(2,0x1) == 0 ) variables_["Csel"]->setInt(3);
+   else if ( registers_["Csel"]->get(3,0x1) == 0 ) variables_["Csel"]->setInt(4);
+   else if ( registers_["Csel"]->get(4,0x1) == 0 ) variables_["Csel"]->setInt(5);
+   else if ( registers_["Csel"]->get(5,0x1) == 0 ) variables_["Csel"]->setInt(6);
+   else if ( registers_["Csel"]->get(6,0x1) == 0 ) variables_["Csel"]->setInt(7);
+   else if ( registers_["Csel"]->get(7,0x1) == 0 ) variables_["Csel"]->setInt(8);
    else variables_["Csel"]->setInt(0);
 
    readRegister(registers_["Cdrv"]);
@@ -338,16 +338,16 @@ void Apv25::writeConfig ( bool force ) {
    registers_["Mode"]->set(variables_["TriggerMode"]->getInt(),1,0x1);
 
    switch ( variables_["Csel"]->getInt() ) {
-      case  0: temp = 0x00; break;
-      case  1: temp = 0x01; break;
-      case  2: temp = 0x02; break;
-      case  3: temp = 0x04; break;
-      case  4: temp = 0x08; break;
-      case  5: temp = 0x10; break;
-      case  6: temp = 0x20; break;
-      case  7: temp = 0x40; break;
-      case  8: temp = 0x80; break;
-      default: temp = 0x00; break;
+      case  0: temp = 0xFF; break;
+      case  1: temp = 0xFE; break;
+      case  2: temp = 0xFD; break;
+      case  3: temp = 0xFB; break;
+      case  4: temp = 0xF7; break;
+      case  5: temp = 0xEF; break;
+      case  6: temp = 0xDF; break;
+      case  7: temp = 0xBF; break;
+      case  8: temp = 0x7F; break;
+      default: temp = 0xFF; break;
    }
    registers_["Csel"]->set(temp);
 

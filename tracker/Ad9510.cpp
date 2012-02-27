@@ -32,10 +32,16 @@ Ad9510::Ad9510 ( uint destination, uint baseAddress, uint index, Device *parent 
    // Create Registers: name, address
    addRegister(new Register("ChipPortConfig",  baseAddress_ + 0x00));
 
+
+   addRegister(new Register("LvdsCmos5",       baseAddress_ + 0x41));
+   addRegister(new Register("LvdsCmos6",       baseAddress_ + 0x42));
+   addRegister(new Register("LvdsCmos7",       baseAddress_ + 0x43));
    addRegister(new Register("Divider5RegA",    baseAddress_ + 0x52));
    addRegister(new Register("Divider5RegB",    baseAddress_ + 0x53));
    addRegister(new Register("Divider6RegA",    baseAddress_ + 0x54));
    addRegister(new Register("Divider6RegB",    baseAddress_ + 0x55));
+   addRegister(new Register("Divider7RegA",    baseAddress_ + 0x56));
+   addRegister(new Register("Divider7RegB",    baseAddress_ + 0x57));
 
    addRegister(new Register("UpdateRegister",  baseAddress_ + 0x5A));
 
@@ -95,6 +101,35 @@ Ad9510::Ad9510 ( uint destination, uint baseAddress, uint index, Device *parent 
    addVariable(new Variable("Divider6Phase", Variable::Configuration));
    variables_["Divider6Phase"]->setDescription("Divider 6 Phase Offset.");
    variables_["Divider6Phase"]->setRange(0,15);
+
+   addVariable(new Variable("Divider7LowCycles", Variable::Configuration));
+   variables_["Divider7LowCycles"]->setDescription("Divider 6 Low Cycles.");
+   variables_["Divider7LowCycles"]->setRange(0,15);
+
+   addVariable(new Variable("Divider7HighCycles", Variable::Configuration));
+   variables_["Divider7HighCycles"]->setDescription("Divider 6 High Cycles.");
+   variables_["Divider7HighCycles"]->setRange(0,15);
+
+   addVariable(new Variable("Divider7Bypass", Variable::Configuration));
+   variables_["Divider7Bypass"]->setDescription("Divider 6 Bypass.");
+   variables_["Divider7Bypass"]->setTrueFalse();
+
+   addVariable(new Variable("Divider7NoSync", Variable::Configuration));
+   variables_["Divider7NoSync"]->setDescription("Divider 6 No Sync.");
+   variables_["Divider7NoSync"]->setTrueFalse();
+
+   addVariable(new Variable("Divider7Force", Variable::Configuration));
+   variables_["Divider7Force"]->setDescription("Divider 6 Force.");
+   variables_["Divider7Force"]->setTrueFalse();
+
+   addVariable(new Variable("Divider7StartHigh", Variable::Configuration));
+   variables_["Divider7StartHigh"]->setDescription("Divider 6 Start High.");
+   variables_["Divider7StartHigh"]->setTrueFalse();
+
+   addVariable(new Variable("Divider7Phase", Variable::Configuration));
+   variables_["Divider7Phase"]->setDescription("Divider 6 Phase Offset.");
+   variables_["Divider7Phase"]->setRange(0,15);
+
 }
 
 // Deconstructor
@@ -122,13 +157,31 @@ void Ad9510::writeConfig ( bool force ) {
    registers_["Divider6RegB"]->set(variables_["Divider6StartHigh"]->getInt(),4,0x1);
    registers_["Divider6RegB"]->set(variables_["Divider6Phase"]->getInt(),0,0xF);
 
-   if ( registers_["Divider5RegA"]->stale() || registers_["Divider5RegB"]->stale() || 
-        registers_["Divider6RegA"]->stale() || registers_["Divider6RegB"]->stale() || force ) {
+   registers_["Divider7RegA"]->set(variables_["Divider7LowCycles"]->getInt(),4,0xF);
+   registers_["Divider7RegA"]->set(variables_["Divider7HighCycles"]->getInt(),0,0xF);
+   registers_["Divider7RegB"]->set(variables_["Divider7Bypass"]->getInt(),7,0x1);
+   registers_["Divider7RegB"]->set(variables_["Divider7NoSync"]->getInt(),6,0x1);
+   registers_["Divider7RegB"]->set(variables_["Divider7Force"]->getInt(),5,0x1);
+   registers_["Divider7RegB"]->set(variables_["Divider7StartHigh"]->getInt(),4,0x1);
+   registers_["Divider7RegB"]->set(variables_["Divider7Phase"]->getInt(),0,0xF);
 
+
+   if ( registers_["Divider5RegA"]->stale() || registers_["Divider5RegB"]->stale() || 
+        registers_["Divider6RegA"]->stale() || registers_["Divider6RegB"]->stale() || 
+        registers_["Divider7RegA"]->stale() || registers_["Divider7RegB"]->stale() || force ) {
+
+      registers_["LvdsCmos5"]->set(0x2);
+      registers_["LvdsCmos6"]->set(0x2);
+      registers_["LvdsCmos7"]->set(0x2);
+      writeRegister(registers_["LvdsCmos5"],true);
+      writeRegister(registers_["LvdsCmos6"],true);
+      writeRegister(registers_["LvdsCmos7"],true);
       writeRegister(registers_["Divider5RegA"],true);
       writeRegister(registers_["Divider5RegB"],true);
       writeRegister(registers_["Divider6RegA"],true);
       writeRegister(registers_["Divider6RegB"],true);
+      writeRegister(registers_["Divider7RegA"],true);
+      writeRegister(registers_["Divider7RegB"],true);
       registers_["UpdateRegister"]->set(0x1);
       writeRegister(registers_["UpdateRegister"],true);
    }

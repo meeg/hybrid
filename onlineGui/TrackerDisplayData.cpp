@@ -22,6 +22,7 @@ TrackerDisplayData::TrackerDisplayData ( ) : QwtRasterData () {
    data_ = (uint *)malloc(size_*sizeof(uint));
    setInterval( Qt::XAxis, QwtInterval( xMin_, xMax_ ) );
    setInterval( Qt::YAxis, QwtInterval( yMin_, yMax_ ) );
+   maxRange_ = 0;
    init();
 }
 
@@ -57,10 +58,10 @@ void TrackerDisplayData::fill ( uint x, uint y ) {
 
    data_[pos]++;
 
-   if ( data_[pos] > maxValue_ ) {
-      maxValue_ = data_[pos];
-      setInterval( Qt::ZAxis, QwtInterval( 0, maxValue_ ) );
-   }
+   if ( data_[pos] > maxValue_ ) maxValue_ = data_[pos];
+
+   if ( maxRange_ == 0 ) setInterval( Qt::ZAxis, QwtInterval( 0, maxValue_ ) );
+   else setInterval( Qt::ZAxis, QwtInterval( 0, maxRange_ ) );
 }
 
 // Init data
@@ -68,5 +69,12 @@ void TrackerDisplayData::init ( ) {
    memset(data_,0,(size_ * sizeof(uint)));
    maxValue_ = 10;
    setInterval( Qt::ZAxis, QwtInterval( 0, maxValue_ ) );
+}
+
+void TrackerDisplayData::setMax(uint max) {
+   maxRange_ = max;
+
+   if ( maxRange_ == 0 ) setInterval( Qt::ZAxis, QwtInterval( 0, maxValue_ ) );
+   else setInterval( Qt::ZAxis, QwtInterval( 0, maxRange_ ) );
 }
 

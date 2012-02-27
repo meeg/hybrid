@@ -30,6 +30,7 @@ class TrackerDisplayData : public QwtRasterData {
  
       uint *data_;
       uint maxValue_;
+      uint maxRange_;
  
    public:
 
@@ -47,6 +48,9 @@ class TrackerDisplayData : public QwtRasterData {
 
       // Init data
       void init ( );
+
+      // Set max value 
+      void setMax(uint max);
 
 };
 

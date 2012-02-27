@@ -33,6 +33,9 @@ TrackerTis::TrackerTis (CommLink *commLink) : System("TrackerTis",commLink) {
    desc_     = "Tracker Tis Control";
    defaults_ = "tis_defaults.xml";
 
+   // Data mask, lane 0, vc 0
+   commLink_->setDataMask(0x11);
+
    // Add sub-devices
    addDevice(new TisFpga(0, 0,this));
 

@@ -22,6 +22,7 @@
 #include <QSpinBox>
 #include <QTimer>
 #include <QLineEdit>
+#include <QCheckBox>
 #include <TrackerEvent.h>
 #include <TrackerDisplayData.h>
 #include <qwt_plot_spectrogram.h>
@@ -41,9 +42,15 @@ class MainWindow : public QWidget {
       // Refresh timer
       QTimer timer_;
 
+      uint fpga_;
+      uint hybrid_;
       uint dCount_;
 
       QLineEdit *countBox_;
+      QSpinBox  *fpgaSelect_;
+      QSpinBox  *hybridSelect_;
+      QCheckBox *autoEnable_;
+      QSpinBox  *maxCount_;
  
    Q_OBJECT
 

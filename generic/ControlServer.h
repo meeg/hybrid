@@ -25,10 +25,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <ControlCmdMem.h>
 using namespace std;
 
 //! Class to manage control interface
 class ControlServer {
+
+      // Number of clients to support
+      static const uint MaxClients_ = 8;
 
       // Debug flag
       bool debug_;
@@ -37,7 +41,7 @@ class ControlServer {
       int servFd_;
 
       // Connection fdes
-      int connFd_;
+      int connFd_[MaxClients_];
 
       // Port number
       int port_;
@@ -47,10 +51,14 @@ class ControlServer {
       struct sockaddr_in connAddr_;
 
       // Current received data
-      stringstream rxData_;
+      stringstream rxData_[MaxClients_];
 
       // Top level device
       System *system_;
+
+      // Shared memory
+      uint             smemFd_;
+      ControlCmdMemory *smem_;
 
    public:
 

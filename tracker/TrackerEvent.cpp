@@ -12,6 +12,7 @@
 //-----------------------------------------------------------------------------
 // Modification history :
 // 08/26/2011: created
+// 02/14/2012: Updates to match FPGA. Added hooks for future TI frames.
 //-----------------------------------------------------------------------------
 #include <iostream>
 #include <string>
@@ -50,45 +51,56 @@ TrackerEvent::TrackerEvent () : Data() {
 TrackerEvent::~TrackerEvent () {
 }
 
-// Get sample size value from header.
-uint TrackerEvent::sampleSize ( ) {
-   return((data_[0]>>8)&0xF);
+// Get TI flag from header
+bool TrackerEvent::isTiFrame ( ) {
+   return((data_[0] & 0x80000000) != 0);
 }
 
 // Get FpgaAddress value from header.
 uint TrackerEvent::fpgaAddress ( ) {
-   return(data_[1]);
+   return(data_[0] & 0xFFFF);
 }
 
 // Get sequence count from header.
 uint TrackerEvent::sequence ( ) {
-   return(data_[2]);
+   return(data_[1]);
 }
 
-// Get trigger value from header.
-uint TrackerEvent::trigger ( ) {
-   return(data_[3]);
+// Get trigger block from header.
+uint * TrackerEvent::tiData ( ) {
+   return(&(data_[2]));
 }
 
 // Get temperature values from header.
 double TrackerEvent::temperature ( uint index ) {
-   switch (index) {
-      case 0: return(tempTable_[(data_[4]&0x3FFF)]);
-      case 1: return(tempTable_[((data_[4]>>16)&0x3FFF)]);
-      case 2: return(tempTable_[(data_[5]&0x3FFF)]);
-      case 3: return(tempTable_[((data_[5]>>16)&0x3FFF)]);
+   if ( isTiFrame () ) return(0.0);
+   else switch (index) {
+      case  0: return(tempTable_[(data_[2]&0x3FFF)]);
+      case  1: return(tempTable_[((data_[2]>>16)&0x3FFF)]);
+      case  2: return(tempTable_[(data_[3]&0x3FFF)]);
+      case  3: return(tempTable_[((data_[3]>>16)&0x3FFF)]);
+      case  4: return(tempTable_[(data_[4]&0x3FFF)]);
+      case  5: return(tempTable_[((data_[4]>>16)&0x3FFF)]);
+      case  6: return(tempTable_[(data_[5]&0x3FFF)]);
+      case  7: return(tempTable_[((data_[5]>>16)&0x3FFF)]);
+      case  8: return(tempTable_[(data_[6]&0x3FFF)]);
+      case  9: return(tempTable_[((data_[6]>>16)&0x3FFF)]);
+      case 10: return(tempTable_[(data_[7]&0x3FFF)]);
+      case 11: return(tempTable_[((data_[7]>>16)&0x3FFF)]);
       default: return(0.0);
    }
 }
 
 // Get sample count
 uint TrackerEvent::count ( ) {
-   return((size_-(headSize_ + tailSize_))/sampleSize_);
+   if ( isTiFrame () ) return(0);
+   else return((size_-(headSize_ + tailSize_))/sampleSize_);
 }
 
 // Get sample at index
 TrackerSample *TrackerEvent::sample (uint index) {
-   if ( index >= count() ) return(NULL);
+   if ( isTiFrame () ) return(NULL);
+   else if ( index >= count() ) return(NULL);
    else {
       sample_.setData(&(data_[headSize_+(index*sampleSize_)]));
       return(&sample_);
@@ -99,7 +111,8 @@ TrackerSample *TrackerEvent::sample (uint index) {
 TrackerSample *TrackerEvent::sampleCopy (uint index) {
    TrackerSample *tmp;
 
-   if ( index >= count() ) return(NULL);
+   if ( isTiFrame () ) return(NULL);
+   else if ( index >= count() ) return(NULL);
    else {
       tmp = new TrackerSample (&(data_[headSize_+(index*sampleSize_)]));
       return(tmp);

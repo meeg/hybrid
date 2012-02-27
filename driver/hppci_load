@@ -1,0 +1,23 @@
+#!/bin/sh
+
+module="hppci"
+device="hppci"
+mode="666"
+
+/sbin/insmod ./$module.ko || exit 1
+
+# remove stale nodes
+rm -f /dev/${device}
+
+major=`grep hppci /proc/devices | cut -f1 -d' '`
+
+i="0";
+
+for num in $major
+do
+   mknod /dev/${device}${i}  c $num 0
+   ((i++))
+done
+
+# give appropriate group/permissions
+chmod $mode /dev/${device}*

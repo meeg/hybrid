@@ -94,7 +94,6 @@ int main (int argc, char **argv) {
          case 0:
             cout << "Starting GUI" << endl;
             system("cntrlGui localhost 8093");
-            cout << "Gui stopped" << endl;
             kill(getppid(),SIGINT);
             break;
 

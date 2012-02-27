@@ -40,37 +40,44 @@ int main (int argc, char **argv) {
    // Process each event
    while ( dataRead.next(&event) ) {
 
-      // Dump header values
-      cout << "Header:sampleSize  = " << dec << event.sampleSize() << endl;
-      cout << "Header:fpgaAddress = 0x" << hex << setw(8) << setfill('0') << event.fpgaAddress() << endl;
-      cout << "Header:sequence    = 0x" << hex << setw(8) << setfill('0') << event.sequence() << endl;
-      cout << "Header:trigger     = 0x" << hex << setw(8) << setfill('0') << event.trigger() << endl;
-      cout << "Header:temp[0]     = " << event.temperature(0) << endl;
-      cout << "Header:temp[1]     = " << event.temperature(1) << endl;
-      cout << "Header:temp[2]     = " << event.temperature(2) << endl;
-      cout << "Header:temp[3]     = " << event.temperature(3) << endl;
-      cout << "Header:count       = " << dec << event.count() << endl;
+      if ( event.isTiFrame() ) {
+         cout << "----------- Trigger Frame ----------------- " << endl;
+         cout << "Size               = "   << dec << event.size() << endl;
+         cout << "Header:fpgaAddress = 0x" << hex << setw(8) << setfill('0') << event.fpgaAddress() << endl;
+         cout << "Header:sequence    = 0x" << hex << setw(8) << setfill('0') << event.sequence() << endl;
+      } else {
 
-      // Iterate through samples
-      for (x=0; x < event.count(); x++) {
+         // Dump header values
+         cout << "----------- Data Frame -------------------- " << endl;
+         cout << "Size               = "   << dec << event.size() << endl;
+         cout << "Header:fpgaAddress = 0x" << hex << setw(8) << setfill('0') << event.fpgaAddress() << endl;
+         cout << "Header:sequence    = 0x" << hex << setw(8) << setfill('0') << event.sequence() << endl;
+         cout << "Header:temp[0]     = " << event.temperature(0) << endl;
+         cout << "Header:temp[1]     = " << event.temperature(1) << endl;
+         cout << "Header:temp[2]     = " << event.temperature(2) << endl;
+         cout << "Header:temp[3]     = " << event.temperature(3) << endl;
+         cout << "Header:count       = " << dec << event.count() << endl;
 
-         // Get sample
-         sample = event.sample(x);
+         // Iterate through samples
+         for (x=0; x < event.count(); x++) {
 
-         // Show sample data
-         cout << "Sample:index       = " << dec << x << endl;
-         cout << "Sample:hybrid      = " << dec << sample->hybrid() << endl;
-         cout << "Sample:apv         = " << dec << sample->apv() << endl;
-         cout << "Sample:channel     = " << dec << sample->channel() << " 0x" << hex << sample->channel() << endl;
-         cout << "Sample:fpgaAddress = 0x" << hex << setw(8) << setfill('0') << sample->fpgaAddress() << endl;
-         cout << "Sample:value[0]    = 0x" << hex << setw(4) << setfill('0') << sample->value(0) << endl;
-         cout << "Sample:value[1]    = 0x" << hex << setw(4) << setfill('0') << sample->value(1) << endl;
-         cout << "Sample:value[2]    = 0x" << hex << setw(4) << setfill('0') << sample->value(2) << endl;
-         cout << "Sample:value[3]    = 0x" << hex << setw(4) << setfill('0') << sample->value(3) << endl;
-         cout << "Sample:value[4]    = 0x" << hex << setw(4) << setfill('0') << sample->value(4) << endl;
-         cout << "Sample:value[5]    = 0x" << hex << setw(4) << setfill('0') << sample->value(5) << endl;
+            // Get sample
+            sample = event.sample(x);
+
+            // Show sample data
+            cout << "Sample:index       = " << dec << x << endl;
+            cout << "Sample:hybrid      = " << dec << sample->hybrid() << endl;
+            cout << "Sample:apv         = " << dec << sample->apv() << endl;
+            cout << "Sample:channel     = " << dec << sample->channel() << " 0x" << hex << sample->channel() << endl;
+            cout << "Sample:fpgaAddress = 0x" << hex << setw(8) << setfill('0') << sample->fpgaAddress() << endl;
+            cout << "Sample:value[0]    = 0x" << hex << setw(4) << setfill('0') << sample->value(0) << endl;
+            cout << "Sample:value[1]    = 0x" << hex << setw(4) << setfill('0') << sample->value(1) << endl;
+            cout << "Sample:value[2]    = 0x" << hex << setw(4) << setfill('0') << sample->value(2) << endl;
+            cout << "Sample:value[3]    = 0x" << hex << setw(4) << setfill('0') << sample->value(3) << endl;
+            cout << "Sample:value[4]    = 0x" << hex << setw(4) << setfill('0') << sample->value(4) << endl;
+            cout << "Sample:value[5]    = 0x" << hex << setw(4) << setfill('0') << sample->value(5) << endl;
+         }
       }
-
    }
 
    // Dump config
