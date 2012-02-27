@@ -18,12 +18,12 @@ class LinFitter : public Fitter
 		double doLinFit(double *times, double *par=NULL); // does linear fit and returns chisq; writes fitted parameters to *par
 		void initMinuit();
 		void doMinuitFit();
-		void plotFit(Event *evt, char *name); //plot event, fit and chisq dependence on each fitted t_0
+		void plotFit(Event *evt, const char *name); //plot event, fit and chisq dependence on each fitted t_0
 		void makeGuess();//guesses initial conditions based on steepest slopes between samples
 		void print_guess();
 		void setVerbosity(int verbosity);
 		double Evaluate(double *x, double *p); //wrapped doLinFit for use with TF2 constructor
-		void plotFCN(Event *evt, char *name, int res, char *style, double x_min, double x_max, double y_min, double y_max); //makes a contour plot of chisq; assumes 2 hits and 2-peak fit
+		void plotFCN(Event *evt, const char *name, int res, const char *style, double x_min, double x_max, double y_min, double y_max); //makes a contour plot of chisq; assumes 2 hits and 2-peak fit
 		void doGridFit(); //does a grid minimization of doLinFit; also writes fit result to guess_t
 		void doFit();
 };

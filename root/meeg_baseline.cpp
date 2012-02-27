@@ -34,25 +34,6 @@
 #include <unistd.h>
 using namespace std;
 
-int chanMap[128];
-
-void initChan ( ) {
-	int idx;
-	int chan;
-
-	for ( idx = 0; idx < 128; idx++ ) {
-		chan = (32*(idx%4)) + (8*(idx/4)) - (31*(idx/16));
-		chanMap[chan] = idx;
-	}
-}
-
-
-int convChan ( int chan ) {
-	//return(chanMap[chan]);
-	return(chan);
-}
-
-
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
@@ -93,11 +74,11 @@ int main ( int argc, char **argv ) {
 				abort();
 		}
 
-	initChan();
-
-	//gStyle->SetOptStat(kFALSE);
-	gStyle->SetPalette(1,0);
 	gROOT->SetStyle("Plain");
+	gStyle->SetOptStat("emrou");
+	gStyle->SetPalette(1,0);
+	gStyle->SetStatW(0.2);                
+	gStyle->SetStatH(0.1);                
 
 	// Start X11 view
 	//   TApplication theApp("App",NULL,NULL);

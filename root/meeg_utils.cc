@@ -22,6 +22,26 @@
 #include <TGraphErrors.h>
 #include <unistd.h>
 
+/*
+   int chanMap[128];
+
+   void initChan ( ) {
+   int idx;
+   int chan;
+
+   for ( idx = 0; idx < 128; idx++ ) {
+   chan = (32*(idx%4)) + (8*(idx/4)) - (31*(idx/16));
+   chanMap[chan] = idx;
+   }
+   }
+
+
+   int convChan ( int chan ) {
+//return(chanMap[chan]);
+return(chan);
+}
+*/
+
 void doStats(int n, int nmin, int nmax, int *y, int &count, double &center, double &spread)
 {
 	double meansq = 0;

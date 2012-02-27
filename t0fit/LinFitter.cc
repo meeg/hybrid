@@ -133,7 +133,7 @@ void LinFitter::doMinuitFit()
 	doLinFit(fit_t,fit_par);
 }
 
-void LinFitter::plotFit(Event *evt, char *name)
+void LinFitter::plotFit(Event *evt, const char *name)
 {
 	currentFitter = this;
 	double *t, *h;
@@ -280,7 +280,7 @@ double LinFitter::Evaluate(double *x, double *p)
 	return doLinFit(x, NULL);
 }
 
-void LinFitter::plotFCN(Event *evt, char *name, int res, char *style, double x_min, double x_max, double y_min, double y_max)
+void LinFitter::plotFCN(Event *evt, const char *name, int res, const char *style, double x_min, double x_max, double y_min, double y_max)
 {
 	if (nPeaks<2) return;
 
