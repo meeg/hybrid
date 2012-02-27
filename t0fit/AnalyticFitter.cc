@@ -76,7 +76,6 @@ int AnalyticFitter::doAnalyticFit(int start, int end, double &time, double &time
 	double time_var = 0;
 	double height_var = 0;
 	covar = 0;
-	double delta, Yi;
 	double *dt_dp = (double *) calloc(length, sizeof(double));
 	double *dh_dp = (double *) calloc(length, sizeof(double));
 	for (i=0;i<length;i++)
@@ -238,7 +237,7 @@ void AnalyticFitter::doFit()
 void AnalyticFitter::mergeSections()
 {
 	int i;
-	double exp_1, exp_2, exp_s;
+	double exp_1, exp_s;
 	double t_1, t_2, t_s;
 	double h_1, h_2, h_s;
 

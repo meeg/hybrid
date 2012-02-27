@@ -335,7 +335,7 @@ void LinFitter::doGridFit()
 	double *min, *max;
 	min = (double *) calloc(nPeaks, sizeof(double));
 	max = (double *) calloc(nPeaks, sizeof(double));
-	int i,j,k;
+	int i,j;
 	double chisq, best_chisq, last_chisq;
 	for (i=0;i<nPeaks;i++)
 	{

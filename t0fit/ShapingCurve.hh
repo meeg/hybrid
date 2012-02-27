@@ -5,7 +5,7 @@ class ShapingCurve
 {
 	public:
 		ShapingCurve(double sTime);
-		~ShapingCurve();
+		virtual ~ShapingCurve();
 	protected:
 		double shapingTime;
 	public:

@@ -121,8 +121,8 @@ int main ( int argc, char **argv ) {
 	TH2F *histA_2d[2];
 	TH2I *pulse2D[2];
 	TH2I *T0_A[2];
-	int maxA[2] = {0, 0};
-	int minA[2] = {16384, 16384};
+	double maxA[2] = {0, 0};
+	double minA[2] = {16384, 16384};
 	double maxT0[2] = {0.0, 0.0};
 	double minT0[2] = {0.0, 0.0};
 	TGraph *T0_dist[2];
@@ -579,7 +579,7 @@ int main ( int argc, char **argv ) {
 		tempPulse->Rebin2D(10,5);
 		for (int i=0;i<tempPulse->GetNbinsX();i++)
 		{
-			for (int j=0;j<tempPulse->GetNbinsY();j++) tempArray[j] = tempPulse->GetBinContent(i+1,j+1);
+			for (int j=0;j<tempPulse->GetNbinsY();j++) tempArray[j] = (int) tempPulse->GetBinContent(i+1,j+1);
 
 			doStats(tempPulse->GetNbinsY(),0,tempPulse->GetNbinsY()-1,tempArray,count,center,spread);
 			if (count)
@@ -645,7 +645,7 @@ int main ( int argc, char **argv ) {
 		int count_integral = 0;
 		for (int i=0;i<T0_A[sgn]->GetNbinsX();i++)
 		{
-			for (int j=0;j<T0_A[sgn]->GetNbinsY();j++) tempArray[j] = T0_A[sgn]->GetBinContent(i+1,j+1);
+			for (int j=0;j<T0_A[sgn]->GetNbinsY();j++) tempArray[j] = (int) T0_A[sgn]->GetBinContent(i+1,j+1);
 
 			doStats(T0_A[sgn]->GetNbinsY(),0,T0_A[sgn]->GetNbinsY()-1,tempArray,count,center,spread);
 			count_integral+=count;

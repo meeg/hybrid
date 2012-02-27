@@ -79,9 +79,9 @@ int main ( int argc, char **argv ) {
 	short *allSamples[2][640][48] = {{{NULL}}};
 	//bool hasSamples[2][640][48] = {{{false}}};
 	//TH1D            *histSamples1D;
-	double          histMin[640];
+	int          histMin[640];
 	for (int i=0;i<640;i++) histMin[i]=16384;
-	double          histMax[640];
+	int          histMax[640];
 	for (int i=0;i<640;i++) histMax[i]=0;
 	//TGraph          *mean;
 	//TGraph          *sigma;
@@ -90,7 +90,7 @@ int main ( int argc, char **argv ) {
 	TrackerSample   *sample;
 	uint            x;
 	uint            y;
-	uint            value;
+	int            value;
 	uint            channel;
 	uint            eventCount;
 	double          sum;
@@ -258,7 +258,7 @@ int main ( int argc, char **argv ) {
 
 					sum = 0;
 					for ( y=0; y < 6; y++ ) {
-						value = sample->value(y);
+						value = (int)sample->value(y);
 
 						//vhigh = (value << 1) & 0x2AAA;
 						//vlow  = (value >> 1) & 0x1555;
