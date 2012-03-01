@@ -55,6 +55,7 @@ int main ( int argc, char **argv ) {
 	bool shift_t0 = false;
 	bool use_dist = false;
 	double dist_window;
+	bool make_shape = false;
 	int single_channel = -1;
 	TString inname = "";
 	int cal_grp = -1;
@@ -88,6 +89,7 @@ int main ( int argc, char **argv ) {
 	char            filename[100];
 	char            name[100];
 	char            name2[100];
+	char title[200];
 	ShapingCurve *myShape[2][640];
 	Fitter *myFitter[2][640];
 
@@ -103,12 +105,12 @@ int main ( int argc, char **argv ) {
 	double maxA[2] = {0, 0};
 	double minA[2] = {16384, 16384};
 	double maxT0[2] = {0.0, 0.0};
-	double minT0[2] = {0.0, 0.0};
+	double minT0[2] = {200.0, 200.0};
 	TGraph *T0_dist[2];
 	double T0_dist_b[2],T0_dist_m[2];
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:d:")) !=-1)
+	while ((c = getopt(argc,argv,"hfsg:o:auc:d:t")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -120,6 +122,7 @@ int main ( int argc, char **argv ) {
 				printf("-o: use specified output filename\n");
 				printf("-s: shift T0 by value from Tp cal file\n");
 				printf("-u: use .shape cal instead of .tp\n");
+				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
 				return(0);
 				break;
@@ -149,6 +152,9 @@ int main ( int argc, char **argv ) {
 				dist_window = atof(optarg);
 				use_dist=true;
 				break;
+			case 't':
+				make_shape = true;
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
@@ -161,6 +167,8 @@ int main ( int argc, char **argv ) {
 	gStyle->SetPalette(1,0);
 	gStyle->SetStatW(0.2);                
 	gStyle->SetStatH(0.1);                
+	gStyle->SetTitleOffset(1.4,"y");
+	gStyle->SetPadLeftMargin(0.15);
 	c1 = new TCanvas("c1","c1",1200,900);
 	//c1->SetLogz();
 	// Start X11 view
@@ -177,6 +185,7 @@ int main ( int argc, char **argv ) {
 	calfile.open(argv[optind]);
 	while (!calfile.eof()) {
 		calfile >> channel;
+		if (calfile.eof()) break;
 		for (int i=0;i<7;i++)
 		{
 			calfile >> calMean[channel][i];
@@ -186,6 +195,24 @@ int main ( int argc, char **argv ) {
 	calfile.close();
 
 	optind++;
+
+	for (int sgn=0;sgn<2;sgn++)
+	{
+		sprintf(name,"%s.tp_%s",argv[optind],sgn?"neg":"pos");
+		cout << "Reading Tp calibration from "<<name<<endl;
+		calfile.open(name);
+		while (!calfile.eof()) {
+			calfile >> channel;
+			if (calfile.eof()) break;
+			calfile >> calA[sgn][channel];
+			calfile >> calT0[sgn][channel];
+			calfile >> calTp[sgn][channel];
+			calfile >> calChisq[sgn][channel];
+
+		}
+		calfile.close();
+	}
+
 	for (int sgn=0;sgn<2;sgn++)
 	{
 		if (use_shape)
@@ -202,6 +229,7 @@ int main ( int argc, char **argv ) {
 				calfile >> shape_t0;
 				calfile >> shape_y0;
 				calfile >> shape_e0;
+				if (calfile.eof()) break;
 				int j=0;
 				do
 				{
@@ -220,45 +248,41 @@ int main ( int argc, char **argv ) {
 					calfile >> ey[i+j];
 					//			if (ti[i]<0) yi[i]=0;
 				}
-				ti[ni+j] = 300.0;
-				yi[ni+j] = 0.0;
-				ey[ni+j] = 1.0;
-				ni+=j+1;
+				ni+=j;
+				do
+				{
+					ti[ni] = ti[ni-1]+5.0;
+					yi[ni] = yi[ni-1];
+					ey[ni] = 1.0;
+					ni++;
+				} while (ti[ni-1]<300.0);
 
 				myShape[sgn][channel] = new SmoothShapingCurve(ni,ti,yi);
 				myFitter[sgn][channel] = new LinFitter(myShape[sgn][channel],6,1,TMath::Mean(6,calSigma[channel]));
 
 
 				if (single_channel!=-1 && channel==single_channel)
+				//if (channel==639)
 				{
 					c1->Clear();
 					TSpline3 *tempspline = new TSpline3("tempspline",ti,yi,ni,"",0.0,yi[ni-1]);
 					tempspline->Draw();
+					tempspline->Print();
 					sprintf(name,"spline_%s.png",sgn?"neg":"pos");
 					c1->SaveAs(name);
 				}
-
 			}
 			calfile.close();
 		}
 		else
 		{
-			sprintf(name,"%s.tp_%s",argv[optind],sgn?"neg":"pos");
-			cout << "Reading Tp calibration from "<<name<<endl;
-			calfile.open(name);
-			while (!calfile.eof()) {
-				calfile >> channel;
-				calfile >> calA[sgn][channel];
-				calfile >> calT0[sgn][channel];
-				calfile >> calTp[sgn][channel];
-				calfile >> calChisq[sgn][channel];
-
+			for (channel = 0; channel<640; channel++)
+			{
 				//myShape[sgn][channel] = new SmoothShapingCurve(calTp[sgn][channel]);
 				//myFitter[sgn][channel] = new LinFitter(myShape[sgn][channel],6,1,calSigma[channel]);
 				myShape[sgn][channel] = new ShapingCurve(calTp[sgn][channel]);
 				myFitter[sgn][channel] = new AnalyticFitter(myShape[sgn][channel],6,1,TMath::Mean(6,calSigma[channel]));
 			}
-			calfile.close();
 		}
 
 		if (use_dist)
@@ -278,9 +302,9 @@ int main ( int argc, char **argv ) {
 				calfile >> ti[ni];
 				calfile >> amplitude[ni];
 				calfile >> integral[ni];
+				if (calfile.eof()) break;
 				ni++;
 			}
-			ni--;
 			calfile.close();
 			/*
 			   ti[ni] = ti[ni-1]+100.0;
@@ -307,27 +331,35 @@ int main ( int argc, char **argv ) {
 	for (int sgn=0;sgn<2;sgn++)
 	{
 		sprintf(name,"Pulse_shape_%s",sgn?"Neg":"Pos");
-		pulse2D[sgn] = new TH2I(name,name,520,-1.5*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL,500,-0.1,1.2);
+		sprintf(title,"Normalized pulse shape, %s pulses;Time [ns];Amplitude [normalized]",sgn?"negative":"positive");
+		pulse2D[sgn] = new TH2I(name,title,520,-1.5*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL,500,-0.1,1.2);
 		sprintf(name,"A_vs_T0_%s",sgn?"Neg":"Pos");
-		T0_A[sgn] = new TH2I(name,name,500,-4*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL,500,0.0,2000.0);
+		sprintf(title,"Amplitude vs. T0, %s pulses;Time [ns];Amplitude [ADC counts]",sgn?"negative":"positive");
+		T0_A[sgn] = new TH2I(name,title,500,-4*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL,500,0.0,2000.0);
 		//T0_A[sgn] = new TH2I(name,name,500,0,2*SAMPLE_INTERVAL,500,800.0,1400.0);
 		if (force_cal_grp)
 		{
 			sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
-			histChiProb[sgn] = new TH2F(name,name,80,0,640,100,0,1.0);
+			sprintf(title,"Chisq probability of fit, %s pulses;Channel;Probability",sgn?"negative":"positive");
+			histChiProb[sgn] = new TH2F(name,title,80,0,640,100,0,1.0);
 			sprintf(name,"T0_%s",sgn?"Neg":"Pos");
-			histT0_2d[sgn] = new TH2F(name,name,80,0,640,1000,-1*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
+			sprintf(title,"Fitted values of T0 relative to channel average, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
+			histT0_2d[sgn] = new TH2F(name,title,80,0,640,1000,-1*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
 			sprintf(name,"A_%s",sgn?"Neg":"Pos");
-			histA_2d[sgn] = new TH2F(name,name,80,0,640,1000,0,2000.0);
+			sprintf(title,"Fitted values of amplitude, %s pulses;Channel;Amplitude [ADC counts]",sgn?"negative":"positive");
+			histA_2d[sgn] = new TH2F(name,title,80,0,640,1000,0,2000.0);
 		}
 		else
 		{
 			sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
-			histChiProb[sgn] = new TH2F(name,name,640,0,640,100,0,1.0);
+			sprintf(title,"Chisq probability of fit, %s pulses;Channel;Probability",sgn?"negative":"positive");
+			histChiProb[sgn] = new TH2F(name,title,640,0,640,100,0,1.0);
 			sprintf(name,"T0_%s",sgn?"Neg":"Pos");
-			histT0_2d[sgn] = new TH2F(name,name,640,0,640,1000,-1*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
+			sprintf(title,"Fitted values of T0 relative to channel average, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
+			histT0_2d[sgn] = new TH2F(name,title,640,0,640,1000,-1*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
 			sprintf(name,"A_%s",sgn?"Neg":"Pos");
-			histA_2d[sgn] = new TH2F(name,name,640,0,640,1000,0,2000.0);
+			sprintf(title,"Fitted values of amplitude, %s pulses;Channel;Amplitude [ADC counts]",sgn?"negative":"positive");
+			histA_2d[sgn] = new TH2F(name,title,640,0,640,1000,0,2000.0);
 		}
 	}
 
@@ -373,10 +405,13 @@ int main ( int argc, char **argv ) {
 	outfile[1].open(inname+".t0_neg");
 
 	ofstream outshapefile[2];
-	cout << "Writing pulse shape to " << inname+".shape_pos" << endl;
-	outshapefile[0].open(inname+".shape_pos");
-	cout << "Writing pulse shape to " << inname+".shape_neg" << endl;
-	outshapefile[1].open(inname+".shape_neg");
+	if (make_shape)
+	{
+		cout << "Writing pulse shape to " << inname+".shape_pos" << endl;
+		outshapefile[0].open(inname+".shape_pos");
+		cout << "Writing pulse shape to " << inname+".shape_neg" << endl;
+		outshapefile[1].open(inname+".shape_neg");
+	}
 
 	ofstream outdistfile[2];
 	cout << "Writing T0 and A distribution to " << inname+".dist_pos" << endl;
@@ -471,6 +506,13 @@ int main ( int argc, char **argv ) {
 						myFitter[sgn][n]->getFitErr(fit_err);
 						chisq = myFitter[sgn][n]->getChisq(fit_par);
 						dof = myFitter[sgn][n]->getDOF();
+						//if (fit_par[1]!=fit_par[1]) 
+						//{
+						//	printf("%d\t%d\t%f\t%f meeg\n",channel,sgn,fit_par[0],fit_par[1]);
+						//	mySamples->print();
+						//	myFitter[sgn][n]->print_fit();
+						//	myFitter[sgn][n]->printResiduals();
+						//}
 
 						if (use_dist)
 						{
@@ -480,6 +522,8 @@ int main ( int argc, char **argv ) {
 							}
 							else continue;
 						}
+
+						fit_par[0]-=calT0[sgn][channel];
 
 
 						histT0[sgn][n]->Fill(fit_par[0]);
@@ -543,53 +587,63 @@ int main ( int argc, char **argv ) {
 	for (int sgn=0;sgn<2;sgn++)
 	{
 		pulse2D[sgn]->Draw("colz");
-		sprintf(name,"Pulse_profile_%s_1",sgn?"Neg":"Pos");
-		TH2I *tempPulse = (TH2I*) pulse2D[sgn]->Clone("temp_pulse");
-		int *tempArray = new int[tempPulse->GetNbinsY()];
-		double *pulse_yi = new double[tempPulse->GetNbinsX()];
-		double *pulse_ti = new double[tempPulse->GetNbinsX()];
-		double *pulse_ey = new double[tempPulse->GetNbinsX()];
-		int pulse_ni = 0;
-
-		double center, spread;
-		int count;
-		tempPulse->Rebin2D(10,5);
-		for (int i=0;i<tempPulse->GetNbinsX();i++)
+		//sprintf(name,"Pulse_profile_%s_1",sgn?"Neg":"Pos");
+		TH2I *tempPulse;
+		int *tempArray;
+		double *pulse_yi, *pulse_ti, *pulse_ey;
+		TGraphErrors *graphErrors;
+		if (make_shape)
 		{
-			for (int j=0;j<tempPulse->GetNbinsY();j++) tempArray[j] = (int) tempPulse->GetBinContent(i+1,j+1);
+			tempPulse = (TH2I*) pulse2D[sgn]->Clone("temp_pulse");
+			tempArray = new int[tempPulse->GetNbinsY()];
+			pulse_yi = new double[tempPulse->GetNbinsX()];
+			pulse_ti = new double[tempPulse->GetNbinsX()];
+			pulse_ey = new double[tempPulse->GetNbinsX()];
+			int pulse_ni = 0;
 
-			doStats(tempPulse->GetNbinsY(),0,tempPulse->GetNbinsY()-1,tempArray,count,center,spread);
-			if (count)
+			double center, spread;
+			int count;
+			tempPulse->Rebin2D(10,5);
+			for (int i=0;i<tempPulse->GetNbinsX();i++)
 			{
-				pulse_yi[pulse_ni] = tempPulse->GetYaxis()->GetBinCenter(1)+center*tempPulse->GetYaxis()->GetBinWidth(1);
-				pulse_ey[pulse_ni] = spread*tempPulse->GetYaxis()->GetBinWidth(1)/sqrt(count);
-				pulse_ti[pulse_ni] = tempPulse->GetXaxis()->GetBinCenter(1)+i*tempPulse->GetXaxis()->GetBinWidth(1);
-				pulse_ni++;
+				for (int j=0;j<tempPulse->GetNbinsY();j++) tempArray[j] = (int) tempPulse->GetBinContent(i+1,j+1);
+
+				doStats(tempPulse->GetNbinsY(),0,tempPulse->GetNbinsY()-1,tempArray,count,center,spread);
+				if (count)
+				{
+					pulse_yi[pulse_ni] = tempPulse->GetYaxis()->GetBinCenter(1)+center*tempPulse->GetYaxis()->GetBinWidth(1);
+					pulse_ey[pulse_ni] = spread*tempPulse->GetYaxis()->GetBinWidth(1)/sqrt(count);
+					pulse_ti[pulse_ni] = tempPulse->GetXaxis()->GetBinCenter(1)+i*tempPulse->GetXaxis()->GetBinWidth(1);
+					pulse_ni++;
+				}
 			}
-		}
-		for (channel=0;channel<640;channel++)
-		{
-			outshapefile[sgn] << channel << "\t";
-			outshapefile[sgn] << pulse_ni << "\t";
-			for (int i=0; i<pulse_ni; i++)
+			for (channel=0;channel<640;channel++)
 			{
-				outshapefile[sgn] << pulse_ti[i] << "\t";
-				outshapefile[sgn] << pulse_yi[i] << "\t";
-				outshapefile[sgn] << pulse_ey[i] << "\t";
+				outshapefile[sgn] << channel << "\t";
+				outshapefile[sgn] << pulse_ni << "\t";
+				for (int i=0; i<pulse_ni; i++)
+				{
+					outshapefile[sgn] << pulse_ti[i] << "\t";
+					outshapefile[sgn] << pulse_yi[i] << "\t";
+					outshapefile[sgn] << pulse_ey[i] << "\t";
+				}
+				outshapefile[sgn] << endl;
 			}
-			outshapefile[sgn] << endl;
+			outshapefile[sgn].close();
+			graphErrors = new TGraphErrors(pulse_ni,pulse_ti,pulse_yi,0,pulse_ey);
+			graphErrors->Draw();
 		}
-		outshapefile[sgn].close();
-		TGraphErrors *graphErrors = new TGraphErrors(pulse_ni,pulse_ti,pulse_yi,0,pulse_ey);
-		graphErrors->Draw();
 		sprintf(name,"%s_t0_pulse_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
-		delete pulse_yi;
-		delete pulse_ti;
-		delete pulse_ey;
-		delete tempPulse;
-		delete tempArray;
-		delete graphErrors;
+		if (make_shape)
+		{
+			delete pulse_yi;
+			delete pulse_ti;
+			delete pulse_ey;
+			delete tempPulse;
+			delete tempArray;
+			delete graphErrors;
+		}
 		/*
 		   pulseProfile[sgn] = pulse2D[sgn]->ProfileX(name);
 		   pulseProfile[sgn]->Rebin(10);
@@ -624,6 +678,8 @@ int main ( int argc, char **argv ) {
 		{
 			for (int j=0;j<T0_A[sgn]->GetNbinsY();j++) tempArray[j] = (int) T0_A[sgn]->GetBinContent(i+1,j+1);
 
+			double center, spread;
+			int count;
 			doStats(T0_A[sgn]->GetNbinsY(),0,T0_A[sgn]->GetNbinsY()-1,tempArray,count,center,spread);
 			count_integral+=count;
 			if (count>0)
@@ -656,21 +712,25 @@ int main ( int argc, char **argv ) {
 
 		sprintf(name,"T0_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_t0_T0_%s.png",inname.Data(),sgn?"neg":"pos");
-		plotResults(name, name2, nChan[sgn], grChan[sgn], grT0[sgn], c1);
+		sprintf(title,"Mean fitted T0, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
+		plotResults(title, name, name2, nChan[sgn], grChan[sgn], grT0[sgn], c1);
 
 		sprintf(name,"T0_err_%s",sgn?"neg":"pos");
 		sprintf(name2,"T0_spread_%s",sgn?"neg":"pos");
 		sprintf(filename,"%s_t0_T0_sigma_%s.png",inname.Data(),sgn?"neg":"pos");
-		plotResults2(name, name2, filename, nChan[sgn], grChan[sgn], grT0_err[sgn], grT0_sigma[sgn], c1);
+		sprintf(title,"Error and spread in fitted T0, %s pulses;Channel;T0 error [ns]",sgn?"negative":"positive");
+		plotResults2(title, name, name2, filename, nChan[sgn], grChan[sgn], grT0_err[sgn], grT0_sigma[sgn], c1);
 
 		sprintf(name,"A_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_t0_A_%s.png",inname.Data(),sgn?"neg":"pos");
-		plotResults(name, name2, nChan[sgn], grChan[sgn], grA[sgn], c1);
+		sprintf(title,"Mean fitted amplitude, %s pulses;Channel;Amplitude [ADC counts]",sgn?"negative":"positive");
+		plotResults(title, name, name2, nChan[sgn], grChan[sgn], grA[sgn], c1);
 
 		sprintf(name,"A_err_%s",sgn?"neg":"pos");
 		sprintf(name2,"A_spread_%s",sgn?"neg":"pos");
 		sprintf(filename,"%s_t0_A_sigma_%s.png",inname.Data(),sgn?"neg":"pos");
-		plotResults2(name, name2, filename, nChan[sgn], grChan[sgn], grA_err[sgn], grA_sigma[sgn], c1);
+		sprintf(title,"Error and spread in fitted amplitude, %s pulses;Channel;Amplitude error [ADC counts]",sgn?"negative":"positive");
+		plotResults2(title, name, name2, filename, nChan[sgn], grChan[sgn], grA_err[sgn], grA_sigma[sgn], c1);
 	}
 
 	// Start X-Windows

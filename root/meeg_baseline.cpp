@@ -58,14 +58,20 @@ int main ( int argc, char **argv ) {
 	uint            channel;
 	uint            eventCount;
 	double          avg;
+	TString inname;
 	char            name[100];
+	char title[200];
 
-	while ((c = getopt(argc,argv,"h")) !=-1)
+	while ((c = getopt(argc,argv,"ho:")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
+				printf("-o: use specified output filename\n");
 				return(0);
+				break;
+			case 'o':
+				inname = optarg;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -79,6 +85,9 @@ int main ( int argc, char **argv ) {
 	gStyle->SetPalette(1,0);
 	gStyle->SetStatW(0.2);                
 	gStyle->SetStatH(0.1);                
+	gStyle->SetTitleOffset(1.4,"y");
+	gStyle->SetPadLeftMargin(0.15);
+	c1 = new TCanvas("c1","c1",1200,900);
 
 	// Start X11 view
 	//   TApplication theApp("App",NULL,NULL);
@@ -94,9 +103,11 @@ int main ( int argc, char **argv ) {
 	for (int i=0;i<6;i++)
 	{
 		sprintf(name,"Value_Hist_s%d",i);
-		histAll[i] = new TH2F(name,name,16384,-0.5,16383.5,640,-0.5,639.5);
+		sprintf(title,"Baseline values, sample %d;ADC counts;Channel",i);
+		histAll[i] = new TH2F(name,title,16384,-0.5,16383.5,640,-0.5,639.5);
 	}
-	histAll[6] = new TH2F("Value_Hist_All","Value_Hist_All",16384,-0.5,16383.5,640,-0.5,639.5);
+	sprintf(title,"Baseline values, all samples;ADC counts;Channel");
+	histAll[6] = new TH2F("Value_Hist_All",title,16384,-0.5,16383.5,640,-0.5,639.5);
 
 
 	hybridMin = 16384;
@@ -113,11 +124,14 @@ int main ( int argc, char **argv ) {
 		histMax[channel] = 0;
 	}
 
-	TString inname=argv[optind];
+	if (inname=="")
+	{
+		inname=argv[optind];
 
-	inname.ReplaceAll(".bin","");
-	if (inname.Contains('/')) {
-		inname.Remove(0,inname.Last('/')+1);
+		inname.ReplaceAll(".bin","");
+		if (inname.Contains('/')) {
+			inname.Remove(0,inname.Last('/')+1);
+		}
 	}
 	ofstream outfile;
 	cout << "Writing calibration to " << inname+".base" << endl;
@@ -206,7 +220,6 @@ int main ( int argc, char **argv ) {
 
 	TGraph          *graph[7];
 	TMultiGraph *mg;
-	c1 = new TCanvas("c1","c1",1200,900);
 
 	histAll[6]->GetXaxis()->SetRangeUser(hybridMin,hybridMax);
 	histAll[6]->Draw("colz");
@@ -230,7 +243,7 @@ int main ( int argc, char **argv ) {
 		mg->Add(graph[i]);
 	}
 	graph[6]->SetMarkerColor(1);
-	mg->SetTitle("base_pedestal");
+	mg->SetTitle("Pedestal;Channel;ADC counts");
 	//mg->GetXaxis()->SetRangeUser(0,640);
 	mg->Draw("a*");
 	sprintf(name,"%s_base_pedestal.png",inname.Data());
@@ -248,7 +261,7 @@ int main ( int argc, char **argv ) {
 		mg->Add(graph[i]);
 	}
 	graph[6]->SetMarkerColor(1);
-	mg->SetTitle("base_noise");
+	mg->SetTitle("Noise;Channel;ADC counts");
 	//mg->GetXaxis()->SetRangeUser(0,640);
 	mg->Draw("a*");
 	sprintf(name,"%s_base_noise.png",inname.Data());

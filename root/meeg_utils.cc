@@ -92,9 +92,10 @@ void doStats(int n, int nmin, int nmax, short int *y, int &count, double &center
 	int *newy = new int[n];
 	for (int i=nmin; i<=nmax; i++) newy[i] = y[i];
 	doStats(n, nmin, nmax, newy, count, center, spread);
+	delete newy;
 }
 
-void plotResults(char *name, char *filename, int n, double *x, double *y, TCanvas *canvas)
+void plotResults(const char *title, const char *name, const char *filename, int n, double *x, double *y, TCanvas *canvas)
 {
 	if (n==0) return;
 	int grpN[8]={0};
@@ -121,6 +122,7 @@ void plotResults(char *name, char *filename, int n, double *x, double *y, TCanva
 		graph[i]->SetMarkerColor(i+1);
 		mg->Add(graph[i]);
 	}
+	mg->SetTitle(title);
 	mg->Draw("a*");
 	canvas->SaveAs(filename);
 	for (int i=0;i<8;i++) if (grpN[i]>0)
@@ -130,7 +132,7 @@ void plotResults(char *name, char *filename, int n, double *x, double *y, TCanva
 	delete mg;
 }
 
-void plotResults2(char *name, char *name2, char *filename, int n, double *x, double *y, double *y2, TCanvas *canvas)
+void plotResults2(const char *title, const char *name, const char *name2, const char *filename, int n, double *x, double *y, double *y2, TCanvas *canvas)
 {
 	if (n==0) return;
 	TMultiGraph *mg = new TMultiGraph();
@@ -174,6 +176,7 @@ void plotResults2(char *name, char *name2, char *filename, int n, double *x, dou
 	}
 
 	canvas->Clear();
+	mg->SetTitle(title);
 	mg->Draw("ap");
 	canvas->SaveAs(filename);
 	for (int i=0;i<8;i++) if (grpN[i]>0)
