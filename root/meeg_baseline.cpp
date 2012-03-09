@@ -142,9 +142,15 @@ int main ( int argc, char **argv ) {
 	// Attempt to open data file
 	if ( ! dataRead.open(argv[optind]) ) return(2);
 
+	TString confname=argv[optind];
+	confname.ReplaceAll(".bin",".conf");
+	if (confname.Contains('/')) {
+		confname.Remove(0,inname.Last('/')+1);
+	}
+
 	ofstream outconfig;
-	cout << "Writing configuration to " << inname+".conf" << endl;
-	outconfig.open(inname+".conf");
+	cout << "Writing configuration to " << confname << endl;
+	outconfig.open(confname);
 
 	dataRead.next(&event);
 	dataRead.dumpConfig(outconfig);
