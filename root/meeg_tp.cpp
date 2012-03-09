@@ -355,8 +355,8 @@ int main ( int argc, char **argv ) {
 		{
 			if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
 			{
-				if (ni>6)
-					fitcurve->Fit(shapingFunction,"Q0","",grT0[sgn][nChan[sgn]]+20.0,5*SAMPLE_INTERVAL);
+				//if (ni>6)
+				//	fitcurve->Fit(shapingFunction,"Q0","",grT0[sgn][nChan[sgn]]+20.0,5*SAMPLE_INTERVAL);
 				grChan[sgn][nChan[sgn]]=channel;
 				A = shapingFunction->GetParameter(0);
 				T0 = shapingFunction->GetParameter(1);

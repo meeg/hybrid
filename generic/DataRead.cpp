@@ -228,12 +228,12 @@ string DataRead::getStatus ( string var ) {
 }
 
 // Dump config
-void DataRead::dumpConfig ( ) {
+void DataRead::dumpConfig ( ostream &out ) {
    VariableHolder::iterator varMapIter;
 
-   cout << "Dumping current config variables:" << endl;
+   out << "Dumping current config variables:" << endl;
    for ( varMapIter = config_.begin(); varMapIter != config_.end(); varMapIter++ ) {
-      cout << "   Config: " << varMapIter->first << " = " << varMapIter->second << endl;
+      out << "   Config: " << varMapIter->first << " = " << varMapIter->second << endl;
    }
 }
 

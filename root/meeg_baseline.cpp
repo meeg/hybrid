@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <TFile.h>
 #include <TH1F.h>
+#include <meeg_utils.hh>
 #include <TH2F.h>
 #include <TF1.h>
 #include <TROOT.h>
@@ -40,7 +41,15 @@ int main ( int argc, char **argv ) {
 	int c;
 	TCanvas         *c1;
 	TH2F            *histAll[7];
-	TH1F            *histSng[640][7];
+	short *allSamples[640][7];
+	for (int i=0;i<640;i++) for (int j=0;j<7;j++)
+	{
+		allSamples[i][j] = new short[16384];
+		for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
+	}
+	bool activeChannel[640];
+	for (int i=0;i<640;i++) activeChannel[i]=false;
+
 	double          histMin[640];
 	double          histMax[640];
 	uint hybridMin, hybridMax;
@@ -113,13 +122,6 @@ int main ( int argc, char **argv ) {
 	hybridMin = 16384;
 	hybridMax = 0;
 	for (channel=0; channel < 640; channel++) {
-		for (int i=0;i<6;i++)
-		{
-			sprintf(name,"ch_%i_sample_%d",channel,i);
-			histSng[channel][i] = new TH1F(name,name,16384,-0.5,16383.5);
-		}
-		sprintf(name,"ch_%i_all_samples",channel);
-		histSng[channel][6] = new TH1F(name,name,16384,-0.5,16383.5);
 		histMin[channel] = 16384;
 		histMax[channel] = 0;
 	}
@@ -140,8 +142,13 @@ int main ( int argc, char **argv ) {
 	// Attempt to open data file
 	if ( ! dataRead.open(argv[optind]) ) return(2);
 
+	ofstream outconfig;
+	cout << "Writing configuration to " << inname+".conf" << endl;
+	outconfig.open(inname+".conf");
+
 	dataRead.next(&event);
-	dataRead.dumpConfig();
+	dataRead.dumpConfig(outconfig);
+	outconfig.close();
 	//dataRead.dumpStatus();
 	//for (uint i=0;i<4;i++)
 	//	printf("Temperature #%d: %f\n",i,event.temperature(i));
@@ -175,9 +182,9 @@ int main ( int argc, char **argv ) {
 					//value = vlow | vhigh;
 
 					histAll[y]->Fill(value,channel);
-					histSng[channel][y]->Fill(value);
 					histAll[6]->Fill(value,channel);
-					histSng[channel][6]->Fill(value);
+					allSamples[channel][y][value]++;
+					allSamples[channel][6][value]++;
 
 					if ( value < histMin[channel] ) histMin[channel] = value;
 					if ( value > histMax[channel] ) histMax[channel] = value;
@@ -192,25 +199,14 @@ int main ( int argc, char **argv ) {
 	dataRead.close();
 
 	for(channel = 0; channel < 640; channel++) {
-		if (histSng[channel][6]->GetEntries()!=0)
+		if (histMin[channel]<=histMax[channel])
 		{
 			grChan[ni]  = channel;
 			outfile <<channel<<"\t";
 			for (int i=0;i<7;i++)
 			{
-				/*
-				   if (histSng[channel]->Fit("gaus","Q0")==0) {
-				   grMean[channel]  = histSng[channel]->GetFunction("gaus")->GetParameter(1);
-				   grSigma[channel] = histSng[channel]->GetFunction("gaus")->GetParameter(2);
-				   }
-				   else {
-				   cout << "Could not fit channel " << channel << endl;
-				   grMean[channel]  = 0;
-				   grSigma[channel] = 1;
-				   }
-				   */
-				grMean[i][ni]  = histSng[channel][i]->GetMean();
-				grSigma[i][ni]  = histSng[channel][i]->GetRMS();
+				int count;
+				doStats_mean(16384,histMin[channel],histMax[channel],allSamples[channel][i],count,grMean[i][ni],grSigma[i][ni]);
 				outfile<<grMean[i][ni]<<"\t"<<grSigma[i][ni]<<"\t";
 			}
 			outfile<<endl;
@@ -267,6 +263,25 @@ int main ( int argc, char **argv ) {
 	sprintf(name,"%s_base_noise.png",inname.Data());
 	c1->SaveAs(name);
 	for (int i=0;i<7;i++)
+		delete graph[i];
+	delete mg;
+
+	c1->Clear();
+	mg = new TMultiGraph();
+	double grShift[640];
+	for (int i=0;i<6;i++)
+	{
+		for (int n=0;n<ni;n++) grShift[n]=grMean[i][n]-grMean[6][n];
+		graph[i] = new TGraph(ni,grChan,grShift);
+		graph[i]->SetMarkerColor(i+1);
+		mg->Add(graph[i]);
+	}
+	mg->SetTitle("Sample-to-sample shift;Channel;ADC counts");
+	//mg->GetXaxis()->SetRangeUser(0,640);
+	mg->Draw("a*");
+	sprintf(name,"%s_base_shift.png",inname.Data());
+	c1->SaveAs(name);
+	for (int i=0;i<6;i++)
 		delete graph[i];
 	delete mg;
 

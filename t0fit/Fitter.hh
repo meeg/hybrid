@@ -43,6 +43,8 @@ class Fitter : public TObject
 		void printResiduals();
 		double getSignal(double time);
 		void setSigmaNoise(double sigma);
+		double getFirstPeak();
+		void setUsedSamples();
 
 		void sortFit();
 		int getNumUsedSamples(int start=0, int end=-1);

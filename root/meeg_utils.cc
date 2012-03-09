@@ -95,6 +95,39 @@ void doStats(int n, int nmin, int nmax, short int *y, int &count, double &center
 	delete newy;
 }
 
+void doStats_mean(int n, int nmin, int nmax, int *y, int &count, double &center, double &spread)
+{
+	double meansq = 0;
+	double mean = 0;
+	center = 0;
+	count = 0;
+	for (int i=nmin;i<=nmax;i++)
+		if (y[i])
+		{
+			count += y[i];
+			mean += i*y[i];
+			meansq += pow(i,2)*y[i];
+		}
+	if (count==0)
+	{
+		center = 0;
+		spread = 0;
+		return;
+	}
+	mean /= count;
+	meansq /= count;
+	spread = sqrt(meansq-mean*mean);
+	center = mean;
+}
+
+void doStats_mean(int n, int nmin, int nmax, short int *y, int &count, double &center, double &spread)
+{
+	int *newy = new int[n];
+	for (int i=nmin; i<=nmax; i++) newy[i] = y[i];
+	doStats_mean(n, nmin, nmax, newy, count, center, spread);
+	delete newy;
+}
+
 void plotResults(const char *title, const char *name, const char *filename, int n, double *x, double *y, TCanvas *canvas)
 {
 	if (n==0) return;

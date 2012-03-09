@@ -21,6 +21,7 @@
 #include <Data.h>
 #include <sys/types.h>
 #include <libxml/tree.h>
+#include <iostream>
 using namespace std;
 
 // Define variable holder
@@ -90,7 +91,7 @@ class DataRead {
       string getStatus ( string var );
 
       //! Dump config
-      void dumpConfig ( );
+      void dumpConfig ( ostream &out=cout );
 
       //! Dump status
       void dumpStatus ( );

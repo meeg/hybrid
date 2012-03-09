@@ -48,6 +48,7 @@ using namespace std;
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
 	int c;
+	bool subtract_T0 = false;
 	bool print_fit_status = false;
 	bool force_cal_grp = false;
 	bool ignore_cal_grp = false;
@@ -110,7 +111,7 @@ int main ( int argc, char **argv ) {
 	double T0_dist_b[2],T0_dist_m[2];
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:d:t")) !=-1)
+	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tb")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -122,6 +123,7 @@ int main ( int argc, char **argv ) {
 				printf("-o: use specified output filename\n");
 				printf("-s: shift T0 by value from Tp cal file\n");
 				printf("-u: use .shape cal instead of .tp\n");
+				printf("-b: subtract value of T0 in .tp cal\n");
 				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
 				return(0);
@@ -137,6 +139,9 @@ int main ( int argc, char **argv ) {
 				break;
 			case 's':
 				shift_t0 = true;
+				break;
+			case 'b':
+				subtract_T0 = true;
 				break;
 			case 'c':
 				single_channel = atoi(optarg);
@@ -496,7 +501,7 @@ int main ( int argc, char **argv ) {
 						for ( y=0; y < 6; y++ ) {
 							samples[y]*=-1;
 						}
-					if (samplesAbove>2 || samplesBelow>2)
+					if (samplesAbove>1 || samplesBelow>1)
 					{
 						int sgn = sum>0?0:1;
 						mySamples->readEvent(samples,0.0);
@@ -523,7 +528,7 @@ int main ( int argc, char **argv ) {
 							else continue;
 						}
 
-						fit_par[0]-=calT0[sgn][channel];
+						if (subtract_T0) fit_par[0]-=calT0[sgn][channel];
 
 
 						histT0[sgn][n]->Fill(fit_par[0]);

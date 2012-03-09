@@ -54,8 +54,8 @@ void Fitter::readSamples(Samples *input)
 	{
 		y[i] = input->getSample(i);
 		sigma[i] = sigma_noise;
-		//useSample[i] = true;
-		useSample[i] = (y[i]>3.0*sigma_noise);
+		useSample[i] = true;
+		//useSample[i] = (y[i]>3.0*sigma_noise);
 	}
 
 	startTime = input->getStartTime();
@@ -113,7 +113,16 @@ int Fitter::getNumUsedSamples(int start, int end)
 	int count=0;
 	for (i=start;i<(end==-1 ? nSamples : end+1);i++)
 		if (useSample[i]) count++;
+		//if (useSample[i] && startTime+sampleInterval*i>getFirstPeak()) count++;
 	return count;
+}
+
+double Fitter::getFirstPeak()
+{
+	double firstPeak = fit_par[0];
+	for (int i=1;i<nPeaks;i++)
+		if (fit_par[2*i]<firstPeak) firstPeak = fit_par[2*i];
+	return firstPeak;
 }
 
 double Fitter::getFitChisq()
