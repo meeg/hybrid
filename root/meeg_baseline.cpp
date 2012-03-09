@@ -38,6 +38,7 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
+	bool flip_channels = false;
 	int c;
 	TCanvas         *c1;
 	TH2F            *histAll[7];
@@ -68,19 +69,28 @@ int main ( int argc, char **argv ) {
 	uint            eventCount;
 	double          avg;
 	TString inname;
+	TString outdir;
 	char            name[100];
 	char title[200];
 
-	while ((c = getopt(argc,argv,"ho:")) !=-1)
+	while ((c = getopt(argc,argv,"ho:n")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
+				printf("-n: flip channel numbering\n");
 				return(0);
 				break;
 			case 'o':
 				inname = optarg;
+				outdir = optarg;
+				if (outdir.Contains('/')) {
+					outdir.Remove(outdir.Last('/'),outdir.Length());
+				}
+				break;
+			case 'n':
+				flip_channels = true;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -139,18 +149,19 @@ int main ( int argc, char **argv ) {
 	cout << "Writing calibration to " << inname+".base" << endl;
 	outfile.open(inname+".base");
 
+	cout << "Reading data file " <<argv[optind] << endl;
 	// Attempt to open data file
 	if ( ! dataRead.open(argv[optind]) ) return(2);
 
 	TString confname=argv[optind];
 	confname.ReplaceAll(".bin",".conf");
 	if (confname.Contains('/')) {
-		confname.Remove(0,inname.Last('/')+1);
+		confname.Remove(0,confname.Last('/')+1);
 	}
 
 	ofstream outconfig;
-	cout << "Writing configuration to " << confname << endl;
-	outconfig.open(confname);
+	cout << "Writing configuration to " <<outdir<<confname << endl;
+	outconfig.open(outdir+confname);
 
 	dataRead.next(&event);
 	dataRead.dumpConfig(outconfig);
@@ -168,7 +179,10 @@ int main ( int argc, char **argv ) {
 
 			// Get sample
 			sample  = event.sample(x);
-			channel = (sample->apv() * 128) + 128 - sample->channel();
+			if (flip_channels)
+				channel = (sample->apv() * 128) + 127 - sample->channel();
+			else
+				channel = (sample->apv() * 128) + sample->channel();
 
 			if ( channel >= (5 * 128) ) {
 				cout << "Channel " << dec << channel << " out of range" << endl;

@@ -52,6 +52,7 @@ int main ( int argc, char **argv ) {
 	bool print_fit_status = false;
 	bool force_cal_grp = false;
 	bool ignore_cal_grp = false;
+	bool flip_channels = false;
 	bool use_shape = false;
 	bool shift_t0 = false;
 	bool use_dist = false;
@@ -59,6 +60,7 @@ int main ( int argc, char **argv ) {
 	bool make_shape = false;
 	int single_channel = -1;
 	TString inname = "";
+	TString outdir = "";
 	int cal_grp = -1;
 	int cal_delay = 0;
 	double delay_step = SAMPLE_INTERVAL/8;
@@ -111,7 +113,7 @@ int main ( int argc, char **argv ) {
 	double T0_dist_b[2],T0_dist_m[2];
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tb")) !=-1)
+	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tbn")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -126,6 +128,7 @@ int main ( int argc, char **argv ) {
 				printf("-b: subtract value of T0 in .tp cal\n");
 				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
+				printf("-n: flip channel numbering\n");
 				return(0);
 				break;
 			case 'f':
@@ -133,6 +136,9 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'u':
 				use_shape = true;
+				break;
+			case 'n':
+				flip_channels = true;
 				break;
 			case 'a':
 				ignore_cal_grp = true;
@@ -152,6 +158,10 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'o':
 				inname = optarg;
+				outdir = optarg;
+				if (outdir.Contains('/')) {
+					outdir.Remove(outdir.Last('/'),outdir.Length());
+				}
 				break;
 			case 'd':
 				dist_window = atof(optarg);
@@ -267,7 +277,7 @@ int main ( int argc, char **argv ) {
 
 
 				if (single_channel!=-1 && channel==single_channel)
-				//if (channel==639)
+					//if (channel==639)
 				{
 					c1->Clear();
 					TSpline3 *tempspline = new TSpline3("tempspline",ti,yi,ni,"",0.0,yi[ni-1]);
@@ -432,18 +442,19 @@ int main ( int argc, char **argv ) {
 
 	while (optind<argc)
 	{
+		cout << "Reading data file " <<argv[optind] << endl;
 		// Attempt to open data file
 		if ( ! dataRead.open(argv[optind]) ) return(2);
 
 		TString confname=argv[optind];
 		confname.ReplaceAll(".bin",".conf");
 		if (confname.Contains('/')) {
-			confname.Remove(0,inname.Last('/')+1);
+			confname.Remove(0,confname.Last('/')+1);
 		}
 
 		ofstream outconfig;
-		cout << "Writing configuration to " << confname << endl;
-		outconfig.open(confname);
+		cout << "Writing configuration to " <<outdir<<confname << endl;
+		outconfig.open(outdir+confname);
 
 		dataRead.next(&event);
 		dataRead.dumpConfig(outconfig);
@@ -473,7 +484,10 @@ int main ( int argc, char **argv ) {
 
 				// Get sample
 				sample  = event.sample(x);
-				channel = (sample->apv() * 128) + 128 - sample->channel();
+				if (flip_channels)
+					channel = (sample->apv() * 128) + 127 - sample->channel();
+				else
+					channel = (sample->apv() * 128) + sample->channel();
 				//				if (sample->apv()==0 || sample->apv()==4) continue;
 
 				if (single_channel!=-1 && channel !=single_channel) continue;
@@ -483,7 +497,7 @@ int main ( int argc, char **argv ) {
 					cout << "Chan = " << dec << sample->channel() << endl;
 				}
 
-				if (!ignore_cal_grp && cal_grp!=-1 && (channel-cal_grp)%8!=0) continue;
+				if (!ignore_cal_grp && cal_grp!=-1 && ((int)sample->channel()-cal_grp)%8!=0) continue;
 				int n = channel;
 				// Filter APVs
 				if ( eventCount > 20 ) {

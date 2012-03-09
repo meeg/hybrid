@@ -47,8 +47,10 @@ int main ( int argc, char **argv ) {
 	bool plot_fit_results = false;
 	bool force_cal_grp = false;
 	bool use_baseline_cal = false;
+	bool flip_channels = false;
 	ifstream calfile;
 	TString inname = "";
+	TString outdir = "";
 	int cal_grp = -1;
 	int cal_delay = 0;
 	double delay_step = SAMPLE_INTERVAL/8;
@@ -84,7 +86,7 @@ int main ( int argc, char **argv ) {
 	double          calMean[640][7] = {{0.0}};
 	double          calSigma[640][7] = {{1.0}};
 
-	while ((c = getopt(argc,argv,"hfrg:o:b:")) !=-1)
+	while ((c = getopt(argc,argv,"hfrg:o:b:n")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -94,6 +96,7 @@ int main ( int argc, char **argv ) {
 				printf("-r: plot fit results\n");
 				printf("-o: use specified output filename\n");
 				printf("-b: use specified baseline cal file\n");
+				printf("-n: flip channel numbering\n");
 				return(0);
 				break;
 			case 'f':
@@ -102,12 +105,19 @@ int main ( int argc, char **argv ) {
 			case 'r':
 				plot_fit_results = true;
 				break;
+			case 'n':
+				flip_channels = true;
+				break;
 			case 'g':
 				force_cal_grp = true;
 				cal_grp = atoi(optarg);
 				break;
 			case 'o':
 				inname = optarg;
+				outdir = optarg;
+				if (outdir.Contains('/')) {
+					outdir.Remove(outdir.Last('/'),outdir.Length());
+				}
 				break;
 			case 'b':
 				use_baseline_cal = true;
@@ -180,18 +190,19 @@ int main ( int argc, char **argv ) {
 
 	while (optind<argc)
 	{
+		cout << "Reading data file " <<argv[optind] << endl;
 		// Attempt to open data file
 		if ( ! dataRead.open(argv[optind]) ) return(2);
 
 		TString confname=argv[optind];
 		confname.ReplaceAll(".bin",".conf");
 		if (confname.Contains('/')) {
-			confname.Remove(0,inname.Last('/')+1);
+			confname.Remove(0,confname.Last('/')+1);
 		}
 
 		ofstream outconfig;
-		cout << "Writing configuration to " << confname << endl;
-		outconfig.open(confname);
+		cout << "Writing configuration to " <<outdir<<confname << endl;
+		outconfig.open(outdir+confname);
 
 		dataRead.next(&event);
 		dataRead.dumpConfig(outconfig);
@@ -234,7 +245,10 @@ int main ( int argc, char **argv ) {
 
 				// Get sample
 				sample  = event.sample(x);
-				channel = (sample->apv() * 128) + 128 - sample->channel();
+				if (flip_channels)
+					channel = (sample->apv() * 128) + 127 - sample->channel();
+				else
+					channel = (sample->apv() * 128) + sample->channel();
 
 				if ( channel >= (5 * 128) ) {
 					cout << "Channel " << dec << channel << " out of range" << endl;
@@ -242,7 +256,8 @@ int main ( int argc, char **argv ) {
 					cout << "Chan = " << dec << sample->channel() << endl;
 				}
 
-				if ((channel-cal_grp)%8!=0) continue;
+				if (((int)sample->channel()-cal_grp)%8!=0) continue;
+
 				// Filter APVs
 				if ( eventCount > 20 ) {
 
