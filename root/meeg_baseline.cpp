@@ -162,7 +162,7 @@ int main ( int argc, char **argv ) {
 
 			// Get sample
 			sample  = event.sample(x);
-			channel = (sample->apv() * 128) + sample->channel();
+			channel = (sample->apv() * 128) + 128 - sample->channel();
 
 			if ( channel >= (5 * 128) ) {
 				cout << "Channel " << dec << channel << " out of range" << endl;

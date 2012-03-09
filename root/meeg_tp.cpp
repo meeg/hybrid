@@ -183,8 +183,19 @@ int main ( int argc, char **argv ) {
 		// Attempt to open data file
 		if ( ! dataRead.open(argv[optind]) ) return(2);
 
+		TString confname=argv[optind];
+		confname.ReplaceAll(".bin",".conf");
+		if (confname.Contains('/')) {
+			confname.Remove(0,inname.Last('/')+1);
+		}
+
+		ofstream outconfig;
+		cout << "Writing configuration to " << confname << endl;
+		outconfig.open(confname);
+
 		dataRead.next(&event);
-		dataRead.dumpConfig();
+		dataRead.dumpConfig(outconfig);
+		outconfig.close();
 		//dataRead.dumpStatus();
 		for (uint i=0;i<4;i++)
 			printf("Temperature #%d: %f\n",i,event.temperature(i));
@@ -223,7 +234,7 @@ int main ( int argc, char **argv ) {
 
 				// Get sample
 				sample  = event.sample(x);
-				channel = (sample->apv() * 128) + sample->channel();
+				channel = (sample->apv() * 128) + 128 - sample->channel();
 
 				if ( channel >= (5 * 128) ) {
 					cout << "Channel " << dec << channel << " out of range" << endl;

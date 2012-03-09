@@ -435,8 +435,19 @@ int main ( int argc, char **argv ) {
 		// Attempt to open data file
 		if ( ! dataRead.open(argv[optind]) ) return(2);
 
+		TString confname=argv[optind];
+		confname.ReplaceAll(".bin",".conf");
+		if (confname.Contains('/')) {
+			confname.Remove(0,inname.Last('/')+1);
+		}
+
+		ofstream outconfig;
+		cout << "Writing configuration to " << confname << endl;
+		outconfig.open(confname);
+
 		dataRead.next(&event);
-		dataRead.dumpConfig();
+		dataRead.dumpConfig(outconfig);
+		outconfig.close();
 		//dataRead.dumpStatus();
 		if (!force_cal_grp)
 		{
@@ -462,7 +473,7 @@ int main ( int argc, char **argv ) {
 
 				// Get sample
 				sample  = event.sample(x);
-				channel = (sample->apv() * 128) + sample->channel();
+				channel = (sample->apv() * 128) + 128 - sample->channel();
 				//				if (sample->apv()==0 || sample->apv()==4) continue;
 
 				if (single_channel!=-1 && channel !=single_channel) continue;
