@@ -10,6 +10,7 @@ popd
 
 mkdir -p $3
 $binpath/meeg_baseline $2 -n -o $3/$4
+$binpath/meeg_baseline $2 -m -o $3/$4_mux
 
 $binpath/meeg_tp $1/*cal?_[1-8]x3_125ns.bin -frn -o $3/$4
 mkdir -p $3/fits
