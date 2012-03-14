@@ -16,6 +16,8 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <algorithm>
+#include <cmath>
 #include <TFile.h>
 #include <TH1F.h>
 #include <meeg_utils.hh>
@@ -35,10 +37,15 @@
 #include <unistd.h>
 using namespace std;
 
+//#define corr1 384
+//#define corr2 383
+
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
 	bool flip_channels = false;
+	bool mux_channels = false;
+	bool skip_corr = false;
 	int c;
 	TCanvas         *c1;
 	TH2F            *histAll[7];
@@ -48,8 +55,26 @@ int main ( int argc, char **argv ) {
 		allSamples[i][j] = new short[16384];
 		for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
 	}
-	bool activeChannel[640];
-	for (int i=0;i<640;i++) activeChannel[i]=false;
+	int chanMap[128];
+	for (int idx = 0; idx < 128; idx++ ) {
+		chanMap[(32*(idx%4)) + (8*(idx/4)) - (31*(idx/16))] = idx;
+	}
+
+	bool channelActive[640];
+	double channelAvg[640];
+	int channelCount[640];
+	double channelMean[640];
+	double channelVariance[640];
+	double channelCovar[640][640];
+	for (int i=0;i<640;i++) {
+		channelCount[i] = 0;
+		channelMean[i] = 0.0;
+		channelVariance[i] = 0.0;
+		for (int j=0;j<640;j++) {
+			channelCovar[i][j] = 0.0;
+		}
+	}
+//	TH2F *corrHist = new TH2F("corrHist","Channel correlation",16384,-0.5,16383.5,16384,-0.5,16383.5);
 
 	double          histMin[640];
 	double          histMax[640];
@@ -67,19 +92,20 @@ int main ( int argc, char **argv ) {
 	uint            value;
 	uint            channel;
 	uint            eventCount;
-	double          avg;
 	TString inname;
 	TString outdir;
 	char            name[100];
 	char title[200];
 
-	while ((c = getopt(argc,argv,"ho:n")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmc")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
 				printf("-n: flip channel numbering\n");
+				printf("-m: number channels in raw mux order\n");
+				printf("-c: don't compute correlations\n");
 				return(0);
 				break;
 			case 'o':
@@ -88,9 +114,16 @@ int main ( int argc, char **argv ) {
 				if (outdir.Contains('/')) {
 					outdir.Remove(outdir.Last('/'),outdir.Length());
 				}
+				else outdir="";
 				break;
 			case 'n':
 				flip_channels = true;
+				break;
+			case 'c':
+				skip_corr = true;
+				break;
+			case 'm':
+				mux_channels = true;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -170,19 +203,31 @@ int main ( int argc, char **argv ) {
 	//for (uint i=0;i<4;i++)
 	//	printf("Temperature #%d: %f\n",i,event.temperature(i));
 
+
+
 	// Process each event
 	eventCount = 0;
 
 	do {
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
+		for (int i=0;i<640;i++)
+		{
+			channelActive[i] = false;
+		}
 		for (x=0; x < event.count(); x++) {
 
 			// Get sample
 			sample  = event.sample(x);
+
+			if (mux_channels) channel = chanMap[sample->channel()];
+			else channel = sample->channel();
+
 			if (flip_channels)
-				channel = (sample->apv() * 128) + 127 - sample->channel();
-			else
-				channel = (sample->apv() * 128) + sample->channel();
+				channel = 127 - channel;
+
+			channel += sample->apv()*128;
+
+			//if (eventCount==0) printf("channel %d\n",channel);
 
 			if ( channel >= (5 * 128) ) {
 				cout << "Channel " << dec << channel << " out of range" << endl;
@@ -191,11 +236,11 @@ int main ( int argc, char **argv ) {
 			}
 
 			// Filter APVs
-			if ( eventCount > 20 ) {
-
-				avg = 0;
+			if ( eventCount >= 20 ) {
+				channelAvg[channel] = 0;
 				for ( y=0; y < 6; y++ ) {
 					value = sample->value(y);
+					channelAvg[channel]+=value;
 
 					//vhigh = (value << 1) & 0x2AAA;
 					//vlow  = (value >> 1) & 0x1555;
@@ -211,21 +256,80 @@ int main ( int argc, char **argv ) {
 					if ( value < hybridMin ) hybridMin = value;
 					if ( value > hybridMax ) hybridMax = value;
 				}
+				channelAvg[channel]/=6.0;
+				//channelAvg[channel] = sample->value(1);
+
+				channelCount[channel]++;
+				channelActive[channel] = true;
 			}
 		}
+		if (!skip_corr)
+			for (int i=0;i<640;i++) if (channelActive[i])
+			{
+				double delta = channelAvg[i]-channelMean[i];
+				if (channelCount[i]==1)
+				{
+					channelMean[i] = channelAvg[i];
+				}
+				else
+				{
+					channelMean[i] += delta/channelCount[i];
+				}
+				channelVariance[i] += delta*(channelAvg[i]-channelMean[i]);
+				for (int j=0;j<i;j++) if (channelActive[j])
+				{
+					channelCovar[i][j] += (channelAvg[i]-channelMean[i])*(channelAvg[j]-channelMean[j]);
+					//if (i==corr1&&j==corr2) corrHist->Fill(channelAvg[i],channelAvg[j]);
+				}
+			}
 		eventCount++;
 
 	} while ( dataRead.next(&event));
 	dataRead.close();
 
-	for(channel = 0; channel < 640; channel++) {
+	int deadAPV = -1;
+	for (int i=0;i<640;i++)
+	{
+		if (channelCount[i])
+		{
+			if (i/128==deadAPV)
+			{
+				printf("Counted %d events on channel %d, even though we thought APV %d was dead\n",channelCount[i],i,deadAPV);
+			}
+			if (channelCount[i]!=(int)eventCount-20)
+			{
+				printf("Counted %d events for channel %d; expected %d\n",channelCount[i],i,eventCount-20);
+			}
+			if (!skip_corr)
+			{
+				channelVariance[i]/=channelCount[i];
+				for (int j=0;j<i;j++) if (channelCount[j])
+				{
+					channelCovar[i][j]/=eventCount-20;
+					channelCovar[i][j]/=sqrt(channelVariance[i]);
+					channelCovar[i][j]/=sqrt(channelVariance[j]);
+					//printf("%d, %d, %f\n",i,j,channelCovar[i][j]);
+				}
+			}
+		}
+		else
+		{
+			if (i/128!=deadAPV)
+			{
+				deadAPV = i/128;
+				printf("No events on channel %d; assuming APV %d is dead\n",i,deadAPV);
+			}
+		}
+	}
+
+	for (channel = 0; channel < 640; channel++) {
+		int count;
 		if (histMin[channel]<=histMax[channel])
 		{
 			grChan[ni]  = channel;
 			outfile <<channel<<"\t";
 			for (int i=0;i<7;i++)
 			{
-				int count;
 				doStats_mean(16384,histMin[channel],histMax[channel],allSamples[channel][i],count,grMean[i][ni],grSigma[i][ni]);
 				outfile<<grMean[i][ni]<<"\t"<<grSigma[i][ni]<<"\t";
 			}
@@ -241,6 +345,67 @@ int main ( int argc, char **argv ) {
 	histAll[6]->Draw("colz");
 	sprintf(name,"%s_base.png",inname.Data());
 	c1->SaveAs(name);
+
+	if (!skip_corr)
+	{
+		//c1->SetLogz();
+		TH2F *channelCorr = new TH2F("channelCorr","Channel correlation - positive correlations",640,-0.5,639.5,640,-0.5,639.5);
+		channelCorr->SetStats(kFALSE);
+		channelCorr->SetNdivisions(0,"XY");
+		for (int i=0;i<640;i++) for (int j=0;j<i;j++) if (channelCovar[i][j]>0)
+		{
+			channelCorr->Fill(i,j,channelCovar[i][j]);
+			channelCorr->Fill(j,i,channelCovar[i][j]);
+		}
+		channelCorr->Draw("colz");
+		sprintf(name,"%s_corr_pos.pdf",inname.Data());
+		c1->SaveAs(name);
+
+		channelCorr->Reset();
+		channelCorr->SetTitle("Channel correlation - negative correlations");
+		for (int i=0;i<640;i++) for (int j=0;j<i;j++) if (channelCovar[i][j]<0)
+		{
+			channelCorr->Fill(i,j,-1*channelCovar[i][j]);
+			channelCorr->Fill(j,i,-1*channelCovar[i][j]);
+		}
+		channelCorr->Draw("colz");
+		sprintf(name,"%s_corr_neg.pdf",inname.Data());
+		c1->SaveAs(name);
+		//c1->SetLogz(0);
+
+		c1->Clear();
+		mg = new TMultiGraph();
+		double yi[6][640], xi[6][640];
+		for (int i=0;i<5;i++) 
+		{
+			for (int j=0;j<127;j++)
+			{
+				yi[i][j] = channelCovar[i*128+j+1][i*128+j];
+				xi[i][j] = i*128+j+0.5;
+			}
+			graph[i] = new TGraph(127,xi[i],yi[i]);
+			graph[i]->SetMarkerColor(i+2);
+			mg->Add(graph[i]);
+		}
+		for (int i=1;i<5;i++)
+		{
+			yi[5][i-1] = channelCovar[i*128][i*128-1];
+			xi[5][i-1] = i*128-0.5;
+		}
+		graph[5] = new TGraph(4,xi[5],yi[5]);
+		graph[5]->SetMarkerColor(1);
+		mg->Add(graph[5]);
+
+		mg->SetTitle("Adjacent channel correlations");
+		mg->Draw("a*");
+		//mg->GetXaxis()->SetRangeUser(0,640);
+		sprintf(name,"%s_corr_adj.png",inname.Data());
+		c1->SaveAs(name);
+		for (int i=0;i<6;i++) delete graph[i];
+		delete mg;
+
+		//printf("correlation %f %f\n",corrHist->GetCorrelationFactor(),channelCovar[corr1][corr2]);
+	}
 
 	for (int i=0;i<6;i++)
 	{

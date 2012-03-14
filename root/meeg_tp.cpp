@@ -118,6 +118,7 @@ int main ( int argc, char **argv ) {
 				if (outdir.Contains('/')) {
 					outdir.Remove(outdir.Last('/'),outdir.Length());
 				}
+				else outdir="";
 				break;
 			case 'b':
 				use_baseline_cal = true;
@@ -259,7 +260,7 @@ int main ( int argc, char **argv ) {
 				if (((int)sample->channel()-cal_grp)%8!=0) continue;
 
 				// Filter APVs
-				if ( eventCount > 20 ) {
+				if ( eventCount >= 20 ) {
 
 					sum = 0;
 					for ( y=0; y < 6; y++ ) {

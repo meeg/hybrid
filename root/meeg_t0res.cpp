@@ -162,6 +162,7 @@ int main ( int argc, char **argv ) {
 				if (outdir.Contains('/')) {
 					outdir.Remove(outdir.Last('/'),outdir.Length());
 				}
+				else outdir="";
 				break;
 			case 'd':
 				dist_window = atof(optarg);
@@ -500,7 +501,7 @@ int main ( int argc, char **argv ) {
 				if (!ignore_cal_grp && cal_grp!=-1 && ((int)sample->channel()-cal_grp)%8!=0) continue;
 				int n = channel;
 				// Filter APVs
-				if ( eventCount > 20 ) {
+				if ( eventCount >= 20 ) {
 
 					int samplesAbove = 0;
 					int samplesBelow = 0;
