@@ -358,7 +358,9 @@ int main ( int argc, char **argv ) {
 			channelCorr->Fill(j,i,channelCovar[i][j]);
 		}
 		channelCorr->Draw("colz");
-		sprintf(name,"%s_corr_pos.pdf",inname.Data());
+		sprintf(name,"%s_pos_corr.pdf",inname.Data());
+		c1->SaveAs(name);
+		sprintf(name,"%s_pos_corr.png",inname.Data());
 		c1->SaveAs(name);
 
 		channelCorr->Reset();
@@ -369,7 +371,9 @@ int main ( int argc, char **argv ) {
 			channelCorr->Fill(j,i,-1*channelCovar[i][j]);
 		}
 		channelCorr->Draw("colz");
-		sprintf(name,"%s_corr_neg.pdf",inname.Data());
+		sprintf(name,"%s_neg_corr.pdf",inname.Data());
+		c1->SaveAs(name);
+		sprintf(name,"%s_neg_corr.png",inname.Data());
 		c1->SaveAs(name);
 		//c1->SetLogz(0);
 

@@ -37,4 +37,4 @@ $binpath/meeg_t0res $3/$4.base $3/$4 $1/*cal?_[1-8]x3_125ns.bin -n -o $3/$4_anfi
 $binpath/meeg_t0res $3/$4.base $3/$4 $1/*cal?_[1-8]x3_125ns.bin -n -o $3/$4_linfit -u 
 
 mkdir -p $3/neg
-mv $3/*_neg $3/*_neg.png $3/neg
+mv $3/*_neg.png $3/neg

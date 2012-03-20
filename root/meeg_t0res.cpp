@@ -741,7 +741,7 @@ int main ( int argc, char **argv ) {
 		sprintf(name,"%s_t0_A_hist_%s.png",inname.Data(),sgn?"neg":"pos");
 		c1->SaveAs(name);
 
-		sprintf(name,"T0_%s",sgn?"neg":"pos");
+		sprintf(name,"T0_graph_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_t0_T0_%s.png",inname.Data(),sgn?"neg":"pos");
 		sprintf(title,"Mean fitted T0, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
 		plotResults(title, name, name2, nChan[sgn], grChan[sgn], grT0[sgn], c1);
@@ -752,7 +752,7 @@ int main ( int argc, char **argv ) {
 		sprintf(title,"Error and spread in fitted T0, %s pulses;Channel;T0 error [ns]",sgn?"negative":"positive");
 		plotResults2(title, name, name2, filename, nChan[sgn], grChan[sgn], grT0_err[sgn], grT0_sigma[sgn], c1);
 
-		sprintf(name,"A_%s",sgn?"neg":"pos");
+		sprintf(name,"A_graph_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_t0_A_%s.png",inname.Data(),sgn?"neg":"pos");
 		sprintf(title,"Mean fitted amplitude, %s pulses;Channel;Amplitude [ADC counts]",sgn?"negative":"positive");
 		plotResults(title, name, name2, nChan[sgn], grChan[sgn], grA[sgn], c1);
