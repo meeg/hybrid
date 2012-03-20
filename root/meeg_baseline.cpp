@@ -112,7 +112,7 @@ int main ( int argc, char **argv ) {
 				inname = optarg;
 				outdir = optarg;
 				if (outdir.Contains('/')) {
-					outdir.Remove(outdir.Last('/'),outdir.Length());
+					outdir.Remove(outdir.Last('/')+1);
 				}
 				else outdir="";
 				break;
@@ -330,7 +330,7 @@ int main ( int argc, char **argv ) {
 			outfile <<channel<<"\t";
 			for (int i=0;i<7;i++)
 			{
-				doStats_mean(16384,histMin[channel],histMax[channel],allSamples[channel][i],count,grMean[i][ni],grSigma[i][ni]);
+				doStats_mean(16384,(int)histMin[channel],(int)histMax[channel],allSamples[channel][i],count,grMean[i][ni],grSigma[i][ni]);
 				outfile<<grMean[i][ni]<<"\t"<<grSigma[i][ni]<<"\t";
 			}
 			outfile<<endl;

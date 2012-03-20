@@ -160,7 +160,7 @@ int main ( int argc, char **argv ) {
 				inname = optarg;
 				outdir = optarg;
 				if (outdir.Contains('/')) {
-					outdir.Remove(outdir.Last('/'),outdir.Length());
+					outdir.Remove(outdir.Last('/')+1);
 				}
 				else outdir="";
 				break;

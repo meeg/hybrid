@@ -5,7 +5,7 @@ then
 	exit
 fi
 pushd "${0/%`basename $0`/}"
-binpath="${PWD/%root/}bin"
+binpath="${PWD/%root/}/bin"
 popd
 
 mkdir -p $3

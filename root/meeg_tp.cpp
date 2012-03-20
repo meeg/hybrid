@@ -116,7 +116,7 @@ int main ( int argc, char **argv ) {
 				inname = optarg;
 				outdir = optarg;
 				if (outdir.Contains('/')) {
-					outdir.Remove(outdir.Last('/'),outdir.Length());
+					outdir.Remove(outdir.Last('/')+1);
 				}
 				else outdir="";
 				break;
@@ -230,6 +230,7 @@ int main ( int argc, char **argv ) {
 		// Process each event
 		eventCount = 0;
 		//bool goodEvent;
+		int pulsePolarity = -1;
 
 		do {
 			//goodEvent = true;
@@ -278,8 +279,13 @@ int main ( int argc, char **argv ) {
 						sum+=value;
 					}
 					sum-=6*sample->value(0);
-					//int sgn = sum>0?0:1;
-					int sgn = eventCount%2;
+					int sgn = sum>0?0:1;
+					if (eventCount==-1)
+					{
+						pulsePolarity=(sgn-eventCount)%2;
+						printf("Saw a %s pulse, event %d, channel %d\n",sgn?"positive":"negative",eventCount,channel);
+					}
+					//int sgn = eventCount%2;
 					for ( y=0; y < 6; y++ ) {
 						if (allSamples[sgn][channel][8*y+8-cal_delay]==NULL)
 						{
