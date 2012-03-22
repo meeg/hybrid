@@ -128,7 +128,7 @@ int main ( int argc, char **argv ) {
 				printf("-b: subtract value of T0 in .tp cal\n");
 				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
-				printf("-n: flip channel numbering\n");
+				printf("-n: physical channel numbering\n");
 				return(0);
 				break;
 			case 'f':
@@ -485,10 +485,11 @@ int main ( int argc, char **argv ) {
 
 				// Get sample
 				sample  = event.sample(x);
+				channel = sample->channel();
 				if (flip_channels)
-					channel = (sample->apv() * 128) + 127 - sample->channel();
+					channel += (4-sample->apv())*128;
 				else
-					channel = (sample->apv() * 128) + sample->channel();
+					channel += sample->apv()*128;
 				//				if (sample->apv()==0 || sample->apv()==4) continue;
 
 				if (single_channel!=-1 && channel !=single_channel) continue;

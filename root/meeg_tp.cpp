@@ -96,7 +96,7 @@ int main ( int argc, char **argv ) {
 				printf("-r: plot fit results\n");
 				printf("-o: use specified output filename\n");
 				printf("-b: use specified baseline cal file\n");
-				printf("-n: flip channel numbering\n");
+				printf("-n: physical channel numbering\n");
 				return(0);
 				break;
 			case 'f':
@@ -247,10 +247,11 @@ int main ( int argc, char **argv ) {
 
 				// Get sample
 				sample  = event.sample(x);
+				channel = sample->channel();
 				if (flip_channels)
-					channel = (sample->apv() * 128) + 127 - sample->channel();
+					channel += (4-sample->apv())*128;
 				else
-					channel = (sample->apv() * 128) + sample->channel();
+					channel += sample->apv()*128;
 
 				if ( channel >= (5 * 128) ) {
 					cout << "Channel " << dec << channel << " out of range" << endl;
@@ -280,7 +281,7 @@ int main ( int argc, char **argv ) {
 					}
 					sum-=6*sample->value(0);
 					int sgn = sum>0?0:1;
-					if (eventCount==-1)
+					if (pulsePolarity==-1)
 					{
 						pulsePolarity=(sgn-eventCount)%2;
 						printf("Saw a %s pulse, event %d, channel %d\n",sgn?"positive":"negative",eventCount,channel);

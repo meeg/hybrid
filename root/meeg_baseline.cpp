@@ -103,7 +103,7 @@ int main ( int argc, char **argv ) {
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
-				printf("-n: flip channel numbering\n");
+				printf("-n: physical channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
 				return(0);
@@ -223,9 +223,9 @@ int main ( int argc, char **argv ) {
 			else channel = sample->channel();
 
 			if (flip_channels)
-				channel = 127 - channel;
-
-			channel += sample->apv()*128;
+				channel += (4-sample->apv())*128;
+			else
+				channel += sample->apv()*128;
 
 			//if (eventCount==0) printf("channel %d\n",channel);
 
@@ -349,7 +349,7 @@ int main ( int argc, char **argv ) {
 	if (!skip_corr)
 	{
 		//c1->SetLogz();
-		TH2F *channelCorr = new TH2F("channelCorr","Channel correlation - positive correlations",640,-0.5,639.5,640,-0.5,639.5);
+		TH2F *channelCorr = new TH2F("channelCorr","Channel correlation - positive correlations;channel 1;channel 2",640,-0.5,639.5,640,-0.5,639.5);
 		channelCorr->SetStats(kFALSE);
 		channelCorr->SetNdivisions(0,"XY");
 		for (int i=0;i<640;i++) for (int j=0;j<i;j++) if (channelCovar[i][j]>0)
@@ -364,7 +364,7 @@ int main ( int argc, char **argv ) {
 		c1->SaveAs(name);
 
 		channelCorr->Reset();
-		channelCorr->SetTitle("Channel correlation - negative correlations");
+		channelCorr->SetTitle("Channel correlation - negative correlations;channel 1;channel 2");
 		for (int i=0;i<640;i++) for (int j=0;j<i;j++) if (channelCovar[i][j]<0)
 		{
 			channelCorr->Fill(i,j,-1*channelCovar[i][j]);
