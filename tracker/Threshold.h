@@ -20,6 +20,7 @@ class Threshold {
    public:
 
       // Constants
+      static const unsigned int IdLength    = 200;
       static const unsigned int FpgaCount   = 7;
       static const unsigned int HybridCount = 3;
       static const unsigned int ApvCount    = 5;
@@ -28,6 +29,9 @@ class Threshold {
       // Sizes
       static const unsigned int FpgaSize = HybridCount * ApvCount * ChanCount;
       static const unsigned int Size     = FpgaCount * FpgaSize;
+
+      // ID Container
+      char thresholdId[IdLength];
 
       // Threshold container
       // Bits 31:16 = Baseline 

@@ -100,6 +100,9 @@ class CommLink {
       // Run enable
       bool runEnable_;
 
+      // Config/status Store Enable
+      bool cfgStoreEn_;
+
       // Data routine
       virtual void dataHandler();
 
@@ -118,9 +121,8 @@ class CommLink {
       // Max RX/Tx size
       uint maxRxTx_;
 
-      // Buffers
-      uint *rxBuff_;
-      uint *txBuff_;
+      // Buffer for pending register transactions
+      uint *regBuff_;
 
    public:
 
@@ -250,6 +252,12 @@ class CommLink {
        * \param status Status XML data
       */
       void addStatus ( string status );
+
+      //! Enable store of config/status to data file & callback
+      /*! 
+       * \param enable Enable of config/status
+      */
+      void setConfigStore ( bool enable );
 
 };
 

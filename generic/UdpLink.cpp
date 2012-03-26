@@ -30,286 +30,188 @@
 #include <stdio.h>
 using namespace std;
 
-// UDP receiver
-int UdpLink::udpRx (uint *idx, uint *buffer, uint size, uint *vc, uint *err ) {
-   ulong           rcount;
-   ulong           toCount;
-   int             ret;
-   uint            udpAddrLength;
-   unsigned char   qbuffer[9000];
-   uint            *quint;
-   bool            rSof;
-   bool            rEof;
-   uint            udpx;
-   uint            udpcnt;
-   uint            x;
-
-   // Setup length
-   udpAddrLength = sizeof(struct sockaddr_in);
-
-   // Keep looping
-   toCount = 0;
-   rcount  = 0;
-   do {
-
-      // Not in frame, attempt every host
-      if ( rcount == 0 ) {
-
-         // Attempt each host
-         for ((*idx)=0; (*idx) < udpCount_; (*idx)++) {
-            if ( udpFd_[*idx] > 0 ) 
-               ret = recvfrom(udpFd_[*idx],&qbuffer,9000,0,(struct sockaddr *)(&(udpAddr_[*idx])),&udpAddrLength);
-            if ( ret > 0 ) break;
-         }
-
-         // No data from any host
-         if ( ret <= 0 ) return(0);
-      }
-
-      // In frame, only receive from current host
-      else ret = recvfrom(udpFd_[*idx],&qbuffer,9000,0,(struct sockaddr *)(&(udpAddr_[*idx])),&udpAddrLength);
-
-      // Got data
-      if ( ret > 0 ) {
-
-         // Get each block
-         udpx = 0;
-         while ( udpx < (uint)ret ) {
-            rSof    = (qbuffer[udpx] >> 7) & 0x1;
-            rEof    = (qbuffer[udpx] >> 6) & 0x1;
-            *vc     = (qbuffer[udpx] >> 4) & 0x3;
-            udpcnt  = (qbuffer[udpx] << 8) & 0xF00;
-            udpx++;
-            udpcnt += (qbuffer[udpx]     ) & 0xFF;
-            udpcnt -= 1;
-            udpx++;
-/*
-            cout << "Got Frame."
-                 << " idx=" << dec << *idx
-                 << " SOF=" << dec << rSof
-                 << " EOF=" << dec << rEof
-                 << " vc=" << dec << *vc
-                 << " udpCnt=" << dec << udpcnt << endl;
-*/
-            // Bad size
-            if ( udpcnt > 4001 ) break;
-
-            // Setup integer pointer
-            quint = (uint *)(&(qbuffer[udpx]));
-
-            // Copy payload integer by integer
-            for ( x=0; x < (udpcnt/2); x++ ) {
-               buffer[rcount] = ntohl(quint[x]);
-               rcount++;
-            }
-            udpx += (udpcnt*2);
-
-         }
-      }
-      else {
-         toCount++;
-         if ( toCount >= 100000 ) {
-            *err = 1;
-            return(0);
-         }
-         usleep(10);
-      }
-   } while ( rcount > 0 && ! rEof );
-   *err = 0;
-   return(rcount);
-}
-
-// UDP transmitter
-int UdpLink::udpTx (uint idx, uint *buffer, uint size, uint vc ) {
-   unsigned char byteData[9000];
-   uint          x;
-   int           ret;
-   uint          usize;
-   uint          *uintData;
-   uint          txcnt;
-   uint          tsize;
-
-   if ( idx >= udpCount_ ) return(0);
-
-   txcnt = 0;
-   while ( txcnt < size ) {
-
-      if ( ((size-txcnt) * 4) > 8000 ) {
-         usize = 4000;
-         tsize = 2000;
-      }
-      else {
-         usize = (size-txcnt) * 2;
-         tsize = (size-txcnt);
-      }
-
-      // Setup header
-      byteData[0]  = 0;
-      if ( txcnt == 0 ) byteData[0] |= 0x80; // SOF
-      if ( (txcnt + tsize) >= size ) byteData[0] |= 0x40; // EOF
-      byteData[0] += (vc << 4) & 0x30;
-      byteData[0] += (usize >> 8) & 0xF;
-      byteData[1]  = usize & 0xFF;
-
-      // Setup integer pointer
-      uintData = (uint *)(&(byteData[2]));
-
-      // Copy payload integer by integer
-      for ( x=0; x < tsize; x++ ) uintData[x] = htonl(buffer[txcnt+x]);
-
-      if (udpFd_[idx] > 0 ) 
-         ret = sendto(udpFd_[idx],byteData,(tsize*4)+2,0,(struct sockaddr *)(&(udpAddr_[idx])),sizeof(struct sockaddr_in));
-
-      txcnt += tsize;
+// Receive Thread
+void UdpLink::rxHandler() {
+   uint           rxMask;
+   uint           rxIdx;
+   uint           *rxBuff[udpCount_];
+   uint           rxSize[udpCount_];
+   int            maxFd;
+   struct timeval timeout;
+   int            ret;
+   fd_set         fds;
+   unsigned char  qbuffer[2];
+   struct msghdr  msgHdr;
+   struct iovec   vecHdr[2];
+   bool           rSof;
+   bool           rEof;
+   uint           rVc;
+   uint           udpcnt;
+   uint           x;
+   Data           *data;
+   
+   // Init buffers
+   for ( rxIdx=0; rxIdx < udpCount_; rxIdx++ ) {
+      rxBuff[rxIdx] = (uint *) malloc(sizeof(uint)*maxRxTx_);
+      rxSize[rxIdx] = 0;
    }
-   return(ret);
-}
 
-// IO Thread
-void UdpLink::ioHandler() {
-   uint      cmdBuff[4];
-   uint      runBuff[4];
-   uint      vc;
-   uint      err;
-   int       rxRet;
-   int       txRet;
-   int       cmdRet;
-   int       runRet;
-   uint      lastReqCnt;
-   uint      lastCmdCnt;
-   uint      lastRunCnt;
-   uint      txVc;
-   uint      cmdVc;
-   uint      runVc;
-   bool      txPend;
-   Data      *rxData;
-   uint      rxMask;
-   uint      rxIdx;
+   // Init scatter/gather structure
+   msgHdr.msg_namelen    = sizeof(struct sockaddr_in);   
+   msgHdr.msg_iov        = vecHdr;
+   vecHdr[0].iov_base    = qbuffer;
+   vecHdr[0].iov_len     = 2;
+   msgHdr.msg_iovlen     = 2;
+   msgHdr.msg_control    = NULL;
+   msgHdr.msg_controllen = 0;
+   msgHdr.msg_flags      = 0;
 
    // While enabled
+   while ( runEnable_ ) {
+
+      // Init fds
+      FD_ZERO(&fds);
+      maxFd = 0;
+
+      // Process each dest
+      for ( rxIdx=0; rxIdx < udpCount_; rxIdx++ ) {
+         FD_SET(udpFd_[rxIdx],&fds);
+         if ( udpFd_[rxIdx] > maxFd ) maxFd = udpFd_[rxIdx];
+      }
+
+      // Setup timeout
+      timeout.tv_sec  = 0;
+      timeout.tv_usec = 500;
+
+      // Select
+      if ( select(maxFd+1, &fds, NULL, NULL, &timeout) <= 0 ) continue;
+
+      // Which FD had data
+      for ( rxIdx=0; rxIdx < udpCount_; rxIdx++ ) {
+         if ( FD_ISSET(udpFd_[rxIdx],&fds) ) {
+
+            // Setup scatter/gather header
+            msgHdr.msg_name    = &(udpAddr_[rxIdx]);
+            vecHdr[1].iov_base = &(rxBuff[rxIdx][rxSize[rxIdx]]);
+            vecHdr[1].iov_len  = (maxRxTx_-rxSize[rxIdx]) * 4;
+
+            // Attempt receive
+            ret = recvmsg(udpFd_[rxIdx],&msgHdr,0);
+
+            // No data
+            if ( ret <= 0 ) continue;
+
+            // Extract header
+            rSof    = (qbuffer[0] >> 7) & 0x1;
+            rEof    = (qbuffer[0] >> 6) & 0x1;
+            rVc     = (qbuffer[0] >> 4) & 0x3;
+            //udpcnt  = (qbuffer[0] << 8) & 0xF00;
+            udpcnt  =  qbuffer[1] & 0xFF;
+            udpcnt -= 1;
+
+            // Bad sof
+            if (( rSof && rxSize[rxIdx] != 0 ) || ( !rSof && rxSize[rxIdx] == 0 )) {
+               cout << "UdpLink::rxHandler -> Bad sof in header."
+                    << " Sof=" << dec << rSof << " count=" << dec << rxSize[rxIdx] << endl;
+               errorCount_++;
+               rxSize[rxIdx] = 0;
+               continue;
+            }
+
+            // Bad size
+            if ( ret < 16 || (udpcnt % 2) != 0 )  {
+               cout << "UdpLink::rxHandler -> Bad length in header. udpcnt=" 
+                    << dec << udpcnt << ", ret=" << dec << ret
+                    << ", iov_len=" << dec << vecHdr[1].iov_len << endl;
+               errorCount_++;
+               rxSize[rxIdx] = 0;
+               continue;
+            }
+            rxSize[rxIdx] += (((uint)ret-2)/4);
+
+            // End of frame
+            if ( rEof ) {
+
+               // Check for data packet
+               rxMask = 1 << rVc;
+               if ( (dataMask_ & rxMask) != 0 ) {
+ 
+                  // Reformat data
+                  if ( dataOrderFix_ ) {          
+                     for ( x=0; x < rxSize[rxIdx]; x++ ) rxBuff[rxIdx][x] = ntohl(rxBuff[rxIdx][x]);
+                  }
+                  data = new Data(rxBuff[rxIdx],rxSize[rxIdx]);
+                  dataQueue_.push(data);
+               }
+
+               // Reformat header for register rx
+               else {
+                  for ( x=0; x < rxSize[rxIdx]; x++ ) rxBuff[rxIdx][x] = ntohl(rxBuff[rxIdx][x]);
+
+                  // Data matches outstanding register request
+                  if ( rxIdx == regReqDest_ && memcmp(rxBuff[rxIdx],regBuff_,8) == 0 && 
+                       (uint)(rxSize[rxIdx]-3) == regReqEntry_->size()) {
+                     if ( ! regReqWrite_ ) {
+                        if ( rxBuff[rxIdx][rxSize[rxIdx]-1] == 0 ) 
+                           memcpy(regReqEntry_->data(),&(rxBuff[rxIdx][2]),(regReqEntry_->size()*4));
+                     }
+                     regReqEntry_->setStatus(rxBuff[rxIdx][rxSize[rxIdx]-1]);
+                     regRespCnt_++;
+                  }
+
+                  // Unexpected frame
+                  else {
+                     unexpCount_++;
+                     if ( debug_ ) {
+                        cout << "UdpLink::rxHandler -> Unuexpected frame received"
+                             << " Comp=" << dec << (memcmp(rxBuff[rxIdx],regBuff_,8))
+                             << " Word0_Exp=0x" << hex << regBuff_[0]
+                             << " Word0_Got=0x" << hex << rxBuff[rxIdx][0]
+                             << " Word1_Exp=0x" << hex << regBuff_[1]
+                             << " Word1_Got=0x" << hex << rxBuff[rxIdx][1]
+                             << " ExpSize=" << dec << regReqEntry_->size()
+                             << " GotSize=" << dec << (rxSize[rxIdx]-3) 
+                             << " DataMaskRx=0x" << hex << rxMask
+                             << " DataMask=0x" << hex << dataMask_ << endl;
+                     }
+                  }
+               }
+               rxSize[rxIdx] = 0;
+            }
+         }
+      }
+   }
+
+   for ( rxIdx=0; rxIdx < udpCount_; rxIdx++ ) free(rxBuff[rxIdx]);
+}
+
+// Transmit thread
+void UdpLink::ioHandler() {
+   uint           cmdBuff[4];
+   uint           runBuff[4];
+   uint           lastReqCnt;
+   uint           lastCmdCnt;
+   uint           lastRunCnt;
+   uint           udpVc;
+   uint           udpDest;
+   uint           udpSize;
+   uint           *udpBuff;
+   unsigned char  byteData[9000];
+   uint           usize;
+   uint           *uintBuff;
+   uint           x;
+   
+   // Setup
    lastReqCnt = regReqCnt_;
    lastCmdCnt = cmdReqCnt_;
    lastRunCnt = runReqCnt_;
-   txPend     = false;
 
+   // Init register buffer
+   regBuff_ = (uint *) malloc(sizeof(uint)*maxRxTx_);
+
+   // While enabled
    while ( runEnable_ ) {
-
-      // Setup and attempt receive
-      rxRet = udpRx(&rxIdx, rxBuff_, maxRxTx_, &vc, &err);
-      rxMask  = 1 << vc;
-
-      // Data is ready and large enough to be a real packet
-      if ( rxRet > 0 ) {
-
-         // An error occured
-         if ( rxRet < 4 || err ) {
-            if ( debug_ ) {
-               cout << "UdpLink::ioHandler -> "
-                    << "Error in data receive. Rx=" << dec << rxRet
-                    << ", Vc=" << dec << vc << ", Err=" << dec << err << endl;
-            }
-            errorCount_++;
-         }
-
-         // Frame was valid
-         else {
-
-            if ( rxBuff_[rxRet-1] != 0 && debug_ ) 
-               cout << "UdpLink::ioHandler -> "
-                    << "Bad tail value in data receive. Rx=" << dec << rxRet
-                    << ", Tail=" << hex << setw(8) << setfill('0') << rxBuff_[rxRet-1] << endl;
-
-            // Check for data packet
-            if ( (dataMask_ & rxMask) != 0 ) {
-               rxData = new Data(rxBuff_,rxRet);
-               dataQueue_.push(rxData);
-            }
-
-            // Data matches outstanding register request
-            else if ( txPend && memcmp(rxBuff_,txBuff_,8) == 0 && (uint)(rxRet-3) == regReqEntry_->size()) {
-               if ( ! regReqWrite_ ) {
-                  if ( rxBuff_[rxRet-1] == 0 ) 
-                     memcpy(regReqEntry_->data(),&(rxBuff_[2]),(regReqEntry_->size()*4));
-                  else memset(regReqEntry_->data(),0xFF,(regReqEntry_->size()*4));
-               }
-               regReqEntry_->setStatus(rxBuff_[rxRet-1]);
-               txPend = false;
-               regRespCnt_++;
-            }
-
-            // Unexpected frame
-            else {
-               unexpCount_++;
-               if ( debug_ ) {
-                  cout << "UdpLink::ioHandler -> Unuexpected frame received"
-                       << " Pend=" <<  txPend
-                       << " Comp=" << dec << (memcmp(rxBuff_,txBuff_,8))
-                       << " Word0 Exp 0x" << hex << txBuff_[0]
-                       << " Word0 Got 0x" << hex << rxBuff_[0]
-                       << " Word1 Exp 0x" << hex << txBuff_[1]
-                       << " Word1 Got 0x" << hex << rxBuff_[1]
-                       << " ExpSize=" << dec << regReqEntry_->size()
-                       << " GotSize=" << dec << (rxRet-3) 
-                       << " DataMaskRx=0x" << hex << rxMask
-                       << " DataMask=0x" << hex << dataMask_ << endl;
-               }
-            }
-         }
-      }
-  
-      // Register TX is pending
-      if ( lastReqCnt != regReqCnt_ ) {
-
-         // Setup tx buffer
-         txBuff_[0]  = 0;
-         txBuff_[1]  = (regReqWrite_)?0x40000000:0x00000000;
-         txBuff_[1] |= regReqEntry_->address() & 0x00FFFFFF;
-
-         // Write has data
-         if ( regReqWrite_ ) {
-            memcpy(&(txBuff_[2]),regReqEntry_->data(),(regReqEntry_->size()*4));
-            txBuff_[regReqEntry_->size()+2]  = 0;
-         }
-
-         // Read is always small
-         else {
-            txBuff_[2]  = (regReqEntry_->size()-1) & 0x3FF;
-            txBuff_[2] |= (txBuff_[2] << 16);
-            txBuff_[3]  = 0;
-         }
- 
-         // Set vc from upper address bits
-         txVc   = (regReqEntry_->address()>>24) & 0xF;
-
-         // Send data
-         txRet = udpTx(regReqDest_,txBuff_, (regReqWrite_)?regReqEntry_->size()+3:4, txVc);
-         if ( txRet > 0 ) txPend = true;
-
-         // Match request count
-         lastReqCnt = regReqCnt_;
-      }
-      else txRet = 0;
-
-      // Command TX is pending
-      if ( lastCmdCnt != cmdReqCnt_ ) {
-
-         // Setup tx buffer
-         cmdBuff[0]  = 0;
-         cmdBuff[1]  = cmdReqEntry_->opCode() & 0xFF;
-         cmdBuff[2]  = 0;
-         cmdBuff[3]  = 0;
- 
-         // Set vc from upper address bits
-         cmdVc   = (cmdReqEntry_->opCode()>>8)  & 0xF;
-
-         // Send data
-         cmdRet = udpTx(cmdReqDest_,cmdBuff, 4, cmdVc);
-
-         // Match request count
-         lastCmdCnt = cmdReqCnt_;
-         cmdRespCnt_++;
-      }
-      else cmdRet = 0;
+      udpSize = 0;
 
       // Run Command TX is pending
       if ( lastRunCnt != runReqCnt_ ) {
@@ -320,28 +222,98 @@ void UdpLink::ioHandler() {
          runBuff[2]  = 0;
          runBuff[3]  = 0;
  
-         // Set vc from upper address bits
-         runVc   = (runReqEntry_->opCode()>>8)  & 0xF;
-
-         // Send data
-         runRet = udpTx(runReqDest_,runBuff, 4, runVc);
-
+         // Setup transmit
+         udpDest = runReqDest_;
+         udpSize = 4;
+         udpBuff = runBuff;
+         udpVc   = (runReqEntry_->opCode()>>8)  & 0xF;
+          
          // Match request count
          lastRunCnt = runReqCnt_;
       }
-      else runRet = 0;
 
-      // Pause if nothing was done
-      if ( rxRet <= 0 && txRet <= 0 && cmdRet <= 0 && runRet <= 0 ) usleep(1);
+      // Register TX is pending
+      else if ( lastReqCnt != regReqCnt_ ) {
+
+         // Setup tx buffer
+         regBuff_[0]  = 0;
+         regBuff_[1]  = (regReqWrite_)?0x40000000:0x00000000;
+         regBuff_[1] |= regReqEntry_->address() & 0x00FFFFFF;
+
+         // Write has data
+         if ( regReqWrite_ ) {
+            memcpy(&(regBuff_[2]),regReqEntry_->data(),(regReqEntry_->size()*4));
+            regBuff_[regReqEntry_->size()+2]  = 0;
+         }
+
+         // Read is always small
+         else {
+            regBuff_[2]  = (regReqEntry_->size()-1) & 0x3FF;
+            regBuff_[2] |= (regBuff_[2] << 16);
+            regBuff_[3]  = 0;
+         }
+ 
+         // Setup transmit
+         udpDest = regReqDest_;
+         udpSize = (regReqWrite_)?regReqEntry_->size()+3:4;
+         udpBuff = regBuff_;
+         udpVc   = (regReqEntry_->address()>>24) & 0xF;
+
+         // Match request count
+         lastReqCnt = regReqCnt_;
+      }
+
+      // Command TX is pending
+      else if ( lastCmdCnt != cmdReqCnt_ ) {
+
+         // Setup tx buffer
+         cmdBuff[0]  = 0;
+         cmdBuff[1]  = cmdReqEntry_->opCode() & 0xFF;
+         cmdBuff[2]  = 0;
+         cmdBuff[3]  = 0;
+
+         // Setup transmit
+         udpDest = cmdReqDest_;
+         udpSize = 4;
+         udpBuff = cmdBuff;
+         udpVc   = (cmdReqEntry_->opCode()>>8) & 0xF;
+
+         // Match request count
+         lastCmdCnt = cmdReqCnt_;
+         cmdRespCnt_++;
+      }
+
+      // Transmit needed and valid
+      if ( udpSize != 0 && (udpSize * 4) <= 8000 && udpDest < udpCount_ && udpFd_[udpDest] > 0 ) {
+         usize = udpSize * 2;
+
+         // Setup header
+         byteData[0]  = 0xC0; // SOF & EOF
+         byteData[0] += (udpVc << 4) & 0x30;
+         byteData[0] += (usize >> 8) & 0xF;
+         byteData[1]  = usize & 0xFF;
+
+         // Setup integer pointer
+         uintBuff = (uint *)(&(byteData[2]));
+
+         // Copy payload integer by integer and convert
+         for ( x=0; x < udpSize; x++ ) uintBuff[x] = htonl(udpBuff[x]);
+
+         // Send
+         sendto(udpFd_[udpDest],byteData,(udpSize*4)+2,0,(struct sockaddr *)(&(udpAddr_[udpDest])),sizeof(struct sockaddr_in));
+      } 
+      usleep(10);
    }
-   pthread_exit(NULL);
+
+   free(regBuff_);
 }
 
 // Constructor
 UdpLink::UdpLink ( ) : CommLink() {
-   udpFd_    = NULL;
-   udpAddr_  = NULL;
-   udpCount_ = 0;
+   udpFd_        = NULL;
+   udpAddr_      = NULL;
+   udpCount_     = 0;
+   dataOrderFix_ = true;
 }
 
 // Deconstructor
@@ -357,9 +329,10 @@ void UdpLink::open ( int port, uint count, ... ) {
    const  sockaddr_in* addr;
    int                 error;
    uint                size;
-   int                 flags;
    uint                x;
    const char *        host;
+   unsigned int        rwin;
+   socklen_t           rwin_size=4;
 
    if ( udpFd_ != NULL ) return;
 
@@ -381,13 +354,16 @@ void UdpLink::open ( int port, uint count, ... ) {
       if ( udpFd_[x] == -1 ) throw string("UdpLink::open -> Could Not Create Socket");
 
       // Set receive size
-      size = 2000000;
+      size = 5000000;
       setsockopt(udpFd_[x], SOL_SOCKET, SO_RCVBUF, (char*)&size, sizeof(size));
-
-      // set non blocking
-      flags = fcntl(udpFd_[x],F_GETFL);
-      flags |= O_NONBLOCK;
-      fcntl(udpFd_[x], F_SETFL, flags);
+      getsockopt(udpFd_[x], SOL_SOCKET, SO_RCVBUF, &rwin, &rwin_size);
+      if(size > rwin) {
+         cout << "--------------------------------" << endl;
+         cout << "Error setting rx buffer size."    << endl;
+         cout << "Wanted " << dec << size << " Got " << dec << rwin << endl;
+         cout << "--------------------------------" << endl;
+      }
+      cout << "UdpLink::open -> Rx buffer size=" << dec << rwin << endl;
 
       // Lookup host address
       aiHints.ai_flags    = AI_CANONNAME;
@@ -435,5 +411,10 @@ void UdpLink::close () {
    udpAddr_  = NULL;
    udpFd_    = NULL;
    udpCount_ = 0;
+}
+
+// Set data order fix flag
+void UdpLink::setDataOrderFix (bool enable) {
+   dataOrderFix_ = enable;
 }
 

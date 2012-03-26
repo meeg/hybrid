@@ -34,6 +34,12 @@ class PgpLink : public CommLink {
       string device_;
       int    fd_;
 
+      //! IO handling thread
+      void ioHandler();
+
+      //! RX handling thread
+      void rxHandler();
+
    public:
 
       //! Constructor
@@ -41,9 +47,6 @@ class PgpLink : public CommLink {
 
       //! Deconstructor
       ~PgpLink ( );
-
-      //! IO handling thread
-      void ioHandler();
 
       //! Open link and start threads
       /*! 

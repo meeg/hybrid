@@ -39,7 +39,8 @@ TrackerEvent::TrackerEvent () : Data() {
    temp = minTemp_;
    while ( temp < maxTemp_ ) {
       tk = k0_ + temp;
-      res = t25_ * exp(coeffA_+(coeffB_/tk)+(coeffC_/(tk*tk))+(coeffD_/(tk*tk*tk)));      
+      //res = t25_ * exp(coeffA_+(coeffB_/tk)+(coeffC_/(tk*tk))+(coeffD_/(tk*tk*tk)));      
+      res = constA_ * exp(beta_/tk);
       volt = (res*vmax_)/(rdiv_+res);
       idx = (uint)((volt / vref_) * (double)(adcCnt_-1));
       if ( idx < adcCnt_ ) tempTable_[idx] = temp; 
@@ -75,18 +76,18 @@ uint * TrackerEvent::tiData ( ) {
 double TrackerEvent::temperature ( uint index ) {
    if ( isTiFrame () ) return(0.0);
    else switch (index) {
-      case  0: return(tempTable_[(data_[2]&0x3FFF)]);
-      case  1: return(tempTable_[((data_[2]>>16)&0x3FFF)]);
-      case  2: return(tempTable_[(data_[3]&0x3FFF)]);
-      case  3: return(tempTable_[((data_[3]>>16)&0x3FFF)]);
-      case  4: return(tempTable_[(data_[4]&0x3FFF)]);
-      case  5: return(tempTable_[((data_[4]>>16)&0x3FFF)]);
-      case  6: return(tempTable_[(data_[5]&0x3FFF)]);
-      case  7: return(tempTable_[((data_[5]>>16)&0x3FFF)]);
-      case  8: return(tempTable_[(data_[6]&0x3FFF)]);
-      case  9: return(tempTable_[((data_[6]>>16)&0x3FFF)]);
-      case 10: return(tempTable_[(data_[7]&0x3FFF)]);
-      case 11: return(tempTable_[((data_[7]>>16)&0x3FFF)]);
+      case  0: return(tempTable_[(data_[2]&0x3FF)]);
+      case  1: return(tempTable_[((data_[2]>>16)&0x3FF)]);
+      case  2: return(tempTable_[(data_[3]&0x3FF)]);
+      case  3: return(tempTable_[((data_[3]>>16)&0x3FF)]);
+      case  4: return(tempTable_[(data_[4]&0x3FF)]);
+      case  5: return(tempTable_[((data_[4]>>16)&0x3FF)]);
+      case  6: return(tempTable_[(data_[5]&0x3FF)]);
+      case  7: return(tempTable_[((data_[5]>>16)&0x3FF)]);
+      case  8: return(tempTable_[(data_[6]&0x3FF)]);
+      case  9: return(tempTable_[((data_[6]>>16)&0x3FF)]);
+      case 10: return(tempTable_[(data_[7]&0x3FF)]);
+      case 11: return(tempTable_[((data_[7]>>16)&0x3FF)]);
       default: return(0.0);
    }
 }

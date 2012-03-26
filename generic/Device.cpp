@@ -106,7 +106,8 @@ void Device::verifyRegister ( Register *reg ) {
    msg << ", Address: 0x" << hex << setw(8) << setfill('0') << reg->address();
    msg << ", Exp: 0x" << hex << setw(8) << setfill('0') << reg->get();
    msg << ", Got: 0x" << hex << setw(8) << setfill('0') << temp->get();
-   msg << ", Match: " << match << endl;
+   msg << ", Match: " << match;
+   msg << ", Status: " << temp->status() << endl;
 
    // Generate verify status
    if ( debug_ ) {

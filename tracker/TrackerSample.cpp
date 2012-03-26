@@ -33,6 +33,16 @@ void TrackerSample::setData ( uint *data ) {
    data_ = data;
 }
 
+// Get error flag
+bool TrackerSample::error ( ) {
+   return((data_[0]>>30)&0x1);
+}
+
+// Get threshold drop flag
+bool TrackerSample::drop ( ) {
+   return((data_[0]>>27)&0x1);
+}
+
 // Get hybrid index.
 uint TrackerSample::hybrid ( ) {
    return((data_[0]>>28)&0x3);

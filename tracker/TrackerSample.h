@@ -7,7 +7,7 @@
 // Description :
 // Sample Container
 // Sample Data consists of the following: Z[xx:xx] = Zeros, O[xx:xx] = Ones
-//    Sample[0] = O[0], Z[0], Hybrid[1:0], Z[0], ApvChip[2:0], Z[0], Channel[6:0], FpgaAddress[15:0]
+//    Sample[0] = O[0], Error[0], Hybrid[1:0], Drop[0], ApvChip[2:0], Z[0], Channel[6:0], FpgaAddress[15:0]
 //    Sample[1] = Z[1:0], Sample1[13:0]], Z[1:0], Sample0[13:0]
 //    Sample[2] = Z[1:0], Sample3[13:0]], Z[1:0], Sample2[13:0]
 //    Sample[3] = Z[1:0], Sample5[13:0]], Z[1:0], Sample4[13:0]
@@ -51,6 +51,18 @@ class TrackerSample {
        * Returns hybrid index.
       */
       uint hybrid ( );
+
+      //! Get error flag
+      /*!
+       * Returns apv error flag
+      */
+      bool error ( );
+
+      //! Get threshold drop flag
+      /*!
+       * Returns threshold drop flag
+      */
+      bool drop ( );
 
       //! Get apv index.
       /*!

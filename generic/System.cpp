@@ -38,6 +38,7 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    swRunRetState_  = "Stopped";
    swRunError_     = "";
    errorBuffer_    = "";
+   errorFlag_      = false;
    lastFileCount_  = 0;
    lastDataCount_  = 0;
    lastTime_       = 0;
@@ -146,11 +147,13 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    variables_["RunRate"]->setDescription("Run rate");
    variables_["RunRate"]->setHidden(true);
    vector<string> rates;
-   rates.resize(4);
+   rates.resize(6);
    rates[0] = "1Hz";
    rates[1] = "10Hz";
    rates[2] = "100Hz";
    rates[3] = "120Hz";
+   rates[4] = "1000Hz";
+   rates[5] = "2000Hz";
    variables_["RunRate"]->setEnums(rates);
 
    addVariable(new Variable("RunCount",Variable::Configuration));
@@ -184,6 +187,10 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    addVariable(new Variable("SystemState",Variable::Status));
    variables_["SystemState"]->setDescription("Current system state.");
    variables_["SystemState"]->setHidden(true);
+
+   addVariable(new Variable("UserStatus",Variable::Status));
+   variables_["UserStatus"]->setDescription("User defined status string.");
+   variables_["UserStatus"]->setHidden(true);
 
    variables_["enabled"]->setHidden(true);
 }
@@ -273,7 +280,9 @@ void System::setRunState(string state) {
 
       // Setup run parameters
       swRunCount_ = getInt("RunCount");
-      if      ( get("RunRate") == "120Hz") swRunPeriod_ =    8333;
+      if      ( get("RunRate") == "2000Hz") swRunPeriod_ =     500;
+      else if ( get("RunRate") == "1000Hz") swRunPeriod_ =    1000;
+      else if ( get("RunRate") == "120Hz") swRunPeriod_ =    8333;
       else if ( get("RunRate") == "100Hz") swRunPeriod_ =   10000;
       else if ( get("RunRate") ==  "10Hz") swRunPeriod_ =  100000;
       else if ( get("RunRate") ==   "1Hz") swRunPeriod_ = 1000000;
@@ -358,7 +367,7 @@ void System::command ( string name, string arg ) {
          if ( debug_ ) cout << tmp.str();
          throw(tmp.str());
       }
-      os << structureString(true) << endl;
+      os << "<system>" << structureString(true) << "</system>" << endl;
       os.close();
    }
 
@@ -485,6 +494,7 @@ void System::parseXmlString ( string xml ) {
       errorBuffer_.append("<error>");
       errorBuffer_.append(error); 
       errorBuffer_.append("</error>\n");
+      errorFlag_ = true;
       configureMsg_ = "A System Error Has Occured!\n";
       configureMsg_.append("Please HardReset and then configure!\n");
    }
@@ -535,6 +545,7 @@ void System::softReset ( ) {
 
 //! Method to perform hard reset
 void System::hardReset ( ) { 
+   errorFlag_ = false;
    configureMsg_ = "System Is Not Configured.\nSet Defaults Or Load Settings!\n";
    setRunState("Stopped");
    command("CloseDataFile","");
@@ -577,6 +588,7 @@ string System::poll () {
          errorBuffer_.append("<error>");
          errorBuffer_.append(swRunError_); 
          errorBuffer_.append("</error>\n");
+         errorFlag_ = true;
          configureMsg_ = "A System Error Has Occured!\n";
          configureMsg_.append("Please HardReset and then configure!\n");
       }
@@ -594,6 +606,7 @@ string System::poll () {
       errorBuffer_.append("<error>");
       errorBuffer_.append(error); 
       errorBuffer_.append("</error>\n");
+      errorFlag_ = true;
       configureMsg_ = "A System Error Has Occured!\n";
       configureMsg_.append("Please HardReset and then configure!\n");
    }
@@ -662,6 +675,7 @@ string System::poll () {
 // Return status string
 string System::statusString(bool hidden) {
    stringstream tmp;
+   tmp.str("");
    tmp << "<status>" << endl;
    tmp << getXmlStatus(true,hidden);
    tmp << "</status>" << endl;
@@ -671,6 +685,7 @@ string System::statusString(bool hidden) {
 // Return config string
 string System::configString(bool hidden) {
    stringstream tmp;
+   tmp.str("");
    tmp << "<config>" << endl;
    tmp << getXmlConfig(true,true,hidden);  // Common
    tmp << getXmlConfig(true,false,hidden); // Per-Instance
@@ -681,12 +696,11 @@ string System::configString(bool hidden) {
 // Return structure string
 string System::structureString (bool hidden) {
    stringstream tmp;
-   tmp << "<system>" << endl;
+   tmp.str("");
    tmp << "<structure>" << endl;
    tmp << getXmlStructure(true,true,hidden);  // General
    tmp << getXmlStructure(true,false,hidden); // Per-Instance
    tmp << "</structure>" << endl;
-   tmp << "</system>" << endl;
    return(tmp.str());
 }
 

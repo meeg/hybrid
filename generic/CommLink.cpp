@@ -100,23 +100,27 @@ void CommLink::dataHandler() {
 
       // Config/status update
       if ( cfgCount != cfgReqCnt_ ) {
-         wrSize = (cfgReqEntry_.length() & 0x0FFFFFFF);
-         if ( cfgIsConfig_ ) cfgSize = wrSize | 0x10000000;
-         else cfgSize = wrSize | 0x20000000;
 
-         // Callback function is set
-         if ( dataCb_ != NULL ) dataCb_((void *)cfgReqEntry_.c_str(), cfgSize);
+         // Storing is enabled
+         if ( cfgStoreEn_ ) {
+            wrSize = (cfgReqEntry_.length() & 0x0FFFFFFF);
+            if ( cfgIsConfig_ ) cfgSize = wrSize | 0x10000000;
+            else cfgSize = wrSize | 0x20000000;
 
-         // Network is open
-         if ( dataNetFd_ >= 0 ) {
-            sendto(dataNetFd_,&cfgSize,4,0,(const sockaddr*)&net_addr_,slen);
-            sendto(dataNetFd_,cfgReqEntry_.c_str(),wrSize,0,(const sockaddr*)&net_addr_,slen);
-         }
+            // Callback function is set
+            if ( dataCb_ != NULL ) dataCb_((void *)cfgReqEntry_.c_str(), cfgSize);
 
-         // Data file is open
-         if ( dataFileFd_ >= 0 ) {
-            write(dataFileFd_,&cfgSize,4);
-            write(dataFileFd_,cfgReqEntry_.c_str(),wrSize);
+            // Network is open
+            if ( dataNetFd_ >= 0 ) {
+               sendto(dataNetFd_,&cfgSize,4,0,(const sockaddr*)&net_addr_,slen);
+               sendto(dataNetFd_,cfgReqEntry_.c_str(),wrSize,0,(const sockaddr*)&net_addr_,slen);
+            }
+
+            // Data file is open
+            if ( dataFileFd_ >= 0 ) {
+               write(dataFileFd_,&cfgSize,4);
+               write(dataFileFd_,cfgReqEntry_.c_str(),wrSize);
+            }
          }
          cfgCount = cfgReqCnt_;
          cfgRespCnt_++;
@@ -196,9 +200,7 @@ CommLink::CommLink ( ) {
    cfgIsConfig_    = false;
    cfgReqCnt_      = 0;
    cfgRespCnt_     = 0;
-
-   rxBuff_ = (uint *)malloc(maxRxTx_*sizeof(uint));
-   txBuff_ = (uint *)malloc(maxRxTx_*sizeof(uint));
+   cfgStoreEn_     = true;
 
    pthread_mutex_init(&mutex_,NULL);
 }
@@ -355,6 +357,7 @@ void CommLink::queueRegister ( uint destination, Register *reg, bool write, bool
    uint         currResp;
    uint         timer;
    stringstream err;
+   uint         tryCount;
 
    if ( (reg->size()+3) > maxRxTx_ ) {
       err.str("");
@@ -372,6 +375,7 @@ void CommLink::queueRegister ( uint destination, Register *reg, bool write, bool
    regReqDest_  = destination;
    regReqWrite_ = write;
    currResp     = regRespCnt_;
+   tryCount     = 0;
    regReqCnt_++;
 
    // Wait for response
@@ -382,13 +386,22 @@ void CommLink::queueRegister ( uint destination, Register *reg, bool write, bool
          err << ", Write: " << dec << write;
          err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
          err << ", Address: 0x" << hex << setw(8) << setfill('0') << reg->address();
-         err << ", Timeout!";
-         if ( debug_ ) cout << err.str() << endl;
+         err << ", Attempt: " << dec << tryCount;
+         if ( tryCount == 3 ) err << ", Timeout!";
+         else err << ", Trying Again!";
+         cout << err.str() << endl;
          timeoutCount_++;
-         reg->set(0xFFFFFFFF);
-         memset(reg->data(),0xFF,(reg->size()*4));
-         pthread_mutex_unlock(&mutex_);
-         throw(err.str());
+
+         // Fail after 4 attempts
+         if ( tryCount == 3 ) {
+            pthread_mutex_unlock(&mutex_);
+            throw(err.str());
+         }
+
+         // Try again
+         usleep(100);
+         tryCount++;
+         regReqCnt_++;
       }
       timer++;
       usleep(1);
@@ -509,11 +522,6 @@ void CommLink::setMaxRxTx (uint size) {
 
    maxRxTx_ = size;
 
-   free(rxBuff_);
-   free(txBuff_);
-
-   rxBuff_ = (uint *)malloc(maxRxTx_*sizeof(uint));
-   txBuff_ = (uint *)malloc(maxRxTx_*sizeof(uint));
 }
 
 // Add configuration to data file
@@ -572,5 +580,10 @@ void CommLink::addStatus ( string status ) {
       usleep(1);
    }
    pthread_mutex_unlock(&mutex_);
+}
+
+// Enable store of config/status to data file & callback
+void CommLink::setConfigStore ( bool enable ) {
+   cfgStoreEn_ = enable;
 }
 

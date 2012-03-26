@@ -30,6 +30,8 @@ typedef struct {
    unsigned int cmdRdyCount;
    unsigned int cmdAckCount;
    char         cmdBuffer[CONTROL_CMD_SIZE];
+   char         statBuffer[CONTROL_CMD_SIZE];
+   char         userBuffer[CONTROL_CMD_SIZE];
 
 } ControlCmdMemory;
 
@@ -38,11 +40,14 @@ inline int controlCmdOpenAndMap ( ControlCmdMemory **ptr ) {
    int smemFd;
 
    // Open shared memory
-   smemFd = shm_open(CONTROL_CMD_FILE, (O_CREAT | O_RDWR), (S_IREAD | S_IWRITE));
+   smemFd = shm_open(CONTROL_CMD_FILE, (O_CREAT | O_RDWR), (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
 
    // Failed to open shred memory
    if ( smemFd < 0 ) return(-1);
-   
+  
+   // Force permissions regardless of umask
+   fchmod(smemFd, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+ 
    // Set the size of the shared memory segment
    ftruncate(smemFd, sizeof(ControlCmdMemory));
 
@@ -81,6 +86,16 @@ inline int controlCmdPending ( ControlCmdMemory *ptr ) {
 // Command ack, called by ControlServer
 inline void controlCmdAck ( ControlCmdMemory *ptr ) {
    ptr->cmdAckCount = ptr->cmdRdyCount;
+}
+
+// Return pointer to status buffer
+inline char * controlStatBuffer ( ControlCmdMemory *ptr ) {
+   return(ptr->statBuffer);
+}
+
+// Return pointer to user buffer
+inline char * controlUserBuffer ( ControlCmdMemory *ptr ) {
+   return(ptr->userBuffer);
 }
 
 #endif

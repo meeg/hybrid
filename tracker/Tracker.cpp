@@ -57,44 +57,80 @@ void Tracker::setRunState ( string state ) {
 
 //! Return local state, specific to each implementation
 string Tracker::localState() {
-   string loc = "";
-   uint apv;
-   uint hyb;
+   stringstream loc;
+   uint         apv;
+   uint         bit;
+   uint         hyb;
+   uint         fpga;
+   uint         apvCnt;
+   uint         syncCnt;
+   uint         reg;
+   bool         fifoErr;
+   bool         latErr;
+   uint         fpgaMask;
+   stringstream stat;
+
+   apvCnt    = 0;
+   syncCnt   = 0;
+   fifoErr   = false;
+   latErr    = false;
+   fpgaMask  = 0x80; // TI Always Enabled
+   loc.str("");
 
    // Check hybrid status
-   for ( hyb = 0; hyb < 1; hyb++ ) { 
-      if ( device("cntrlFpga",0)->device("hybrid",hyb)->get("enabled") == "True" ) {
-         for ( apv = 0; apv < 5; apv++ ) {
+   for ( fpga = 0; fpga < 1; fpga++ ) { 
+      if ( device("cntrlFpga",fpga)->get("enabled") == "True" ) {
+         fpgaMask |= (1 << fpga);
+      
+         // Get sync register
+         reg = device("cntrlFpga",fpga)->getInt("ApvSyncDetect");
 
-            if ( device("cntrlFpga",0)->device("hybrid",hyb)->device("apv25",apv)->get("enabled") == "True" ) {
+         for ( hyb = 0; hyb < 1; hyb++ ) { 
+            if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->get("enabled") == "True" ) {
 
-               if ( device("cntrlFpga",0)->device("hybrid",hyb)->device("apv25",apv)->getInt("FifoError") != 0 ) {
-                  loc = "APV FIFO Error.\nSoft Reset Required!\n";
-                  break;
-               }
+               // Check APV status registers
+               for ( apv = 0; apv < 5; apv++ ) {
+                  if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->get("enabled") == "True" ) {
+                     if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->getInt("FifoError") != 0 ) {
+                        fifoErr = true;
+                     }
+                     if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->getInt("LatencyError") != 0 ) {
+                        latErr = true;
+                     }
 
-               if ( device("cntrlFpga",0)->device("hybrid",hyb)->device("apv25",apv)->getInt("LatencyError") != 0 ) {
-                  loc = "APV Latency Error.\nSoft Reset Required!\n";
-                  break;
+                     apvCnt++;
+                  }
+
+                  // Count synced apvs
+                  bit = (hyb * 5) + apv;
+                  if (((reg >> bit) & 0x1 ) != 0) syncCnt++;
                }
             }
          }
       }
    }
 
-   if ( device("cntrlFpga",0)->getInt("ApvSyncDetect") == 0 ) 
-      loc = "APV Device Not Synced.\nSoft Reset Required!\n";
+   // Update status message
+   if ( fifoErr ) loc << "APV FIFO Error.\n";
+   if ( latErr  ) loc << "APV Latency Error.\n";
+   loc << dec << syncCnt << " Out Of " << dec << apvCnt << " Apvs Are Synced!\n";
+   if ( (!fifoErr) && (!latErr) ) loc << "System Ready To Take Data.\n";      
+   else loc << "Soft Reset Required!\n";
 
-   if ( loc == "" ) loc = "System Ready To Take Data.\n";      
-
-   return(loc);
+   return(loc.str());
 }
 
 //! Method to perform soft reset
 void Tracker::softReset ( ) {
+
    System::softReset();
+
+   device("cntrlFpga",0)->command("ApvClkRst","");
+   sleep(1);
    device("cntrlFpga",0)->command("Apv25Reset","");
-   sleep(5);
+   sleep(1);
+   device("cntrlFpga",0)->command("Apv25Reset","");
+   sleep(1);
 }
 
 //! Method to perform hard reset
@@ -102,13 +138,11 @@ void Tracker::hardReset ( ) {
    bool gotVer = false;
    uint count = 0;
 
-   System::hardReset();
-
    device("cntrlFpga",0)->device("hybrid",0)->set("enabled","False");
    device("cntrlFpga",0)->device("hybrid",1)->set("enabled","False");
    device("cntrlFpga",0)->device("hybrid",2)->set("enabled","False");
 
-   device("cntrlFpga",0)->command("MasterReset","");
+   System::hardReset();
 
    do {
       sleep(1);
@@ -118,7 +152,7 @@ void Tracker::hardReset ( ) {
       } catch ( string err ) { 
          if ( count > 5 ) {
             gotVer = true;
-            throw(string("Tracker::hardReset -> Error contacting concentrator"));
+            throw(string("TrackerFull::hardReset -> Error reading version regsiter"));
          }
          else {
             count++;

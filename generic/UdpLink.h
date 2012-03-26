@@ -36,11 +36,14 @@ class UdpLink : public CommLink {
       int    *udpFd_;
       struct sockaddr_in *udpAddr_;
 
-      // UDP receiver
-      int udpRx ( uint *idx, uint *buffer, uint size, uint *vc, uint *err );
-      
-      // UDP transmitter
-      int udpTx ( uint idx, uint *buffer, uint size, uint vc );
+      // Data order fix
+      bool dataOrderFix_;
+
+      //! IO handling thread
+      void ioHandler();
+
+      //! RX handling thread
+      void rxHandler();
 
    public:
 
@@ -49,9 +52,6 @@ class UdpLink : public CommLink {
 
       //! Deconstructor
       ~UdpLink ( );
-
-      //! IO handling thread
-      void ioHandler();
 
       //! Set max receive size
       /*! 
@@ -70,6 +70,12 @@ class UdpLink : public CommLink {
 
       //! Stop threads and close link
       void close ();
+
+      //! Set data order fix flag
+      /*! 
+       * \param enable Enable flag
+      */
+      void setDataOrderFix (bool enable);
 
 };
 #endif

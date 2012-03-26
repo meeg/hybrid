@@ -24,136 +24,75 @@
 #include <iostream>
 #include <string>
 #include <iomanip>
+#include <math.h>
 using namespace std;
 
 // Constructor
 CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) : 
                      Device(destination,0,"cntrlFpga",index,parent) {
 
+   double       temp;
+   double       tk;
+   double       res;
+   double       volt;
+   unsigned int idx;
+
+   // Fill temperature lookup table
+   temp = minTemp_;
+   while ( temp < maxTemp_ ) {
+      tk = k0_ + temp;
+      //res = t25_ * exp(coeffA_+(coeffB_/tk)+(coeffC_/(tk*tk))+(coeffD_/(tk*tk*tk)));      
+      res = constA_ * exp(beta_/tk);
+      volt = (res*vmax_)/(rdiv_+res);
+      idx = (uint)((volt / vref_) * (double)(adcCnt_-1));
+      if ( idx < adcCnt_ ) tempTable_[idx] = temp; 
+      temp += incTemp_;
+   }
+
    // Description
    desc_ = "Control FPGA Object.";
+
+   // Init threshold data
+   thold_ = NULL;
 
    // Create Registers: name, address
    addRegister(new Register("Version",         0x01000000));
    addRegister(new Register("MasterReset",     0x01000001));
-   addRegister(new Register("ScratchPad",      0x01000002));
+   addRegister(new Register("TrigCount",       0x01000002));
    addRegister(new Register("AdcChanEn",       0x01000003));
    addRegister(new Register("Apv25Reset",      0x01000004));
    addRegister(new Register("ApvClkRst",       0x01000005));
    addRegister(new Register("TisClkEn",        0x01000006));
-   addRegister(new Register("Apv25Reset",      0x01000004));
+   addRegister(new Register("TrigCntRst",      0x01000007));
    addRegister(new Register("ApvSyncStatus",   0x01000008));
    addRegister(new Register("ApvHardReset",    0x01000009));
    addRegister(new Register("TholdEnable",     0x0100000A));
    addRegister(new Register("ApvTrigGenPause", 0x0100000B));
    addRegister(new Register("ApvTrigSrcType",  0x0100000C));
    addRegister(new Register("ClockSelect",     0x0100000E));
-   addRegister(new Register("GetTemp",         0x01000016));
+   addRegister(new Register("TempData",        0x01000010, 6));
+   addRegister(new Register("TempPollPer",     0x01000016));
    addRegister(new Register("CalDelay",        0x01000017));
-   addRegister(new Register("InputDelayA",     0x01000020));
-   addRegister(new Register("InputDelayB",     0x01000021));
-   addRegister(new Register("InputDelayC",     0x01000022));
-   addRegister(new Register("InputDelayD",     0x01000023));
-   addRegister(new Register("InputDelayE",     0x01000024));
-   addRegister(new Register("InputDelayF",     0x01000025));
-   addRegister(new Register("InputDelayG",     0x01000026));
-   addRegister(new Register("InputDelayH",     0x01000027));
-   addRegister(new Register("InputDelayI",     0x01000028));
-   addRegister(new Register("InputDelayJ",     0x01000029));
-   addRegister(new Register("InputDelayK",     0x0100002a));
-   addRegister(new Register("InputDelayL",     0x0100002b));
-   addRegister(new Register("InputDelayM",     0x0100002c));
-   addRegister(new Register("InputDelayN",     0x0100002d));
-   addRegister(new Register("InputDelayO",     0x0100002e));
+   addRegister(new Register("InputDelay",      0x01000020, 15));
    addRegister(new Register("FrameDelayA",     0x01000030));
    addRegister(new Register("FrameDelayB",     0x01000031));
    addRegister(new Register("AdcClkDelay",     0x01000032));
-
+   addRegister(new Register("SyncData",        0x01000040, 15));
    addRegister(new Register("ThresholdA",      0x01200000, 640)); // Hybrid 0
    addRegister(new Register("ThresholdB",      0x01200400, 640)); // Hybrid 1
    addRegister(new Register("ThresholdC",      0x01200800, 640)); // Hybrid 2
-
-   // Init thresholds for testing. Will result in sample 3,4,5 matching
-   // for channels 126 & 127
-   for (uint fpga=0; fpga < Threshold::FpgaCount; fpga++) {
-      for (uint hyb=0; hyb < Threshold::HybridCount; hyb++) {
-         for (uint apv=0; apv < Threshold::ApvCount; apv++) {
-            for (uint chan=0; chan < Threshold::ChanCount; chan++) {
-               thold_.threshData[fpga][hyb][apv][chan] = 0x0000037d;
-            }
-         }
-      }
-   }
-   memcpy(registers_["ThresholdA"]->data(),thold_.threshData[index][0],640*4);
-   memcpy(registers_["ThresholdB"]->data(),thold_.threshData[index][1],640*4);
-   memcpy(registers_["ThresholdC"]->data(),thold_.threshData[index][2],640*4);
 
    // Setup variables
    addVariable(new Variable("FpgaVersion", Variable::Status));
    variables_["FpgaVersion"]->setDescription("FPGA version field");
 
-   addVariable(new Variable("ScratchPad", Variable::Configuration));
-   variables_["ScratchPad"]->setDescription("Scratchpad for testing");
+   addVariable(new Variable("TrigCount", Variable::Status));
+   variables_["TrigCount"]->setDescription("Trig Count Value");
+   variables_["TrigCount"]->setComp(0,1,0,"");
 
-   addVariable(new Variable("Adc00Enable", Variable::Configuration));
-   variables_["Adc00Enable"]->setDescription("Enable ADC channel 0");
-   variables_["Adc00Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc01Enable", Variable::Configuration));
-   variables_["Adc01Enable"]->setDescription("Enable ADC channel 1");
-   variables_["Adc01Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc02Enable", Variable::Configuration));
-   variables_["Adc02Enable"]->setDescription("Enable ADC channel 2");
-   variables_["Adc02Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc03Enable", Variable::Configuration));
-   variables_["Adc03Enable"]->setDescription("Enable ADC channel 3");
-   variables_["Adc03Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc04Enable", Variable::Configuration));
-   variables_["Adc04Enable"]->setDescription("Enable ADC channel 4");
-   variables_["Adc04Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc05Enable", Variable::Configuration));
-   variables_["Adc05Enable"]->setDescription("Enable ADC channel 5");
-   variables_["Adc05Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc06Enable", Variable::Configuration));
-   variables_["Adc06Enable"]->setDescription("Enable ADC channel 6");
-   variables_["Adc06Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc07Enable", Variable::Configuration));
-   variables_["Adc07Enable"]->setDescription("Enable ADC channel 7");
-   variables_["Adc07Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc08Enable", Variable::Configuration));
-   variables_["Adc08Enable"]->setDescription("Enable ADC channel 8");
-   variables_["Adc08Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc09Enable", Variable::Configuration));
-   variables_["Adc09Enable"]->setDescription("Enable ADC channel 9");
-   variables_["Adc09Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc10Enable", Variable::Configuration));
-   variables_["Adc10Enable"]->setDescription("Enable ADC channel 10");
-   variables_["Adc10Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc11Enable", Variable::Configuration));
-   variables_["Adc11Enable"]->setDescription("Enable ADC channel 11");
-   variables_["Adc11Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc12Enable", Variable::Configuration));
-   variables_["Adc12Enable"]->setDescription("Enable ADC channel 12");
-   variables_["Adc12Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc13Enable", Variable::Configuration));
-   variables_["Adc13Enable"]->setDescription("Enable ADC channel 13");
-   variables_["Adc13Enable"]->setTrueFalse();
-
-   addVariable(new Variable("Adc14Enable", Variable::Configuration));
-   variables_["Adc14Enable"]->setDescription("Enable ADC channel 14");
-   variables_["Adc14Enable"]->setTrueFalse();
+   addVariable(new Variable("AdcEnable", Variable::Configuration));
+   variables_["AdcEnable"]->setDescription("Enable ADC channel mask");
+   variables_["AdcEnable"]->setPerInstance(true);
 
    addVariable(new Variable("AdcClkInvert", Variable::Configuration));
    variables_["AdcClkInvert"]->setDescription("Invert ADC clock");
@@ -205,9 +144,14 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    clkSel[1] = "External";
    variables_["ClockSelect"]->setEnums(clkSel);
 
-   addVariable(new Variable("GetTemp", Variable::Configuration));
-   variables_["GetTemp"]->setDescription("Enables getting temperature.");
-   variables_["GetTemp"]->setTrueFalse();
+   addVariable(new Variable("DataBypass", Variable::Configuration));
+   variables_["DataBypass"]->setDescription("Data bypass");
+   variables_["DataBypass"]->setTrueFalse();
+
+   addVariable(new Variable("TempPollPer", Variable::Configuration));
+   variables_["TempPollPer"]->setDescription("Temp Polling Period.");
+   variables_["TempPollPer"]->setRange(0,0x7FFFFFFF);
+   variables_["TempPollPer"]->setComp(0,0.008,0,"uS");
 
    addVariable(new Variable("CalDelay", Variable::Configuration));
    variables_["CalDelay"]->setDescription("Cal to trig delay.");
@@ -310,6 +254,91 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    variables_["AdcClkDelay"]->setRange(0,63);
    variables_["AdcClkDelay"]->setComp(0,78,0,"pS");
 
+   addVariable(new Variable("Temp_0_0", Variable::Status));
+   variables_["Temp_0_0"]->setDescription("Hybrid 0, Temp 0");
+
+   addVariable(new Variable("Temp_0_1", Variable::Status));
+   variables_["Temp_0_1"]->setDescription("Hybrid 0, Temp 1");
+
+   addVariable(new Variable("Temp_0_2", Variable::Status));
+   variables_["Temp_0_2"]->setDescription("Hybrid 0, Temp 2");
+
+   addVariable(new Variable("Temp_0_3", Variable::Status));
+   variables_["Temp_0_3"]->setDescription("Hybrid 0, Temp 3");
+
+   addVariable(new Variable("Temp_1_0", Variable::Status));
+   variables_["Temp_1_0"]->setDescription("Hybrid 1, Temp 0");
+
+   addVariable(new Variable("Temp_1_1", Variable::Status));
+   variables_["Temp_1_1"]->setDescription("Hybrid 1, Temp 1");
+
+   addVariable(new Variable("Temp_1_2", Variable::Status));
+   variables_["Temp_1_2"]->setDescription("Hybrid 1, Temp 2");
+
+   addVariable(new Variable("Temp_1_3", Variable::Status));
+   variables_["Temp_1_3"]->setDescription("Hybrid 1, Temp 3");
+
+   addVariable(new Variable("Temp_2_0", Variable::Status));
+   variables_["Temp_2_0"]->setDescription("Hybrid 2, Temp 0");
+
+   addVariable(new Variable("Temp_2_1", Variable::Status));
+   variables_["Temp_2_1"]->setDescription("Hybrid 2, Temp 1");
+
+   addVariable(new Variable("Temp_2_2", Variable::Status));
+   variables_["Temp_2_2"]->setDescription("Hybrid 2, Temp 2");
+
+   addVariable(new Variable("Temp_2_3", Variable::Status));
+   variables_["Temp_2_3"]->setDescription("Hybrid 2, Temp 3");
+
+   addVariable(new Variable("SyncDataA", Variable::Status));
+   variables_["SyncDataA"]->setDescription("Sync Data A");
+
+   addVariable(new Variable("SyncDataB", Variable::Status));
+   variables_["SyncDataB"]->setDescription("Sync Data B");
+
+   addVariable(new Variable("SyncDataC", Variable::Status));
+   variables_["SyncDataC"]->setDescription("Sync Data C");
+
+   addVariable(new Variable("SyncDataD", Variable::Status));
+   variables_["SyncDataD"]->setDescription("Sync Data D");
+
+   addVariable(new Variable("SyncDataE", Variable::Status));
+   variables_["SyncDataE"]->setDescription("Sync Data E");
+
+   addVariable(new Variable("SyncDataF", Variable::Status));
+   variables_["SyncDataF"]->setDescription("Sync Data F");
+
+   addVariable(new Variable("SyncDataG", Variable::Status));
+   variables_["SyncDataG"]->setDescription("Sync Data G");
+
+   addVariable(new Variable("SyncDataH", Variable::Status));
+   variables_["SyncDataH"]->setDescription("Sync Data H");
+
+   addVariable(new Variable("SyncDataI", Variable::Status));
+   variables_["SyncDataI"]->setDescription("Sync Data I");
+
+   addVariable(new Variable("SyncDataJ", Variable::Status));
+   variables_["SyncDataJ"]->setDescription("Sync Data J");
+
+   addVariable(new Variable("SyncDataK", Variable::Status));
+   variables_["SyncDataK"]->setDescription("Sync Data K");
+
+   addVariable(new Variable("SyncDataL", Variable::Status));
+   variables_["SyncDataL"]->setDescription("Sync Data L");
+
+   addVariable(new Variable("SyncDataM", Variable::Status));
+   variables_["SyncDataM"]->setDescription("Sync Data M");
+
+   addVariable(new Variable("SyncDataN", Variable::Status));
+   variables_["SyncDataN"]->setDescription("Sync Data N");
+
+   addVariable(new Variable("SyncDataO", Variable::Status));
+   variables_["SyncDataO"]->setDescription("Sync Data O");
+
+   addVariable(new Variable("NewRegisters", Variable::Configuration));
+   variables_["NewRegisters"]->setDescription("Enable new registers");
+   variables_["NewRegisters"]->setTrueFalse();
+
    // Commands
    addCommand(new Command("ApvSWTrig",0x0));
    commands_["ApvSWTrig"]->setDescription("Generate APV software trigger + calibration.");
@@ -327,6 +356,9 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
 
    addCommand(new Command("Apv25HardReset"));
    commands_["Apv25HardReset"]->setDescription("Assert reset line to APV25s.");
+
+   addCommand(new Command("TrigCntRst"));
+   commands_["TrigCntRst"]->setDescription("Trigger count reset");
 
    // Add sub-devices
    addDevice(new Hybrid(destination,0x01100000, 0,this));
@@ -369,14 +401,56 @@ void CntrlFpga::command ( string name, string arg) {
       writeRegister(registers_["ApvHardReset"],true);
       REGISTER_UNLOCK
    }
+   else if ( name == "TrigCntRst" ) {
+      REGISTER_LOCK
+      registers_["TrigCntRst"]->set(0x1);
+      writeRegister(registers_["TrigCntRst"],true);
+      REGISTER_UNLOCK
+   }
    else Device::command(name, arg);
+}
+
+// Method to read temperature data
+void CntrlFpga::readTemps ( ) {
+   uint         hybrid;
+   uint         temp;
+   stringstream name;
+   stringstream txt;
+   uint         val;
+   uint         tmp;
+
+   readRegister(registers_["TempData"]);
+
+   for (hybrid=0; hybrid < 3; hybrid++) {
+      for (temp=0; temp < 4; temp++) {
+         name.str("");
+         name << "Temp_" << dec << hybrid;
+         name << "_" << dec << temp;
+
+         tmp = registers_["TempData"]->getIndex(hybrid*2+(temp/2));
+
+         if ( (temp % 2) == 0 ) val = (tmp & 0xFFF);
+         else val = ((tmp >> 16) & 0xFFF);
+
+         txt.str("");
+         txt << tempTable_[val] << " C (";
+         txt << "0x" << hex << setw(3) << setfill('0') << val << ")";
+         variables_[name.str()]->set(txt.str());
+      }
+   }
 }
 
 // Method to read status registers and update variables
 void CntrlFpga::readStatus ( ) {
    REGISTER_LOCK
+   uint         tmp;
+   uint         val;
+   stringstream txt;
 
    // Read status
+   readRegister(registers_["TrigCount"]);
+   variables_["TrigCount"]->setInt(registers_["TrigCount"]->get());
+
    readRegister(registers_["Version"]);
    variables_["FpgaVersion"]->setInt(registers_["Version"]->get());
 
@@ -384,6 +458,100 @@ void CntrlFpga::readStatus ( ) {
    variables_["ApvSyncDetect"]->setInt(registers_["ApvSyncStatus"]->get(0,0x7FFF));
    variables_["FramePolA"]->setInt(registers_["ApvSyncStatus"]->get(16,0x1));
    variables_["FramePolB"]->setInt(registers_["ApvSyncStatus"]->get(17,0x1));
+
+   readTemps();
+
+   if ( variables_["NewRegisters"]->getInt() ) readRegister(registers_["SyncData"]);
+
+   tmp = registers_["SyncData"]->getIndex(0);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataA"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(1);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataB"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(2);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataC"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(3);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataD"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(4);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataE"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(5);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataF"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(6);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataG"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(7);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataH"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(8);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataI"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(9);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataJ"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(10);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataK"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(11);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataL"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(12);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataM"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(13);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataN"]->set(txt.str());
+
+   tmp = registers_["SyncData"]->getIndex(14);
+   val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
+   txt.str("");
+   txt << val << " ADU/Mip";
+   variables_["SyncDataO"]->set(txt.str());
 
    // Sub devices
    Device::readStatus();
@@ -395,25 +563,8 @@ void CntrlFpga::readConfig ( ) {
    REGISTER_LOCK
 
    // Read config
-   readRegister(registers_["ScratchPad"]);
-   variables_["ScratchPad"]->setInt(registers_["ScratchPad"]->get());
-
    readRegister(registers_["AdcChanEn"]);
-   variables_["Adc00Enable"]->setInt(registers_["AdcChanEn"]->get(0,0x1));
-   variables_["Adc01Enable"]->setInt(registers_["AdcChanEn"]->get(1,0x1));
-   variables_["Adc02Enable"]->setInt(registers_["AdcChanEn"]->get(2,0x1));
-   variables_["Adc03Enable"]->setInt(registers_["AdcChanEn"]->get(3,0x1));
-   variables_["Adc04Enable"]->setInt(registers_["AdcChanEn"]->get(4,0x1));
-   variables_["Adc05Enable"]->setInt(registers_["AdcChanEn"]->get(5,0x1));
-   variables_["Adc06Enable"]->setInt(registers_["AdcChanEn"]->get(6,0x1));
-   variables_["Adc07Enable"]->setInt(registers_["AdcChanEn"]->get(7,0x1));
-   variables_["Adc08Enable"]->setInt(registers_["AdcChanEn"]->get(8,0x1));
-   variables_["Adc09Enable"]->setInt(registers_["AdcChanEn"]->get(9,0x1));
-   variables_["Adc10Enable"]->setInt(registers_["AdcChanEn"]->get(10,0x1));
-   variables_["Adc11Enable"]->setInt(registers_["AdcChanEn"]->get(11,0x1));
-   variables_["Adc12Enable"]->setInt(registers_["AdcChanEn"]->get(12,0x1));
-   variables_["Adc13Enable"]->setInt(registers_["AdcChanEn"]->get(13,0x1));
-   variables_["Adc14Enable"]->setInt(registers_["AdcChanEn"]->get(14,0x1));
+   variables_["AdcEnable"]->setInt(registers_["AdcChanEn"]->get(0,0x7FFF));
    variables_["AdcClkInvert"]->setInt(registers_["AdcChanEn"]->get(16,0x1));
 
    readRegister(registers_["TisClkEn"]);
@@ -428,54 +579,30 @@ void CntrlFpga::readConfig ( ) {
 
    readRegister(registers_["ClockSelect"]);
    variables_["ClockSelect"]->setInt(registers_["ClockSelect"]->get(0,0x1));
+   variables_["DataBypass"]->setInt(registers_["ClockSelect"]->get(1,0x1));
 
    readRegister(registers_["CalDelay"]);
    variables_["CalDelay"]->setInt(registers_["CalDelay"]->get(0,0xFFFF));
 
-   readRegister(registers_["InputDelayA"]);
-   variables_["InputDelayA"]->setInt(registers_["InputDelayA"]->get(0,0x3F));
+   readRegister(registers_["TempPollPer"]);
+   variables_["TempPollPer"]->setInt(registers_["TempPollPer"]->get());
 
-   readRegister(registers_["InputDelayB"]);
-   variables_["InputDelayB"]->setInt(registers_["InputDelayB"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayC"]);
-   variables_["InputDelayC"]->setInt(registers_["InputDelayC"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayD"]);
-   variables_["InputDelayD"]->setInt(registers_["InputDelayD"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayE"]);
-   variables_["InputDelayE"]->setInt(registers_["InputDelayE"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayF"]);
-   variables_["InputDelayF"]->setInt(registers_["InputDelayF"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayG"]);
-   variables_["InputDelayG"]->setInt(registers_["InputDelayG"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayH"]);
-   variables_["InputDelayH"]->setInt(registers_["InputDelayH"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayI"]);
-   variables_["InputDelayI"]->setInt(registers_["InputDelayI"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayJ"]);
-   variables_["InputDelayJ"]->setInt(registers_["InputDelayJ"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayK"]);
-   variables_["InputDelayK"]->setInt(registers_["InputDelayK"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayL"]);
-   variables_["InputDelayL"]->setInt(registers_["InputDelayL"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayM"]);
-   variables_["InputDelayM"]->setInt(registers_["InputDelayM"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayN"]);
-   variables_["InputDelayN"]->setInt(registers_["InputDelayN"]->get(0,0x3F));
-
-   readRegister(registers_["InputDelayO"]);
-   variables_["InputDelayO"]->setInt(registers_["InputDelayO"]->get(0,0x3F));
+   readRegister(registers_["InputDelay"]);
+   variables_["InputDelayA"]->setInt(registers_["InputDelay"]->getIndex(0));
+   variables_["InputDelayB"]->setInt(registers_["InputDelay"]->getIndex(1));
+   variables_["InputDelayC"]->setInt(registers_["InputDelay"]->getIndex(2));
+   variables_["InputDelayD"]->setInt(registers_["InputDelay"]->getIndex(3));
+   variables_["InputDelayE"]->setInt(registers_["InputDelay"]->getIndex(4));
+   variables_["InputDelayF"]->setInt(registers_["InputDelay"]->getIndex(5));
+   variables_["InputDelayG"]->setInt(registers_["InputDelay"]->getIndex(6));
+   variables_["InputDelayH"]->setInt(registers_["InputDelay"]->getIndex(7));
+   variables_["InputDelayI"]->setInt(registers_["InputDelay"]->getIndex(8));
+   variables_["InputDelayJ"]->setInt(registers_["InputDelay"]->getIndex(9));
+   variables_["InputDelayK"]->setInt(registers_["InputDelay"]->getIndex(10));
+   variables_["InputDelayL"]->setInt(registers_["InputDelay"]->getIndex(11));
+   variables_["InputDelayM"]->setInt(registers_["InputDelay"]->getIndex(12));
+   variables_["InputDelayN"]->setInt(registers_["InputDelay"]->getIndex(13));
+   variables_["InputDelayO"]->setInt(registers_["InputDelay"]->getIndex(14));
 
    readRegister(registers_["FrameDelayA"]);
    variables_["FrameDelayA"]->setInt(registers_["FrameDelayA"]->get(0,0x3F));
@@ -498,28 +625,11 @@ void CntrlFpga::readConfig ( ) {
 void CntrlFpga::writeConfig ( bool force ) {
    REGISTER_LOCK
 
-   // Write config
-   registers_["ScratchPad"]->set(variables_["ScratchPad"]->getInt());
-   writeRegister(registers_["ScratchPad"],force);
-
    registers_["ClockSelect"]->set(variables_["ClockSelect"]->getInt(),0,0x1);
+   registers_["ClockSelect"]->set(variables_["DataBypass"]->getInt(),1,0x1);
    writeRegister(registers_["ClockSelect"],force);
 
-   registers_["AdcChanEn"]->set(variables_["Adc00Enable"]->getInt(),0,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc01Enable"]->getInt(),1,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc02Enable"]->getInt(),2,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc03Enable"]->getInt(),3,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc04Enable"]->getInt(),4,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc05Enable"]->getInt(),5,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc06Enable"]->getInt(),6,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc07Enable"]->getInt(),7,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc08Enable"]->getInt(),8,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc09Enable"]->getInt(),9,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc10Enable"]->getInt(),10,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc11Enable"]->getInt(),11,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc12Enable"]->getInt(),12,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc13Enable"]->getInt(),13,0x1);
-   registers_["AdcChanEn"]->set(variables_["Adc14Enable"]->getInt(),14,0x1);
+   registers_["AdcChanEn"]->set(variables_["AdcEnable"]->getInt(),0,0x7FFF);
    registers_["AdcChanEn"]->set(variables_["AdcClkInvert"]->getInt(),16,0x1);
    writeRegister(registers_["AdcChanEn"],force);
 
@@ -533,56 +643,28 @@ void CntrlFpga::writeConfig ( bool force ) {
    registers_["ApvTrigSrcType"]->set(variables_["ApvTrigSource"]->getInt(),0,0xFF);
    writeRegister(registers_["ApvTrigSrcType"],force);
 
-   registers_["GetTemp"]->set(variables_["GetTemp"]->getInt(),0,0x1);
-   writeRegister(registers_["GetTemp"],force);
+   registers_["TempPollPer"]->set(variables_["TempPollPer"]->getInt());
+   writeRegister(registers_["TempPollPer"],force);
 
    registers_["CalDelay"]->set(variables_["CalDelay"]->getInt(),0,0xFFFF);
    writeRegister(registers_["CalDelay"],force);
 
-   registers_["InputDelayA"]->set(variables_["InputDelayA"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayA"],force);
-
-   registers_["InputDelayB"]->set(variables_["InputDelayB"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayB"],force);
-
-   registers_["InputDelayC"]->set(variables_["InputDelayC"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayC"],force);
-
-   registers_["InputDelayD"]->set(variables_["InputDelayD"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayD"],force);
-
-   registers_["InputDelayE"]->set(variables_["InputDelayE"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayE"],force);
-
-   registers_["InputDelayF"]->set(variables_["InputDelayF"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayF"],force);
-
-   registers_["InputDelayG"]->set(variables_["InputDelayG"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayG"],force);
-
-   registers_["InputDelayH"]->set(variables_["InputDelayH"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayH"],force);
-
-   registers_["InputDelayI"]->set(variables_["InputDelayI"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayI"],force);
-
-   registers_["InputDelayJ"]->set(variables_["InputDelayJ"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayJ"],force);
-
-   registers_["InputDelayK"]->set(variables_["InputDelayK"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayK"],force);
-
-   registers_["InputDelayL"]->set(variables_["InputDelayL"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayL"],force);
-
-   registers_["InputDelayM"]->set(variables_["InputDelayM"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayM"],force);
-
-   registers_["InputDelayN"]->set(variables_["InputDelayN"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayN"],force);
-
-   registers_["InputDelayO"]->set(variables_["InputDelayO"]->getInt(),0,0x3F);
-   writeRegister(registers_["InputDelayO"],force);
+   registers_["InputDelay"]->setIndex(0,variables_["InputDelayA"]->getInt());
+   registers_["InputDelay"]->setIndex(1,variables_["InputDelayB"]->getInt());
+   registers_["InputDelay"]->setIndex(2,variables_["InputDelayC"]->getInt());
+   registers_["InputDelay"]->setIndex(3,variables_["InputDelayD"]->getInt());
+   registers_["InputDelay"]->setIndex(4,variables_["InputDelayE"]->getInt());
+   registers_["InputDelay"]->setIndex(5,variables_["InputDelayF"]->getInt());
+   registers_["InputDelay"]->setIndex(6,variables_["InputDelayG"]->getInt());
+   registers_["InputDelay"]->setIndex(7,variables_["InputDelayH"]->getInt());
+   registers_["InputDelay"]->setIndex(8,variables_["InputDelayI"]->getInt());
+   registers_["InputDelay"]->setIndex(9,variables_["InputDelayJ"]->getInt());
+   registers_["InputDelay"]->setIndex(10,variables_["InputDelayK"]->getInt());
+   registers_["InputDelay"]->setIndex(11,variables_["InputDelayL"]->getInt());
+   registers_["InputDelay"]->setIndex(12,variables_["InputDelayM"]->getInt());
+   registers_["InputDelay"]->setIndex(13,variables_["InputDelayN"]->getInt());
+   registers_["InputDelay"]->setIndex(14,variables_["InputDelayO"]->getInt());
+   writeRegister(registers_["InputDelay"],force);
 
    registers_["FrameDelayA"]->set(variables_["FrameDelayA"]->getInt(),0,0x3F);
    writeRegister(registers_["FrameDelayA"],force);
@@ -597,9 +679,31 @@ void CntrlFpga::writeConfig ( bool force ) {
    writeRegister(registers_["TholdEnable"],force);
 
    // Threshold data
-   writeRegister(registers_["ThresholdA"],force);
-   writeRegister(registers_["ThresholdB"],force);
-   writeRegister(registers_["ThresholdC"],force);
+   if ( thold_ != NULL ) {
+
+      if ( force || memcmp(registers_["ThresholdA"]->data(),thold_->threshData[index_][0],640*4) != 0 ) {
+         memcpy(registers_["ThresholdA"]->data(),thold_->threshData[index_][0],640*4);
+         writeRegister(registers_["ThresholdA"],true);
+      }
+      if ( force || memcmp(registers_["ThresholdB"]->data(),thold_->threshData[index_][1],640*4) != 0 ) {
+         memcpy(registers_["ThresholdB"]->data(),thold_->threshData[index_][1],640*4);
+         writeRegister(registers_["ThresholdB"],true);
+      }
+      if ( force || memcmp(registers_["ThresholdC"]->data(),thold_->threshData[index_][2],640*4) != 0 ) {
+         memcpy(registers_["ThresholdC"]->data(),thold_->threshData[index_][2],640*4);
+         writeRegister(registers_["ThresholdC"],true);
+      }
+   }
+   else {
+      memset(registers_["ThresholdA"]->data(),0,640*4);
+      memset(registers_["ThresholdB"]->data(),0,640*4);
+      memset(registers_["ThresholdC"]->data(),0,640*4);
+      if (force ) { 
+         writeRegister(registers_["ThresholdA"],true);
+         writeRegister(registers_["ThresholdB"],true);
+         writeRegister(registers_["ThresholdC"],true);
+      }
+   }
 
    // Sub devices
    Device::writeConfig(force);
@@ -610,29 +714,14 @@ void CntrlFpga::writeConfig ( bool force ) {
 void CntrlFpga::verifyConfig ( ) {
    REGISTER_LOCK
 
-   verifyRegister(registers_["ScratchPad"]);
    verifyRegister(registers_["AdcChanEn"]);
    verifyRegister(registers_["TisClkEn"]);
    verifyRegister(registers_["ApvTrigSrcType"]);
    verifyRegister(registers_["ApvTrigGenPause"]);
    verifyRegister(registers_["CalDelay"]);
    verifyRegister(registers_["ClockSelect"]);
-   verifyRegister(registers_["GetTemp"]);
-   verifyRegister(registers_["InputDelayA"]);
-   verifyRegister(registers_["InputDelayB"]);
-   verifyRegister(registers_["InputDelayC"]);
-   verifyRegister(registers_["InputDelayD"]);
-   verifyRegister(registers_["InputDelayE"]);
-   verifyRegister(registers_["InputDelayF"]);
-   verifyRegister(registers_["InputDelayG"]);
-   verifyRegister(registers_["InputDelayH"]);
-   verifyRegister(registers_["InputDelayI"]);
-   verifyRegister(registers_["InputDelayJ"]);
-   verifyRegister(registers_["InputDelayK"]);
-   verifyRegister(registers_["InputDelayL"]);
-   verifyRegister(registers_["InputDelayM"]);
-   verifyRegister(registers_["InputDelayN"]);
-   verifyRegister(registers_["InputDelayO"]);
+   verifyRegister(registers_["TempPollPer"]);
+   verifyRegister(registers_["InputDelay"]);
    verifyRegister(registers_["FrameDelayA"]);
    verifyRegister(registers_["FrameDelayB"]);
    verifyRegister(registers_["AdcClkDelay"]);
@@ -643,5 +732,10 @@ void CntrlFpga::verifyConfig ( ) {
 
    Device::verifyConfig();
    REGISTER_UNLOCK
+}
+
+//! Set Threshold data pointer
+void CntrlFpga::setThreshold (Threshold *thold) {
+   thold_ = thold;
 }
 

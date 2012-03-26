@@ -63,6 +63,7 @@ class System : public Device {
 
       // Return data buffer
       string errorBuffer_;
+      bool   errorFlag_;
 
       // Tracking counters
       uint   lastFileCount_;

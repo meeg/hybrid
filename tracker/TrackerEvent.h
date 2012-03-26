@@ -24,12 +24,12 @@
 //
 //    The rest of the event header depends on the T flag, For T = 0:
 //
-//       Header[2] = TempB[15:0], TempA[15:0]
-//       Header[3] = TempD[15:0], TempC[15:0]
-//       Header[4] = TempF[15:0], TempE[15:0]
-//       Header[5] = TempH[15:0], TempG[15:0]
-//       Header[6] = TempJ[15:0], TempI[15:0]
-//       Header[7] = TempL[15:0], TempK[15:0]
+//       Header[2] = TempB[15:0], TempA[15:0] -- Hybrid 0
+//       Header[3] = TempD[15:0], TempC[15:0] -- Hybrid 0
+//       Header[4] = TempF[15:0], TempE[15:0] -- Hybrid 1
+//       Header[5] = TempH[15:0], TempG[15:0] -- Hybrid 1
+//       Header[6] = TempJ[15:0], TempI[15:0] -- Hybrid 2
+//       Header[7] = TempL[15:0], TempK[15:0] -- Hybrid 2
 //
 //       Samples... (See TrackerSample.h)
 //
@@ -71,6 +71,8 @@ class TrackerEvent : public Data {
       static const double coeffB_  =  4.4307830e3;
       static const double coeffC_  = -3.4078983e4;
       static const double coeffD_  = -8.8941929e6;
+      static const double beta_    = 3750;
+      static const double constA_  = 0.03448533;
       static const double t25_     = 10000.0;
       static const double k0_      = 273.15;
       static const double vmax_    = 2.5;

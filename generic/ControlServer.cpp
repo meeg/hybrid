@@ -111,8 +111,10 @@ void ControlServer::receive ( uint timeout ) {
    uint           x;
    int            y;
    string         pmsg;
+   bool           cmdPend;
 
    // Setup for listen call
+   FD_ZERO(&fdset);
    maxFd = 0;
    if ( servFd_ >= 0 ) {
       FD_SET(servFd_,&fdset);
@@ -159,11 +161,8 @@ void ControlServer::receive ( uint timeout ) {
             connFd_[x] = newFd;
 
             msg.str("");
-            msg << system_->structureString(false);
-            msg << "\f";
-            write(connFd_[x],msg.str().c_str(),msg.str().length());
-            msg.str("");
             msg << "<system>" << endl;
+            msg << system_->structureString(false);
             msg << system_->configString(false);
             msg << system_->statusString(false);
             msg << "</system>" << endl;
@@ -216,12 +215,21 @@ void ControlServer::receive ( uint timeout ) {
    if ( controlCmdPending(smem_) ) {
       if ( debug_ ) cout << "ControlServer::receive -> Processing shared memory message: " << endl;
       system_->parseXmlString(controlCmdBuffer(smem_));
-      controlCmdAck(smem_);
-      if ( debug_ ) cout << "CodaServer::receive -> Done Processing shared memory message: " << endl;
+      cmdPend = true;
    }
+   else cmdPend = false;
 
    // Poll
    pmsg = system_->poll();
+
+   // Copy resulting system state to buffer
+   if ( cmdPend ) {
+      strcpy(controlStatBuffer(smem_),system_->get("SystemState").c_str());
+      strcpy(controlUserBuffer(smem_),system_->get("UserStatus").c_str());
+      controlCmdAck(smem_);
+      if ( debug_ ) cout << "CodaServer::receive -> Done Processing shared memory message: " << endl;
+      cmdPend = false;
+   }
 
    // Send message
    if ( pmsg != "" ) {

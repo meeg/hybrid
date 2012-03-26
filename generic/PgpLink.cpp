@@ -27,92 +27,87 @@
 #include <stdlib.h>
 using namespace std;
 
-// IO Thread
-void PgpLink::ioHandler() {
-   uint      cmdBuff[4];
-   uint      runBuff[4];
-   uint      lane;
-   uint      vc;
-   uint      eofe;
-   uint      fifoErr;
-   uint      lengthErr;
-   int       rxRet;
-   int       txRet;
-   int       cmdRet;
-   int       runRet;
-   uint      lastReqCnt;
-   uint      lastCmdCnt;
-   uint      lastRunCnt;
-   uint      txLane;
-   uint      txVc;
-   uint      cmdLane;
-   uint      cmdVc;
-   uint      runLane;
-   uint      runVc;
-   bool      txPend;
-   Data      *rxData;
-   uint      vcMask;
-   uint      laneMask;
-   uint      vcMaskRx;
-   uint      laneMaskRx;
+
+// Receive Thread
+void PgpLink::rxHandler() {
+   uint           *rxBuff;
+   int            maxFd;
+   struct timeval timeout;
+   int            ret;
+   fd_set         fds;
+   Data           *data;
+   uint           lane;
+   uint           vc;
+   uint           eofe;
+   uint           fifoErr;
+   uint           lengthErr;
+   uint           vcMaskRx;
+   uint           laneMaskRx;
+   uint           vcMask;
+   uint           laneMask;
+
+   // Init buffer
+   rxBuff = (uint *) malloc(sizeof(uint)*maxRxTx_);
 
    // While enabled
-   lastReqCnt = regReqCnt_;
-   lastCmdCnt = cmdReqCnt_;
-   lastRunCnt = runReqCnt_;
-   txPend     = false;
    while ( runEnable_ ) {
 
-      // Setup and attempt receive
-      rxRet = pgpcard_recv(fd_, rxBuff_, maxRxTx_, &lane, &vc, &eofe, &fifoErr, &lengthErr);
+      // Init fds
+      FD_ZERO(&fds);
+      FD_SET(fd_,&fds);
+      maxFd = fd_;
 
-      // Data is ready and large enough to be a real packet
-      if ( rxRet > 0 ) {
+      // Setup timeout
+      timeout.tv_sec  = 0;
+      timeout.tv_usec = 500;
 
-         // An error occured
-         if ( rxRet < 4 || eofe || fifoErr || lengthErr ) {
+      // Select
+      if ( select(maxFd+1, &fds, NULL, NULL, &timeout) <= 0 ) continue;
+
+      // Data is available
+      if ( FD_ISSET(fd_,&fds) ) {
+
+         // Setup and attempt receive
+         ret = pgpcard_recv(fd_, rxBuff, maxRxTx_, &lane, &vc, &eofe, &fifoErr, &lengthErr);
+
+         // No data
+         if ( ret <= 0 ) continue;
+
+         // Bad size or error
+         if ( ret < 4 || eofe || fifoErr || lengthErr ) {
             if ( debug_ ) {
                cout << "PgpLink::ioHandler -> "
-                    << "Error in data receive. Rx=" << dec << rxRet
+                    << "Error in data receive. Rx=" << dec << ret
                     << ", Lane=" << dec << lane << ", Vc=" << dec << vc
                     << ", EOFE=" << dec << eofe << ", FifoErr=" << dec << fifoErr
                     << ", LengthErr=" << dec << lengthErr << endl;
             }
             errorCount_++;
+            continue;
          }
 
-         // Frame was valid
+         // Check for data packet
+         vcMaskRx   = (0x1 << vc);
+         laneMaskRx = (0x1 << lane);
+         vcMask     = (dataMask_ & 0xF);
+         laneMask   = ((dataMask_ >> 4) & 0xF);
+
+         if ( (vcMaskRx & vcMask) != 0 && (laneMaskRx & laneMask) != 0 ) {
+            data = new Data(rxBuff,ret);
+            dataQueue_.push(data);
+         }
+
+         // Reformat header for register rx
          else {
 
-            if ( rxBuff_[rxRet-1] != 0 && debug_ ) 
-               cout << "PgpLink::ioHandler -> "
-                    << "Bad tail value in data receive. Rx=" << dec << rxRet
-                    << ", Tail=" << hex << setw(8) << setfill('0') << rxBuff_[rxRet-1] << endl;
-
-            // Setup mask values
-            vcMaskRx   = (0x1 << vc);
-            laneMaskRx = (0x1 << lane);
-            vcMask     = (dataMask_ & 0xF);
-            laneMask   = ((dataMask_ >> 4) & 0xF);
-
-            // Check for data packet
-            if ( (vcMaskRx & vcMask) != 0 && (laneMaskRx & laneMask) != 0 ) {
-               rxData = new Data(rxBuff_,rxRet);
-               if ( ! dataQueue_.push(rxData) ) {
-                  unexpCount_++;
-                  delete rxData;
-               }
-            }
-
             // Data matches outstanding register request
-            else if ( txPend && (memcmp(rxBuff_,txBuff_,8) == 0) && ((uint)(rxRet-3) == regReqEntry_->size())) {
+            if ( memcmp(rxBuff,regBuff_,8) == 0 && (uint)(ret-3) == regReqEntry_->size()) {
                if ( ! regReqWrite_ ) {
-                  if ( rxBuff_[rxRet-1] == 0 ) 
-                     memcpy(regReqEntry_->data(),&(rxBuff_[2]),(regReqEntry_->size()*4));
+                  if ( rxBuff[ret-1] == 0 ) 
+                     memcpy(regReqEntry_->data(),&(rxBuff[2]),(regReqEntry_->size()*4));
                   else memset(regReqEntry_->data(),0xFF,(regReqEntry_->size()*4));
                }
-               regReqEntry_->setStatus(rxBuff_[rxRet-1]);
-               txPend = false;
+               regReqEntry_->setStatus(rxBuff[ret-1]);
                regRespCnt_++;
             }
 
@@ -120,11 +115,14 @@ void PgpLink::ioHandler() {
             else {
                unexpCount_++;
                if ( debug_ ) {
-                  cout << "PgpLink::ioHandler -> Unuexpected frame received"
-                       << " Pend=" <<  txPend
-                       << " Comp=" << (memcmp(rxBuff_,txBuff_,8))
-                       << " ExpSize=" << regReqEntry_->size()
-                       << " GotSize=" << (rxRet-3) 
+                  cout << "PgpLink::rxHandler -> Unuexpected frame received"
+                       << " Comp=" << dec << (memcmp(rxBuff,regBuff_,8))
+                       << " Word0_Exp=0x" << hex << regBuff_[0]
+                       << " Word0_Got=0x" << hex << rxBuff[0]
+                       << " Word1_Exp=0x" << hex << regBuff_[1]
+                       << " Word1_Got=0x" << hex << rxBuff[1]
+                       << " ExpSize=" << dec << regReqEntry_->size()
+                       << " GotSize=" << dec << (ret-3) 
                        << " VcMaskRx=0x" << hex << vcMaskRx
                        << " VcMask=0x" << hex << vcMask
                        << " LaneMaskRx=0x" << hex << laneMaskRx
@@ -133,61 +131,35 @@ void PgpLink::ioHandler() {
             }
          }
       }
-  
-      // Register TX is pending
-      if ( lastReqCnt != regReqCnt_ ) {
+   }
 
-         // Setup tx buffer
-         txBuff_[0]  = 0;
-         txBuff_[1]  = (regReqWrite_)?0x40000000:0x00000000;
-         txBuff_[1] |= regReqEntry_->address() & 0x00FFFFFF;
+   free(rxBuff);
+}
 
-         // Write has data
-         if ( regReqWrite_ ) {
-            memcpy(&(txBuff_[2]),regReqEntry_->data(),(regReqEntry_->size()*4));
-            txBuff_[regReqEntry_->size()+2]  = 0;
-         }
+// Transmit thread
+void PgpLink::ioHandler() {
+   uint           cmdBuff[4];
+   uint           runBuff[4];
+   uint           lastReqCnt;
+   uint           lastCmdCnt;
+   uint           lastRunCnt;
+   uint           runVc;
+   uint           runLane;
+   uint           regVc;
+   uint           regLane;
+   uint           cmdVc;
+   uint           cmdLane;
+   
+   // Setup
+   lastReqCnt = regReqCnt_;
+   lastCmdCnt = cmdReqCnt_;
+   lastRunCnt = runReqCnt_;
 
-         // Read is always small
-         else {
-            txBuff_[2]  = regReqEntry_->size()-1;
-            txBuff_[3]  = 0;
-         }
- 
-         // Set lane and vc from upper address bits
-         txLane = (regReqEntry_->address()>>28) & 0xF;
-         txVc   = (regReqEntry_->address()>>24) & 0xF;
+   // Init register buffer
+   regBuff_ = (uint *) malloc(sizeof(uint)*maxRxTx_);
 
-         // Send data
-         txRet = pgpcard_send(fd_, txBuff_, regReqEntry_->size()+3, txLane, txVc);
-         if ( txRet > 0 ) txPend = true;
-
-         // Match request count
-         lastReqCnt = regReqCnt_;
-      }
-      else txRet = 0;
-
-      // Command TX is pending
-      if ( lastCmdCnt != cmdReqCnt_ ) {
-
-         // Setup tx buffer
-         cmdBuff[0]  = 0;
-         cmdBuff[1]  = cmdReqEntry_->opCode() & 0xFF;
-         cmdBuff[2]  = 0;
-         cmdBuff[3]  = 0;
- 
-         // Set lane and vc from upper address bits
-         cmdLane = (cmdReqEntry_->opCode()>>12) & 0xF;
-         cmdVc   = (cmdReqEntry_->opCode()>>8)  & 0xF;
-
-         // Send data
-         cmdRet = pgpcard_send(fd_, cmdBuff, 4, cmdLane, cmdVc);
-
-         // Match request count
-         lastCmdCnt = cmdReqCnt_;
-         cmdRespCnt_++;
-      }
-      else cmdRet = 0;
+   // While enabled
+   while ( runEnable_ ) {
 
       // Run Command TX is pending
       if ( lastRunCnt != runReqCnt_ ) {
@@ -198,22 +170,72 @@ void PgpLink::ioHandler() {
          runBuff[2]  = 0;
          runBuff[3]  = 0;
  
-         // Set lane and vc from upper address bits
+         // Setup transmit
          runLane = (runReqEntry_->opCode()>>12) & 0xF;
          runVc   = (runReqEntry_->opCode()>>8)  & 0xF;
-
+        
          // Send data
-         runRet = pgpcard_send(fd_, runBuff, 4, runLane, runVc);
-
+         pgpcard_send(fd_, runBuff, 4, runLane, runVc);
+  
          // Match request count
          lastRunCnt = runReqCnt_;
       }
-      else runRet = 0;
 
-      // Pause if nothing was done
-      if ( rxRet <= 0 && txRet <= 0 && cmdRet <= 0 && runRet <= 0 ) usleep(1);
+      // Register TX is pending
+      else if ( lastReqCnt != regReqCnt_ ) {
+
+         // Setup tx buffer
+         regBuff_[0]  = 0;
+         regBuff_[1]  = (regReqWrite_)?0x40000000:0x00000000;
+         regBuff_[1] |= regReqEntry_->address() & 0x00FFFFFF;
+
+         // Write has data
+         if ( regReqWrite_ ) {
+            memcpy(&(regBuff_[2]),regReqEntry_->data(),(regReqEntry_->size()*4));
+            regBuff_[regReqEntry_->size()+2]  = 0;
+         }
+
+         // Read is always small
+         else {
+            regBuff_[2]  = (regReqEntry_->size()-1);
+            regBuff_[3]  = 0;
+         }
+
+         // Set lane and vc from upper address bits
+         regLane = (regReqEntry_->address()>>28) & 0xF;
+         regVc   = (regReqEntry_->address()>>24) & 0xF;
+
+         // Send data
+         pgpcard_send(fd_, regBuff_, ((regReqWrite_)?regReqEntry_->size()+3:4), regLane, regVc);
+ 
+         // Match request count
+         lastReqCnt = regReqCnt_;
+      }
+
+      // Command TX is pending
+      else if ( lastCmdCnt != cmdReqCnt_ ) {
+
+         // Setup tx buffer
+         cmdBuff[0]  = 0;
+         cmdBuff[1]  = cmdReqEntry_->opCode() & 0xFF;
+         cmdBuff[2]  = 0;
+         cmdBuff[3]  = 0;
+
+         // Setup transmit
+         cmdLane = (cmdReqEntry_->opCode()>>12) & 0xF;
+         cmdVc   = (cmdReqEntry_->opCode()>>8)  & 0xF;
+        
+         // Send data
+         pgpcard_send(fd_, cmdBuff, 4, cmdLane, cmdVc);
+
+         // Match request count
+         lastCmdCnt = cmdReqCnt_;
+         cmdRespCnt_++;
+      }
+      else usleep(10);
    }
-   pthread_exit(NULL);
+
+   free(regBuff_);
 }
 
 // Constructor

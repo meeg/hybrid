@@ -32,10 +32,11 @@ Ad9510::Ad9510 ( uint destination, uint baseAddress, uint index, Device *parent 
    // Create Registers: name, address
    addRegister(new Register("ChipPortConfig",  baseAddress_ + 0x00));
 
-
    addRegister(new Register("LvdsCmos5",       baseAddress_ + 0x41));
    addRegister(new Register("LvdsCmos6",       baseAddress_ + 0x42));
    addRegister(new Register("LvdsCmos7",       baseAddress_ + 0x43));
+   addRegister(new Register("ClockSel",        baseAddress_ + 0x45));
+
    addRegister(new Register("Divider5RegA",    baseAddress_ + 0x52));
    addRegister(new Register("Divider5RegB",    baseAddress_ + 0x53));
    addRegister(new Register("Divider6RegA",    baseAddress_ + 0x54));
@@ -46,6 +47,10 @@ Ad9510::Ad9510 ( uint destination, uint baseAddress, uint index, Device *parent 
    addRegister(new Register("UpdateRegister",  baseAddress_ + 0x5A));
 
    // Variables
+   addVariable(new Variable("ClockExternal", Variable::Configuration));
+   variables_["ClockExternal"]->setDescription("Clock Select External");
+   variables_["ClockExternal"]->setTrueFalse();
+
    addVariable(new Variable("Divider5LowCycles", Variable::Configuration));
    variables_["Divider5LowCycles"]->setDescription("Divider 5 Low Cycles.");
    variables_["Divider5LowCycles"]->setRange(0,15);
@@ -141,6 +146,8 @@ void Ad9510::writeConfig ( bool force ) {
 
    registers_["ChipPortConfig"]->set(0x90);
 
+   registers_["ClockSel"]->set(variables_["ClockExternal"]->getInt(),0,0x1);
+
    registers_["Divider5RegA"]->set(variables_["Divider5LowCycles"]->getInt(),4,0xF);
    registers_["Divider5RegA"]->set(variables_["Divider5HighCycles"]->getInt(),0,0xF);
    registers_["Divider5RegB"]->set(variables_["Divider5Bypass"]->getInt(),7,0x1);
@@ -168,7 +175,8 @@ void Ad9510::writeConfig ( bool force ) {
 
    if ( registers_["Divider5RegA"]->stale() || registers_["Divider5RegB"]->stale() || 
         registers_["Divider6RegA"]->stale() || registers_["Divider6RegB"]->stale() || 
-        registers_["Divider7RegA"]->stale() || registers_["Divider7RegB"]->stale() || force ) {
+        registers_["Divider7RegA"]->stale() || registers_["Divider7RegB"]->stale() ||
+        registers_["ClockSel"]->stale()     || force ) {
 
       registers_["LvdsCmos5"]->set(0x2);
       registers_["LvdsCmos6"]->set(0x2);
@@ -176,6 +184,7 @@ void Ad9510::writeConfig ( bool force ) {
       writeRegister(registers_["LvdsCmos5"],true);
       writeRegister(registers_["LvdsCmos6"],true);
       writeRegister(registers_["LvdsCmos7"],true);
+      writeRegister(registers_["ClockSel"],true);
       writeRegister(registers_["Divider5RegA"],true);
       writeRegister(registers_["Divider5RegB"],true);
       writeRegister(registers_["Divider6RegA"],true);

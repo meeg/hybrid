@@ -23,8 +23,28 @@ using namespace std;
 //! Class to contain APV25 
 class CntrlFpga : public Device {
 
+      // Temperature Constants
+      static const double coeffA_  = -1.4141963e1;
+      static const double coeffB_  =  4.4307830e3;
+      static const double coeffC_  = -3.4078983e4;
+      static const double coeffD_  = -8.8941929e6;
+      static const double beta_    = 3750;
+      static const double constA_  = 0.03448533;
+      static const double t25_     = 10000.0;
+      static const double k0_      = 273.15;
+      static const double vmax_    = 2.5;
+      static const double vref_    = 2.5;
+      static const double rdiv_    = 10000;
+      static const double minTemp_ = -50;
+      static const double maxTemp_ = 150;
+      static const double incTemp_ = 0.01;
+      static const uint   adcCnt_  = 4096;
+
+      // Temperature lookup table
+      double tempTable_[adcCnt_];
+
       // Threshold data
-      Threshold thold_;
+      Threshold *thold_;
 
    public:
 
@@ -45,6 +65,12 @@ class CntrlFpga : public Device {
        * \param arg      Optional arg
       */
       void command ( string name, string arg );
+
+      //! Method to read temperature data
+      /*! 
+       * Throws string on error.
+      */
+      void readTemps ( );
 
       //! Method to read status registers and update variables
       /*! 
@@ -67,6 +93,9 @@ class CntrlFpga : public Device {
 
       //! Verify hardware state of configuration
       void verifyConfig ( );
+
+      //! Set Threshold data pointer
+      void setThreshold (Threshold *thold);
 
 };
 #endif

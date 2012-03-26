@@ -33,17 +33,15 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-   TCanvas         *c1, *c2, *c3, *c4;
+   TCanvas         *c1, *c2;
    TH2F            *histAll;
    TH1F            *histSng[640];
    double          histMin[640];
    double          histMax[640];
    double          allMin;
    double          allMax;
-   TGraph          *mean;
    TGraph          *sigma;
    double          grChan[640];
-   double          grMean[640];
    double          grSigma[640];
    DataRead        dataRead;
    TrackerEvent    event;
@@ -56,9 +54,9 @@ int main ( int argc, char **argv ) {
    uint            tarFpga;
    uint            tarHybrid;
    uint            eventCount;
-   char            name[100];
    bool            valid[640];
    uint            grCount;
+   stringstream    title;
 
    gStyle->SetOptStat(kFALSE);
 
@@ -75,11 +73,14 @@ int main ( int argc, char **argv ) {
    tarChan   = atoi(argv[3]);
 
    // 2d histogram
-   histAll = new TH2F("Value_Hist_All","Value_Hist_All",16384,0,16384,640,0,640);
+   title.str("");
+   title << "All_" << argv[4];
+   histAll = new TH2F(title.str().c_str(),title.str().c_str(),16384,0,16384,640,0,640);
 
    for (channel=0; channel < 640; channel++) {
-      sprintf(name,"%i",channel);
-      histSng[channel] = new TH1F(name,name,16384,0,16384);
+      title.str("");
+      title << dec << channel << "_" << argv[4];
+      histSng[channel] = new TH1F(title.str().c_str(),title.str().c_str(),16384,0,16384);
       histMin[channel] = 16384;
       histMax[channel] = 0;
       valid[channel]   = false;
@@ -141,28 +142,23 @@ int main ( int argc, char **argv ) {
          histSng[channel]->Fit("gaus");
          histSng[channel]->GetXaxis()->SetRangeUser(histMin[channel],histMax[channel]);
          histSng[channel]->Draw();
-         grMean[grCount]  = histSng[channel]->GetFunction("gaus")->GetParameter(1);
          grSigma[grCount] = histSng[channel]->GetFunction("gaus")->GetParameter(2);
          grChan[grCount]  = channel;
          grCount++;
       }
    }
-   c1 = new TCanvas("c1","c1");
+
+   title.str("");
+   title << "c1_" << argv[4];
+   c1 = new TCanvas(title.str().c_str(),title.str().c_str());
    c1->cd();
    histAll->Draw("colz");
    histAll->GetXaxis()->SetRangeUser(allMin,allMax);
 
-   c2 = new TCanvas("c2","c2");
+   title.str("");
+   title << "c2_" << argv[4];
+   c2 = new TCanvas(title.str().c_str(),title.str().c_str());
    c2->cd();
-   histSng[tarChan]->Draw();
-
-   c3 = new TCanvas("c3","c3");
-   c3->cd();
-   mean = new TGraph(grCount,grChan,grMean);
-   mean->Draw("a*");
-
-   c4 = new TCanvas("c4","c4");
-   c4->cd();
    sigma = new TGraph(grCount,grChan,grSigma);
    sigma->Draw("a*");
 
