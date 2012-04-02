@@ -37,8 +37,9 @@
 #include <unistd.h>
 using namespace std;
 
-//#define corr1 384
-//#define corr2 383
+//#define corr1 599
+//#define corr1 604
+//#define corr2 500
 
 // Process the data
 // Pass root file to open as first and only arg.
@@ -74,7 +75,8 @@ int main ( int argc, char **argv ) {
 			channelCovar[i][j] = 0.0;
 		}
 	}
-//	TH2F *corrHist = new TH2F("corrHist","Channel correlation",16384,-0.5,16383.5,16384,-0.5,16383.5);
+	TH2S *corrHist;
+	//corrHist = new TH2S("corrHist","Channel correlation",16384,-0.5,16383.5,16384,-0.5,16383.5);
 
 	double          histMin[640];
 	double          histMax[640];
@@ -96,6 +98,8 @@ int main ( int argc, char **argv ) {
 	TString outdir;
 	char            name[100];
 	char title[200];
+	TGraph          *graph[7];
+	TMultiGraph *mg;
 
 	while ((c = getopt(argc,argv,"ho:nmc")) !=-1)
 		switch (c)
@@ -200,16 +204,29 @@ int main ( int argc, char **argv ) {
 	dataRead.dumpConfig(outconfig);
 	outconfig.close();
 	//dataRead.dumpStatus();
-	//for (uint i=0;i<4;i++)
-	//	printf("Temperature #%d: %f\n",i,event.temperature(i));
 
+	int runCount = atoi(dataRead.getConfig("RunCount").c_str());
+	double *apv_means[5];
+	for (int i=0;i<5;i++) apv_means[i] = new double[runCount];
+	double *moving_yi = new double[runCount];
+	double *moving_yi2 = new double[runCount];
+	double *moving_ti = new double[runCount];
 
+	bool temp_read = false;
 
 	// Process each event
 	eventCount = 0;
 
 	do {
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
+		if (!temp_read && !event.isTiFrame()) for (uint i=0;i<4;i++)
+			if (event.temperature(i)!=0.0)
+			{
+				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
+				temp_read = true;
+			}
+		moving_ti[eventCount] = eventCount;
+		for (int i=0;i<5;i++) apv_means[i][eventCount] = 0.0;
 		for (int i=0;i<640;i++)
 		{
 			channelActive[i] = false;
@@ -262,7 +279,22 @@ int main ( int argc, char **argv ) {
 				channelCount[channel]++;
 				channelActive[channel] = true;
 			}
+			double mean = 0;
+			for (y=0;y<6;y++) mean+=sample->value(y);
+			mean/=6.0;
+			apv_means[sample->apv()][eventCount] += mean;
+			/*
+			   if (channel==corr1)
+			   {
+			   moving_yi[eventCount] = mean;
+			   }
+			   if (channel==corr2)
+			   {
+			   moving_yi2[eventCount] = mean;
+			   }
+			   */
 		}
+		for (int i=0;i<5;i++) apv_means[i][eventCount] /= 128;
 		if (!skip_corr)
 			for (int i=0;i<640;i++) if (channelActive[i])
 			{
@@ -279,13 +311,59 @@ int main ( int argc, char **argv ) {
 				for (int j=0;j<i;j++) if (channelActive[j])
 				{
 					channelCovar[i][j] += (channelAvg[i]-channelMean[i])*(channelAvg[j]-channelMean[j]);
-					//if (i==corr1&&j==corr2) corrHist->Fill(channelAvg[i],channelAvg[j]);
+					/*
+					   if (i==corr1&&j==corr2)
+					   {
+					   //if (channelAvg[i]<7620)
+					   corrHist->Fill(channelAvg[i],channelAvg[j]);
+					   //else
+					   //printf("event %d\n",eventCount);
+					   }
+					  */
 				}
 			}
 		eventCount++;
 
 	} while ( dataRead.next(&event));
 	dataRead.close();
+
+	/*
+	   TGraph *movingGraph = new TGraph(eventCount,moving_ti,moving_yi);
+	   TGraph *movingGraph2 = new TGraph(eventCount,moving_ti,moving_yi2);
+	   movingGraph->SetMarkerColor(2);
+	   mg = new TMultiGraph();
+	   mg->Add(movingGraph);
+	   mg->Add(movingGraph2);
+
+	   mg->Draw("a*");
+	   c1->SaveAs("meeg.png");
+	   c1->Clear();
+	   */
+
+	mg = new TMultiGraph();
+	for (int i=0;i<5;i++)
+	{
+		graph[i] = new TGraph(eventCount,moving_ti,apv_means[i]);
+		graph[i]->SetMarkerColor(i+1);
+		if (i==4) graph[i]->SetMarkerColor(6);
+		graph[i]->SetMarkerStyle(20);
+		graph[i]->SetMarkerSize(0.25);
+		mg->Add(graph[i]);
+	}
+	mg->Draw("ap");
+	sprintf(name,"%s_base_apvmeans.png",inname.Data());
+	c1->SaveAs(name);
+	c1->Clear();
+	for (int i=0;i<5;i++) delete graph[i];
+	//delete mg;
+
+	/*
+	   c1->Clear();
+	   corrHist->GetXaxis()->SetRangeUser(histMin[corr1],histMax[corr1]);
+	   corrHist->GetYaxis()->SetRangeUser(histMin[corr2],histMax[corr2]);
+	   corrHist->Draw("colz");
+	   c1->SaveAs("meeg2.png");
+	   */
 
 	int deadAPV = -1;
 	for (int i=0;i<640;i++)
@@ -338,8 +416,6 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
-	TGraph          *graph[7];
-	TMultiGraph *mg;
 
 	histAll[6]->GetXaxis()->SetRangeUser(hybridMin,hybridMax);
 	histAll[6]->Draw("colz");
@@ -409,6 +485,7 @@ int main ( int argc, char **argv ) {
 		delete mg;
 
 		//printf("correlation %f %f\n",corrHist->GetCorrelationFactor(),channelCovar[corr1][corr2]);
+		//printf("correlation %f\n",channelCovar[corr1][corr2]);
 	}
 
 	for (int i=0;i<6;i++)

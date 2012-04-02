@@ -48,6 +48,8 @@ int main ( int argc, char **argv ) {
 	bool force_cal_grp = false;
 	bool use_baseline_cal = false;
 	bool flip_channels = false;
+	bool move_fitstart = false;
+	double fit_shift;
 	ifstream calfile;
 	TString inname = "";
 	TString outdir = "";
@@ -85,8 +87,14 @@ int main ( int argc, char **argv ) {
 	double grChisq[2][640];
 	double          calMean[640][7] = {{0.0}};
 	double          calSigma[640][7] = {{1.0}};
+	for (int i=0;i<640;i++) {
+		for (int j=0;j<7;j++) {
+			calMean[i][j] = 0.0;
+			calSigma[i][j] = 1.0;
+		}
+	}
 
-	while ((c = getopt(argc,argv,"hfrg:o:b:n")) !=-1)
+	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:n")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -96,7 +104,9 @@ int main ( int argc, char **argv ) {
 				printf("-r: plot fit results\n");
 				printf("-o: use specified output filename\n");
 				printf("-b: use specified baseline cal file\n");
+				printf("-d: use specified dtrig baseline cal file\n");
 				printf("-n: physical channel numbering\n");
+				printf("-s: start fit at given delay after a first guess at T0\n");
 				return(0);
 				break;
 			case 'f':
@@ -128,11 +138,38 @@ int main ( int argc, char **argv ) {
 					calfile >> channel;
 					for (int i=0;i<7;i++)
 					{
-						calfile >> calMean[channel][i];
+						double temp;
+						calfile >> temp;
+						calMean[channel][i]+=temp;
 						calfile >> calSigma[channel][i];
 					}
 				}
 				calfile.close();
+				break;
+			case 'd':
+				cout << "Reading dtrig baseline calibration from " << optarg << endl;
+				calfile.open(optarg);
+				while (!calfile.eof()) {
+					calfile >> channel;
+					double temp;
+					for (int i=0;i<6;i++)
+					{
+						calfile >> temp;
+						calMean[channel][i]-=temp;
+						calfile >> calSigma[channel][i];
+					}
+					calfile >> temp;
+					for (int i=0;i<6;i++)
+					{
+						calMean[channel][i]+=temp;
+					}
+					calfile >> calSigma[channel][6];
+				}
+				calfile.close();
+				break;
+			case 's':
+				move_fitstart = true;
+				fit_shift = atof(optarg);
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -140,6 +177,7 @@ int main ( int argc, char **argv ) {
 			default:
 				abort();
 		}
+
 
 	gROOT->SetStyle("Plain");
 	gStyle->SetPalette(1,0);
@@ -315,7 +353,7 @@ int main ( int argc, char **argv ) {
 	double chanChan[640];
 	//TH1S *histSamples1D = new TH1S("h1","h1",16384,-0.5,16383.5);
 	TH2S *histSamples;
-	double A, T0, Tp, A0;
+	double A, T0, Tp, A0, fit_start;
 
 	for (int i=0;i<640;i++) chanChan[i] = i;
 
@@ -379,23 +417,28 @@ int main ( int argc, char **argv ) {
 		}
 
 		fitcurve = new TGraphErrors(ni,ti,yi,NULL,ey);
-		if (plot_tp_fits) fitcurve->Draw();
 		if (sgn==0) shapingFunction->SetParameter(0,TMath::MaxElement(ni,yi)-yi[0]);
 		else shapingFunction->SetParameter(0,TMath::MinElement(ni,yi)-yi[0]);
 		shapingFunction->SetParameter(1,12.0);
 		shapingFunction->SetParameter(2,50.0);
 		shapingFunction->FixParameter(3,yi[0]);
+		A0 = yi[0];
 		if (ni>0)
 		{
 			if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
 			{
-				//if (ni>6)
-				//	fitcurve->Fit(shapingFunction,"Q0","",grT0[sgn][nChan[sgn]]+20.0,5*SAMPLE_INTERVAL);
-				grChan[sgn][nChan[sgn]]=channel;
 				A = shapingFunction->GetParameter(0);
 				T0 = shapingFunction->GetParameter(1);
 				Tp = shapingFunction->GetParameter(2);
-				A0 = shapingFunction->GetParameter(3);
+				if (move_fitstart)
+				{
+					fit_start = T0+fit_shift;
+					fitcurve->Fit(shapingFunction,"Q0","",fit_start,5*SAMPLE_INTERVAL);
+					A = shapingFunction->GetParameter(0);
+					T0 = shapingFunction->GetParameter(1);
+					Tp = shapingFunction->GetParameter(2);
+				}
+				grChan[sgn][nChan[sgn]]=channel;
 				grA[sgn][nChan[sgn]]=A;
 				if (sgn==1) grA[sgn][nChan[sgn]]*=-1;
 				grT0[sgn][nChan[sgn]]=T0;
@@ -410,8 +453,26 @@ int main ( int argc, char **argv ) {
 		}
 		if (plot_tp_fits)
 		{
-			shapingFunction->SetRange(-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
-			shapingFunction->Draw("LSAME");
+			fitcurve->Draw();
+			if (move_fitstart)
+			{
+				shapingFunction->SetLineStyle(1);
+				shapingFunction->SetLineWidth(1);
+				shapingFunction->SetLineColor(2);
+				shapingFunction->SetRange(fit_start,5*SAMPLE_INTERVAL);
+				shapingFunction->DrawCopy("LSAME");
+				shapingFunction->SetRange(-1*SAMPLE_INTERVAL,fit_start);
+				shapingFunction->SetLineStyle(2);
+				shapingFunction->Draw("LSAME");
+			}
+			else
+			{
+				shapingFunction->SetLineStyle(1);
+				shapingFunction->SetLineWidth(1);
+				shapingFunction->SetLineColor(2);
+				shapingFunction->SetRange(-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+				shapingFunction->Draw("LSAME");
+			}
 			sprintf(name,"%s_tp_fit_%s_%i.png",inname.Data(),sgn?"neg":"pos",channel);
 			c1->SaveAs(name);
 			delete histSamples;
