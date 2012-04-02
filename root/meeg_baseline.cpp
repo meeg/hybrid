@@ -75,7 +75,7 @@ int main ( int argc, char **argv ) {
 			channelCovar[i][j] = 0.0;
 		}
 	}
-	TH2S *corrHist;
+	//TH2S *corrHist;
 	//corrHist = new TH2S("corrHist","Channel correlation",16384,-0.5,16383.5,16384,-0.5,16383.5);
 
 	double          histMin[640];
@@ -208,9 +208,11 @@ int main ( int argc, char **argv ) {
 	int runCount = atoi(dataRead.getConfig("RunCount").c_str());
 	double *apv_means[5];
 	for (int i=0;i<5;i++) apv_means[i] = new double[runCount];
+	double *moving_ti = new double[runCount];
+	/*
 	double *moving_yi = new double[runCount];
 	double *moving_yi2 = new double[runCount];
-	double *moving_ti = new double[runCount];
+	*/
 
 	bool temp_read = false;
 
