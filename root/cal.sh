@@ -9,8 +9,8 @@ binpath="${PWD/%root/}/bin"
 popd
 
 mkdir -p $3
-$binpath/meeg_baseline $2 -n -o $3/$4
-$binpath/meeg_baseline $2 -m -o $3/$4_mux
+$binpath/meeg_baseline $2 -n -t -o $3/$4
+$binpath/meeg_baseline $2 -mn -o $3/$4_mux
 
 $binpath/meeg_tp $1/*cal_?.bin -frn -o $3/$4
 mkdir -p $3/fits

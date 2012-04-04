@@ -49,6 +49,7 @@ int main ( int argc, char **argv ) {
 	bool use_baseline_cal = false;
 	bool flip_channels = false;
 	bool move_fitstart = false;
+	bool read_temp = false;
 	double fit_shift;
 	ifstream calfile;
 	TString inname = "";
@@ -74,7 +75,8 @@ int main ( int argc, char **argv ) {
 	uint            y;
 	int            value;
 	uint            channel;
-	uint            eventCount;
+	int            eventCount;
+	int runCount;
 	double          sum;
 	char            name[100];
 	char            name2[100];
@@ -94,7 +96,7 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
-	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:n")) !=-1)
+	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:nt")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -107,6 +109,7 @@ int main ( int argc, char **argv ) {
 				printf("-d: use specified dtrig baseline cal file\n");
 				printf("-n: physical channel numbering\n");
 				printf("-s: start fit at given delay after a first guess at T0\n");
+				printf("-t: print temperature\n");
 				return(0);
 				break;
 			case 'f':
@@ -170,6 +173,9 @@ int main ( int argc, char **argv ) {
 			case 's':
 				move_fitstart = true;
 				fit_shift = atof(optarg);
+				break;
+			case 't':
+				read_temp = true;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -247,8 +253,8 @@ int main ( int argc, char **argv ) {
 		dataRead.dumpConfig(outconfig);
 		outconfig.close();
 		//dataRead.dumpStatus();
-		for (uint i=0;i<4;i++)
-			printf("Temperature #%d: %f\n",i,event.temperature(i));
+
+		runCount = atoi(dataRead.getConfig("RunCount").c_str());
 
 		if (!force_cal_grp)
 		{
@@ -280,6 +286,12 @@ int main ( int argc, char **argv ) {
 			//if (eventCount%2==0) printf("Event %d is %s\n",eventCount,goodEvent?"good":"bad");
 			//goodEvent = true;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
+			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
+				if (event.temperature(i)!=0.0)
+				{
+					printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
+					read_temp = false;
+				}
 			//if (goodEvent) 
 			for (x=0; x < event.count(); x++) {
 
@@ -321,7 +333,7 @@ int main ( int argc, char **argv ) {
 					int sgn = sum>0?0:1;
 					if (pulsePolarity==-1)
 					{
-						pulsePolarity=(sgn-eventCount)%2;
+						pulsePolarity=((sgn-eventCount)%2 + 2)%2;
 						printf("Saw a %s pulse, event %d, channel %d\n",sgn?"positive":"negative",eventCount,channel);
 					}
 					//int sgn = eventCount%2;
@@ -340,6 +352,10 @@ int main ( int argc, char **argv ) {
 
 		} while ( dataRead.next(&event));
 		dataRead.close();
+		if (eventCount != runCount)
+		{
+			printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
+		}
 		optind++;
 	}
 

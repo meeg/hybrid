@@ -47,6 +47,7 @@ int main ( int argc, char **argv ) {
 	bool flip_channels = false;
 	bool mux_channels = false;
 	bool skip_corr = false;
+	bool read_temp = false;
 	int c;
 	TCanvas         *c1;
 	TH2F            *histAll[7];
@@ -93,7 +94,8 @@ int main ( int argc, char **argv ) {
 	uint            y;
 	uint            value;
 	uint            channel;
-	uint            eventCount;
+	int            eventCount;
+	int runCount;
 	TString inname;
 	TString outdir;
 	char            name[100];
@@ -101,7 +103,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmc")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmct")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -110,6 +112,7 @@ int main ( int argc, char **argv ) {
 				printf("-n: physical channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
+				printf("-t: print temperature\n");
 				return(0);
 				break;
 			case 'o':
@@ -128,6 +131,9 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'm':
 				mux_channels = true;
+				break;
+			case 't':
+				read_temp = true;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -205,27 +211,26 @@ int main ( int argc, char **argv ) {
 	outconfig.close();
 	//dataRead.dumpStatus();
 
-	int runCount = atoi(dataRead.getConfig("RunCount").c_str());
+	runCount = atoi(dataRead.getConfig("RunCount").c_str());
 	double *apv_means[5];
 	for (int i=0;i<5;i++) apv_means[i] = new double[runCount];
 	double *moving_ti = new double[runCount];
 	/*
-	double *moving_yi = new double[runCount];
-	double *moving_yi2 = new double[runCount];
-	*/
+	   double *moving_yi = new double[runCount];
+	   double *moving_yi2 = new double[runCount];
+	   */
 
-	bool temp_read = false;
 
 	// Process each event
 	eventCount = 0;
 
 	do {
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
-		if (!temp_read && !event.isTiFrame()) for (uint i=0;i<4;i++)
+		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 			if (event.temperature(i)!=0.0)
 			{
 				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
-				temp_read = true;
+				read_temp = false;
 			}
 		moving_ti[eventCount] = eventCount;
 		for (int i=0;i<5;i++) apv_means[i][eventCount] = 0.0;
@@ -316,18 +321,23 @@ int main ( int argc, char **argv ) {
 					/*
 					   if (i==corr1&&j==corr2)
 					   {
-					   //if (channelAvg[i]<7620)
-					   corrHist->Fill(channelAvg[i],channelAvg[j]);
-					   //else
-					   //printf("event %d\n",eventCount);
-					   }
-					  */
+					//if (channelAvg[i]<7620)
+					corrHist->Fill(channelAvg[i],channelAvg[j]);
+					//else
+					//printf("event %d\n",eventCount);
+					}
+					*/
 				}
 			}
 		eventCount++;
 
 	} while ( dataRead.next(&event));
 	dataRead.close();
+
+	if (eventCount != runCount)
+	{
+		printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
+	}
 
 	/*
 	   TGraph *movingGraph = new TGraph(eventCount,moving_ti,moving_yi);

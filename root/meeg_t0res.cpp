@@ -87,7 +87,8 @@ int main ( int argc, char **argv ) {
 	uint            y;
 	uint            value;
 	int            channel;
-	uint            eventCount;
+	int            eventCount;
+	int runCount;
 	double          sum;
 	char            filename[100];
 	char            name[100];
@@ -461,6 +462,8 @@ int main ( int argc, char **argv ) {
 		dataRead.dumpConfig(outconfig);
 		outconfig.close();
 		//dataRead.dumpStatus();
+		
+		runCount = atoi(dataRead.getConfig("RunCount").c_str());
 		if (!force_cal_grp)
 		{
 			cal_grp = atoi(dataRead.getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
@@ -585,6 +588,11 @@ int main ( int argc, char **argv ) {
 			eventCount++;
 
 		} while ( dataRead.next(&event) );
+		dataRead.close();
+		if (eventCount != runCount)
+		{
+			printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
+		}
 		optind++;
 	}
 
