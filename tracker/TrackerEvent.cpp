@@ -76,18 +76,18 @@ uint * TrackerEvent::tiData ( ) {
 double TrackerEvent::temperature ( uint index ) {
    if ( isTiFrame () ) return(0.0);
    else switch (index) {
-      case  0: return(tempTable_[(data_[2]&0x3FF)]);
-      case  1: return(tempTable_[((data_[2]>>16)&0x3FF)]);
-      case  2: return(tempTable_[(data_[3]&0x3FF)]);
-      case  3: return(tempTable_[((data_[3]>>16)&0x3FF)]);
-      case  4: return(tempTable_[(data_[4]&0x3FF)]);
-      case  5: return(tempTable_[((data_[4]>>16)&0x3FF)]);
-      case  6: return(tempTable_[(data_[5]&0x3FF)]);
-      case  7: return(tempTable_[((data_[5]>>16)&0x3FF)]);
-      case  8: return(tempTable_[(data_[6]&0x3FF)]);
-      case  9: return(tempTable_[((data_[6]>>16)&0x3FF)]);
-      case 10: return(tempTable_[(data_[7]&0x3FF)]);
-      case 11: return(tempTable_[((data_[7]>>16)&0x3FF)]);
+      case  0: return(tempTable_[(data_[2]&0xFFF)]);
+      case  1: return(tempTable_[((data_[2]>>16)&0xFFF)]);
+      case  2: return(tempTable_[(data_[3]&0xFFF)]);
+      case  3: return(tempTable_[((data_[3]>>16)&0xFFF)]);
+      case  4: return(tempTable_[(data_[4]&0xFFF)]);
+      case  5: return(tempTable_[((data_[4]>>16)&0xFFF)]);
+      case  6: return(tempTable_[(data_[5]&0xFFF)]);
+      case  7: return(tempTable_[((data_[5]>>16)&0xFFF)]);
+      case  8: return(tempTable_[(data_[6]&0xFFF)]);
+      case  9: return(tempTable_[((data_[6]>>16)&0xFFF)]);
+      case 10: return(tempTable_[(data_[7]&0xFFF)]);
+      case 11: return(tempTable_[((data_[7]>>16)&0xFFF)]);
       default: return(0.0);
    }
 }

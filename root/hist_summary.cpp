@@ -33,7 +33,7 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-   TCanvas         *c1, *c2;
+   TCanvas         *c1, *c2, *c3;
    TH2F            *histAll;
    TH1F            *histSng[640];
    double          histMin[640];
@@ -161,6 +161,12 @@ int main ( int argc, char **argv ) {
    c2->cd();
    sigma = new TGraph(grCount,grChan,grSigma);
    sigma->Draw("a*");
+
+   title.str("");
+   title << "c3_" << argv[4];
+   c3 = new TCanvas(title.str().c_str(),title.str().c_str());
+   c3->cd();
+   histSng[tarChan]->Draw();
 
    // Start X-Windows
    theApp.Run();

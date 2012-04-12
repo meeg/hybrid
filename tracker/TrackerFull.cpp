@@ -64,20 +64,23 @@ TrackerFull::TrackerFull (CommLink *commLink) : System("TrackerFull",commLink) {
    variables_["TempPollPer"]->setRange(0,3600);
    variables_["TempPollPer"]->setComp(0,1,0,"S");
 
+   addVariable(new Variable("IntTrigEn", Variable::Configuration));
+   variables_["IntTrigEn"]->setTrueFalse();
+
    addCommand(new Command("CodaPrestart"));
    commands_["CodaPrestart"]->setDescription("Coda Prestart");
 
    addCommand(new Command("CodaGo"));
    commands_["CodaGo"]->setDescription("Coda Go");
 
-   addCommand(new Command("CodaGoInt"));
-   commands_["CodaGoInt"]->setDescription("Coda Go Int Triggers");
-
    addCommand(new Command("CodaPause"));
    commands_["CodaPause"]->setDescription("Coda Pause");
 
    addCommand(new Command("CodaEnd"));
    commands_["CodaEnd"]->setDescription("Coda Done");
+
+   addCommand(new Command("IntTrigStart"));
+   commands_["IntTrigStart"]->setDescription("Start Internal Trigger");
 
    addCommand(new Command("DumpThreshold"));
    commands_["DumpThreshold"]->setDescription("Dump Threshold To File");
@@ -138,7 +141,7 @@ void TrackerFull::command ( string name, string arg ) {
       System::command("WriteStatusXml",tmp.str());
 
       tmp.str("");
-      tmp << dstr.str() << "_CodaPrestart_Threshold.xml";
+      tmp << dstr.str() << "_CodaPrestart_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
    }
 
@@ -175,47 +178,10 @@ void TrackerFull::command ( string name, string arg ) {
       System::command("WriteStatusXml",tmp.str());
 
       tmp.str("");
-      tmp << dstr.str() << "_CodaGo_Threshold.xml";
-      this->command("DumpThreshold",tmp.str());
-   }
-
-   else if ( name == "CodaGoInt" ) {
-      cout << "TrackerFull::command -> Executing CodaGoInt" << endl;
-      command  = "<system><config>";
-      command += "<cntrlFpga>";
-      command += "<ApvTrigSource>External</ApvTrigSource>";
-      command += "</cntrlFpga>";
-      command += "<tisFpga>";
-      command += "<TrigEnable>True</TrigEnable>";
-      command += "</tisFpga>";
-      command += "</config></system>";
-      parseXmlString(command);
-      variables_["CodaState"]->set("Go Internal");
-
-      time(&tme);
-      tm_data = localtime(&tme);
-      dstr.str("");
-      dstr << "./logs/";
-      dstr << dec << (tm_data->tm_year + 1900) << "_";
-      dstr << dec << setw(2) << setfill('0') << (tm_data->tm_mon+1) << "_";
-      dstr << dec << setw(2) << setfill('0') << tm_data->tm_mday    << "_";
-      dstr << dec << setw(2) << setfill('0') << tm_data->tm_hour    << "_";
-      dstr << dec << setw(2) << setfill('0') << tm_data->tm_min     << "_";
-      dstr << dec << setw(2) << setfill('0') << tm_data->tm_sec;
-
-      tmp.str("");
-      tmp << dstr.str() << "_CodaGoInt_Config.xml";
-      System::command("WriteConfigXml",tmp.str());
-
-      tmp.str("");
-      tmp << dstr.str() << "_CodaGoInt_Status.xml";
-      System::command("WriteStatusXml",tmp.str());
-
-      tmp.str("");
-      tmp << dstr.str() << "_CodaGoInt_Threshold.xml";
+      tmp << dstr.str() << "_CodaGo_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
 
-      device("tisFpga",0)->command("IntTrigStart","");
+      if ( getInt("IntTrigEn") == 1 ) device("tisFpga")->command("IntTrigStart","");
    }
 
    else if ( name == "CodaPause" ) {
@@ -253,7 +219,7 @@ void TrackerFull::command ( string name, string arg ) {
       System::command("WriteStatusXml",tmp.str());
 
       tmp.str("");
-      tmp << dstr.str() << "_CodaPause_Threshold.xml";
+      tmp << dstr.str() << "_CodaPause_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
    }
 
@@ -292,7 +258,7 @@ void TrackerFull::command ( string name, string arg ) {
       System::command("WriteStatusXml",tmp.str());
 
       tmp.str("");
-      tmp << dstr.str() << "_CodaEnd_Threshold.xml";
+      tmp << dstr.str() << "_CodaEnd_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
    }
 
@@ -330,6 +296,12 @@ void TrackerFull::command ( string name, string arg ) {
 
 // Method to set run state
 void TrackerFull::setRunState ( string state ) {
+
+   if ( get("CodaState") != "" ) {
+      cout << "TrackerFull::setRunState -> Can't start manual run while connected to coda!!!!!" << endl;
+      return;
+   }
+
    if ( !swRunning_ ) device("tisFpga",0)->setRunCommand("TisSWTrig");
    System::setRunState(state);
 }
@@ -435,8 +407,7 @@ string TrackerFull::localState() {
    if ( fifoErr ) loc << "APV FIFO Error.\n";
    if ( latErr  ) loc << "APV Latency Error.\n";
    loc << dec << syncCnt << " Out Of " << dec << apvCnt << " Apvs Are Synced!\n";
-   if ( (!fifoErr) && (!latErr) ) loc << "System Ready To Take Data.\n";      
-   else loc << "Soft Reset Required!\n";
+   if ( fifoErr || latErr ) loc << "Soft Reset Required!\n";
 
    // Add coda state
    if ( variables_["CodaState"]->get() != "" ) 
@@ -444,7 +415,7 @@ string TrackerFull::localState() {
 
    // Update user state variable
    stat.str("");
-   stat << dec << fpgaMask << " " << dec << eventSize << " " << dec << errorFlag;
+   stat << dec << fpgaMask << " " << dec << eventSize << " " << dec << errorFlag << " " << dec << getInt("IntTrigEn") << endl;
    variables_["UserStatus"]->set(stat.str());
 
    // Polling is enabled

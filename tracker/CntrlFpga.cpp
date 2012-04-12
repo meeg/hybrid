@@ -46,6 +46,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
       volt = (res*vmax_)/(rdiv_+res);
       idx = (uint)((volt / vref_) * (double)(adcCnt_-1));
       if ( idx < adcCnt_ ) tempTable_[idx] = temp; 
+      //cout << "temp=" << temp << " adc=0x" << hex << idx << endl;
       temp += incTemp_;
    }
 
@@ -54,6 +55,8 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
 
    // Init threshold data
    thold_ = NULL;
+
+   variables_["enabled"]->set("False");
 
    // Create Registers: name, address
    addRegister(new Register("Version",         0x01000000));
@@ -147,6 +150,10 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addVariable(new Variable("DataBypass", Variable::Configuration));
    variables_["DataBypass"]->setDescription("Data bypass");
    variables_["DataBypass"]->setTrueFalse();
+
+   addVariable(new Variable("FiltEnable", Variable::Configuration));
+   variables_["FiltEnable"]->setDescription("FIR FIlter Enable");
+   variables_["FiltEnable"]->setTrueFalse();
 
    addVariable(new Variable("TempPollPer", Variable::Configuration));
    variables_["TempPollPer"]->setDescription("Temp Polling Period.");
@@ -466,91 +473,106 @@ void CntrlFpga::readStatus ( ) {
    tmp = registers_["SyncData"]->getIndex(0);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(0);
+   txt << " " << dec << val;
    variables_["SyncDataA"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(1);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(1);
+   txt << " " << dec << val;
    variables_["SyncDataB"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(2);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(2);
+   txt << " " << dec << val;
    variables_["SyncDataC"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(3);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(3);
+   txt << " " << dec << val;
    variables_["SyncDataD"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(4);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(4);
+   txt << " " << dec << val;
    variables_["SyncDataE"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(5);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(5);
+   txt << " " << dec << val;
    variables_["SyncDataF"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(6);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(6);
+   txt << " " << dec << val;
    variables_["SyncDataG"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(7);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(7);
+   txt << " " << dec << val;
    variables_["SyncDataH"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(8);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(8);
+   txt << " " << dec << val;
    variables_["SyncDataI"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(9);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(9);
+   txt << " " << dec << val;
    variables_["SyncDataJ"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(10);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(10);
+   txt << " " << dec << val;
    variables_["SyncDataK"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(11);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(11);
+   txt << " " << dec << val;
    variables_["SyncDataL"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(12);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(12);
+   txt << " " << dec << val;
    variables_["SyncDataM"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(13);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(13);
+   txt << " " << dec << val;
    variables_["SyncDataN"]->set(txt.str());
 
    tmp = registers_["SyncData"]->getIndex(14);
    val = (((tmp >> 16) & 0xFFFF) - (tmp & 0xFFFF)) / 8;
    txt.str("");
-   txt << val << " ADU/Mip";
+   txt << "0x" << hex << setw(8) << setfill('0') << registers_["SyncData"]->getIndex(14);
+   txt << " " << dec << val;
    variables_["SyncDataO"]->set(txt.str());
 
    // Sub devices
@@ -580,6 +602,7 @@ void CntrlFpga::readConfig ( ) {
    readRegister(registers_["ClockSelect"]);
    variables_["ClockSelect"]->setInt(registers_["ClockSelect"]->get(0,0x1));
    variables_["DataBypass"]->setInt(registers_["ClockSelect"]->get(1,0x1));
+   variables_["FiltEnable"]->setInt(registers_["ClockSelect"]->get(2,0x1));
 
    readRegister(registers_["CalDelay"]);
    variables_["CalDelay"]->setInt(registers_["CalDelay"]->get(0,0xFFFF));
@@ -627,6 +650,7 @@ void CntrlFpga::writeConfig ( bool force ) {
 
    registers_["ClockSelect"]->set(variables_["ClockSelect"]->getInt(),0,0x1);
    registers_["ClockSelect"]->set(variables_["DataBypass"]->getInt(),1,0x1);
+   registers_["ClockSelect"]->set(variables_["FiltEnable"]->getInt(),2,0x1);
    writeRegister(registers_["ClockSelect"],force);
 
    registers_["AdcChanEn"]->set(variables_["AdcEnable"]->getInt(),0,0x7FFF);
@@ -719,7 +743,7 @@ void CntrlFpga::verifyConfig ( ) {
    verifyRegister(registers_["ApvTrigSrcType"]);
    verifyRegister(registers_["ApvTrigGenPause"]);
    verifyRegister(registers_["CalDelay"]);
-   verifyRegister(registers_["ClockSelect"]);
+   //verifyRegister(registers_["ClockSelect"]);
    verifyRegister(registers_["TempPollPer"]);
    verifyRegister(registers_["InputDelay"]);
    verifyRegister(registers_["FrameDelayA"]);
