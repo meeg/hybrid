@@ -7,14 +7,14 @@ OBJ     := $(PWD)/.obj
 
 # Generic Sources
 GEN_DIR := $(PWD)/../generic
-GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp
-GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h
+GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp $(GEN_DIR)/DataReadEvio.cpp
+GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h $(GEN_DIR)/DataReadEvio.h
 GEN_OBJ := $(patsubst $(GEN_DIR)/%.cpp,$(OBJ)/%.o,$(GEN_SRC))
 
 # Tracker Sources
 TRK_DIR := $(PWD)/../tracker
-TRK_SRC := $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp
-TRK_HDR := $(TRK_DIR)/TrackerEvent.h   $(TRK_DIR)/TrackerSample.h
+TRK_SRC := $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TrackerBank.cpp $(TRK_DIR)/TrackerEvioEvent.cpp
+TRK_HDR := $(TRK_DIR)/TrackerEvent.h   $(TRK_DIR)/TrackerSample.h $(TRK_DIR)/TrackerBank.h $(TRK_DIR)/TrackerEvioEvent.h
 TRK_OBJ := $(patsubst $(TRK_DIR)/%.cpp,$(OBJ)/%.o,$(TRK_SRC))
 
 # Fitter Sources
@@ -25,8 +25,8 @@ FIT_OBJ := $(patsubst $(FIT_DIR)/%.cc,$(OBJ)/%.o,$(FIT_SRC))
 
 # EVIO Sources
 EVIO_DIR := $(PWD)/../evio
-EVIO_SRC := $(EVIO_DIR)/evio.c
-EVIO_HDR := $(EVIO_DIR)/evio.h
+EVIO_SRC := $(EVIO_DIR)/evio.c $(EVIO_DIR)/evioswap.c $(EVIO_DIR)/eviofmt.c $(EVIO_DIR)/eviofmtswap.c
+EVIO_HDR := $(EVIO_DIR)/evio.h $(EVIO_DIR)/evioswap.h
 EVIO_OBJ := $(patsubst $(EVIO_DIR)/%.c,$(OBJ)/%.o,$(EVIO_SRC))
 
 # Root Sources
@@ -59,7 +59,7 @@ $(OBJ)/%.o: $(FIT_DIR)/%.cc $(FIT_DIR)/%.hh
 	$(CC) -c $(CFLAGS) $(DEF) -o $@ $<
 
 # Compile EVIO Sources
-$(OBJ)/%.o: $(EVIO_DIR)/%.c $(EVIO_DIR)/%.h
+$(OBJ)/%.o: $(EVIO_DIR)/%.c
 	$(CC) -c $(CFLAGS) $(DEF) -o $@ $<
 
 # Compile ROOT Sources

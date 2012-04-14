@@ -17,6 +17,9 @@
 #include "TrackerBank.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+
 using namespace std;
 
 // Constructor
@@ -55,6 +58,7 @@ bool TrackerBank::updateBank(uint *data, uint size, uint tag) {
    if ( size_ < (headSize_ + tailSize_) ) {
       data_  = NULL;
       size_  = 0;
+      cout<<"Frame is too small ... "<<endl;
       return(false);
    }
 
@@ -62,8 +66,10 @@ bool TrackerBank::updateBank(uint *data, uint size, uint tag) {
    if ( ((size_ - (headSize_ + tailSize_)) % sampleSize_) != 0 ) {
       data_  = NULL;
       size_  = 0;
+      cout<<"Improper frame size ... "<<endl;
       return(false);
    }
+   sampleCount_=(size_-(headSize_ + tailSize_))/sampleSize_;
  
    return(true);
 }

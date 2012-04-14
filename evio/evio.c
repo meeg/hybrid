@@ -58,7 +58,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
+#include <unistd.h>
 #include <evio.h>
+#include <evioswap.h>
 
 /**
  * This structure contains information about file
@@ -2356,7 +2359,7 @@ int evWriteDictionary(int handle, char *xmlDictionary)
 {
     EVFILE  *a;
     char    *pChar;
-    int32_t *dictBuf;
+    uint32_t *dictBuf;
     int      i, status, dictionaryLen, padSize, bufSize, pads[] = {4,3,2,1};
 
     /* Look up file struct from handle */

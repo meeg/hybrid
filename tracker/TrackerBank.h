@@ -57,7 +57,7 @@
 #include "TrackerSample.h"
 using namespace std;
 
-//! Tracker Event Container Class
+//! Tracker Bank Container Class
 class TrackerBank {
 
       // Temperature Constants
