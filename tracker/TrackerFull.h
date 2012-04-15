@@ -19,6 +19,7 @@
 #include <System.h>
 #include <EpicsDataMem.h>
 #include <Threshold.h>
+#include <Filter.h>
 using namespace std;
 
 class CommLink;
@@ -37,6 +38,9 @@ class TrackerFull : public System {
 
       // Threshold data
       Threshold thold_;
+
+      // Filter data
+      Filter filt_;
 
    public:
 

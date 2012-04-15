@@ -310,10 +310,10 @@ int main ( int argc, char **argv ) {
 				}
 			//if (goodEvent) 
 			for (x=0; x < event.count(); x++) {
-			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
-
 				// Get sample
 				sample  = event.sample(x);
+				if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
+
 				channel = sample->channel();
 				if (flip_channels)
 					channel += (4-sample->apv())*128;

@@ -240,6 +240,7 @@ int main ( int argc, char **argv ) {
 	eventCount = 0;
 
 	do {
+		//printf("fpga %d\n",event.fpgaAddress());
 		if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount > num_events) break;
@@ -256,10 +257,10 @@ int main ( int argc, char **argv ) {
 			channelActive[i] = false;
 		}
 		for (x=0; x < event.count(); x++) {
-			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
-
 			// Get sample
 			sample  = event.sample(x);
+			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
+			//printf("hybrid %d\n",sample->hybrid());
 
 			if (mux_channels) channel = chanMap[sample->channel()];
 			else channel = sample->channel();

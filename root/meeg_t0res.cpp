@@ -501,10 +501,10 @@ int main ( int argc, char **argv ) {
 			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
 			for (x=0; x < event.count(); x++) {
-				if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
-
 				// Get sample
 				sample  = event.sample(x);
+				if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
+
 				channel = sample->channel();
 				if (flip_channels)
 					channel += (4-sample->apv())*128;
