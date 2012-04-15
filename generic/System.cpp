@@ -325,10 +325,16 @@ void System::command ( string name, string arg ) {
    clock_gettime(CLOCK_REALTIME,&stme);
 
    // Read defaults file
-   if ( name == "SetDefaults" ) parseXmlFile(defaults_);
+   if ( name == "SetDefaults" ) {
+      parseXmlFile(defaults_);
+      //softReset();
+   }
 
    // Read and parse xml file
-   else if ( name == "ReadXmlFile" ) parseXmlFile(arg);
+   else if ( name == "ReadXmlFile" ) {
+      parseXmlFile(arg);
+      //softReset();
+   }
 
    // Write config xml dump
    else if ( name == "WriteConfigXml" ) {

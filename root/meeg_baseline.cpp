@@ -243,7 +243,7 @@ int main ( int argc, char **argv ) {
 		//printf("fpga %d\n",event.fpgaAddress());
 		if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
-		if (num_events!=-1 && eventCount > num_events) break;
+		if (num_events!=-1 && eventCount >= num_events) break;
 		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 			if (event.temperature(i)!=0.0)
 			{
