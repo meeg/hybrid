@@ -56,6 +56,9 @@ int main ( int argc, char **argv ) {
 	bool use_shape = false;
 	bool shift_t0 = false;
 	bool use_dist = false;
+	int fpga = -1;
+	int hybrid = -1;
+	int num_events = -1;
 	double dist_window;
 	bool make_shape = false;
 	int single_channel = -1;
@@ -114,7 +117,7 @@ int main ( int argc, char **argv ) {
 	double T0_dist_b[2],T0_dist_m[2];
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tbn")) !=-1)
+	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tbnH:F:e:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -130,6 +133,9 @@ int main ( int argc, char **argv ) {
 				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
 				printf("-n: physical channel numbering\n");
+				printf("-F: use only specified FPGA\n");
+				printf("-H: use only specified hybrid\n");
+				printf("-e: stop after specified number of events\n");
 				return(0);
 				break;
 			case 'f':
@@ -171,6 +177,15 @@ int main ( int argc, char **argv ) {
 				break;
 			case 't':
 				make_shape = true;
+				break;
+			case 'F':
+				fpga = atoi(optarg);
+				break;
+			case 'H':
+				hybrid = atoi(optarg);
+				break;
+			case 'e':
+				num_events = atoi(optarg);
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -483,8 +498,10 @@ int main ( int argc, char **argv ) {
 		eventCount = 0;
 
 		do {
+			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
 			for (x=0; x < event.count(); x++) {
+				if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
 
 				// Get sample
 				sample  = event.sample(x);

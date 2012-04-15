@@ -50,6 +50,9 @@ int main ( int argc, char **argv ) {
 	bool flip_channels = false;
 	bool move_fitstart = false;
 	bool read_temp = false;
+	int fpga = -1;
+	int hybrid = -1;
+	int num_events = -1;
 	double fit_shift;
 	ifstream calfile;
 	TString inname = "";
@@ -96,7 +99,7 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
-	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:nt")) !=-1)
+	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:ntH:F:e:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -110,6 +113,9 @@ int main ( int argc, char **argv ) {
 				printf("-n: physical channel numbering\n");
 				printf("-s: start fit at given delay after a first guess at T0\n");
 				printf("-t: print temperature\n");
+				printf("-F: use only specified FPGA\n");
+				printf("-H: use only specified hybrid\n");
+				printf("-e: stop after specified number of events\n");
 				return(0);
 				break;
 			case 'f':
@@ -176,6 +182,15 @@ int main ( int argc, char **argv ) {
 				break;
 			case 't':
 				read_temp = true;
+				break;
+			case 'F':
+				fpga = atoi(optarg);
+				break;
+			case 'H':
+				hybrid = atoi(optarg);
+				break;
+			case 'e':
+				num_events = atoi(optarg);
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -285,6 +300,7 @@ int main ( int argc, char **argv ) {
 			//}
 			//if (eventCount%2==0) printf("Event %d is %s\n",eventCount,goodEvent?"good":"bad");
 			//goodEvent = true;
+			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
 			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 				if (event.temperature(i)!=0.0)
@@ -294,6 +310,7 @@ int main ( int argc, char **argv ) {
 				}
 			//if (goodEvent) 
 			for (x=0; x < event.count(); x++) {
+			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
 
 				// Get sample
 				sample  = event.sample(x);

@@ -48,6 +48,9 @@ int main ( int argc, char **argv ) {
 	bool mux_channels = false;
 	bool skip_corr = false;
 	bool read_temp = false;
+	int fpga = -1;
+	int hybrid = -1;
+	int num_events = -1;
 	int c;
 	TCanvas         *c1;
 	TH2F            *histAll[7];
@@ -103,7 +106,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmct")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmctH:F:e:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -113,6 +116,9 @@ int main ( int argc, char **argv ) {
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
 				printf("-t: print temperature\n");
+				printf("-F: use only specified FPGA\n");
+				printf("-H: use only specified hybrid\n");
+				printf("-e: stop after specified number of events\n");
 				return(0);
 				break;
 			case 'o':
@@ -134,6 +140,15 @@ int main ( int argc, char **argv ) {
 				break;
 			case 't':
 				read_temp = true;
+				break;
+			case 'F':
+				fpga = atoi(optarg);
+				break;
+			case 'H':
+				hybrid = atoi(optarg);
+				break;
+			case 'e':
+				num_events = atoi(optarg);
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -225,7 +240,9 @@ int main ( int argc, char **argv ) {
 	eventCount = 0;
 
 	do {
+		if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
+		if (num_events!=-1 && eventCount > num_events) break;
 		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 			if (event.temperature(i)!=0.0)
 			{
@@ -239,6 +256,7 @@ int main ( int argc, char **argv ) {
 			channelActive[i] = false;
 		}
 		for (x=0; x < event.count(); x++) {
+			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
 
 			// Get sample
 			sample  = event.sample(x);
@@ -258,6 +276,7 @@ int main ( int argc, char **argv ) {
 				cout << "Apv = " << dec << sample->apv() << endl;
 				cout << "Chan = " << dec << sample->channel() << endl;
 			}
+
 
 			// Filter APVs
 			if ( eventCount >= 20 ) {
