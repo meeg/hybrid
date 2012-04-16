@@ -133,7 +133,7 @@ int main ( int argc, char **argv ) {
 		for(x=0; x < event.count(); x++) {
 			sample = event.sample(x);
 			channel = sample->channel();
-			if(debug_)	  cout<<"channel #"<<channel<<endl;
+			if(debug_)	  cout<<"hybrid #"<<sample->hybrid()<<" channel #"<<channel<<endl;
 			if ( eventCount > 0 ) {
 
 				avg = 0;

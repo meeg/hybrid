@@ -31,9 +31,6 @@ class TrackerEvioEvent  {
   // Internal bank contrainer
   TrackerEvent* banks_[8];
   
-  // Update
-  void update();
-  
  public:
   
   //! Constructor

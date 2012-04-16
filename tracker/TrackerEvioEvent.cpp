@@ -25,8 +25,6 @@
 #include "TrackerEvioEvent.h"
 using namespace std;
 
-void TrackerEvioEvent::update() { }
-
 // Constructor
 TrackerEvioEvent::TrackerEvioEvent ()  {
   nbanks=0;
@@ -36,6 +34,10 @@ TrackerEvioEvent::~TrackerEvioEvent ()  {
 }
 
 void TrackerEvioEvent::restart ()  {
+	for (int i = 0;i<nbanks;i++)
+	{
+		delete banks_[i];
+	}
   nbanks=0;
 }
 
