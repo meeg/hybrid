@@ -26,7 +26,7 @@ using namespace std;
 
 // Constructor
 DataReadEvio::DataReadEvio ( ) {
-	debug_=false;
+	debug_=true;
 	//  debug_=true;
 	fd_ = -1;
 	maxbuf=MAXEVIOBUF;
@@ -87,7 +87,7 @@ return(NULL);
 			}
 			return true;
 		}
-		printf("reading an EVIO event\n");
+		if(debug_)printf("reading an EVIO event\n");
 		bool nodata = true;
 		int nevents=0;
 		int status;
@@ -106,7 +106,7 @@ return(NULL);
 				//  do this by stepping through the banks until get an SVT bank
 				//  then hand make a "Data" object 
 				eventInfo(buf);
-				printf("evtTag = %d\n",evtTag);
+				if(debug_)printf("evtTag = %d\n",evtTag);
 				if(evtTag==1){
 					inSVT=false;  // reset the inSVT flag
 					parse_fragment(buf, BANK,&tee);

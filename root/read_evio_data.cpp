@@ -90,7 +90,7 @@ int main ( int argc, char **argv ) {
 	char            name[100];
 
 	//evio stuff.  
-	bool debug_=true;
+	bool debug_=false;
 
 	initChan();
 
@@ -128,7 +128,6 @@ int main ( int argc, char **argv ) {
 	while (dataRead->next(&event)) {
 		eventCount++;      
 		cout<<"event number "<<eventCount<<endl;
-		printf("%d\n",event.fpgaAddress());
 		if(debug_)cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		for(x=0; x < event.count(); x++) {
 			sample = event.sample(x);
@@ -145,12 +144,6 @@ int main ( int argc, char **argv ) {
 
 					if ( value < histMin[channel] ) histMin[channel] = value;
 					if ( value > histMax[channel] ) histMax[channel] = value;
-
-					if ( channel == tar && eventCount < 1000 ) {
-						grY[grCnt] = value;
-						grX[grCnt] = grCnt;
-						grCnt++;		
-					}	      
 				}
 				if(debug_)    cout<<endl;
 			}	  
@@ -169,8 +162,6 @@ int main ( int argc, char **argv ) {
 
 	c2 = new TCanvas("c12","c12");
 	c2->cd();
-	histSng[tar]->GetXaxis()->SetRangeUser(histMin[tar],histMax[tar]);
-	histSng[tar]->Draw();
 
 	c3 = new TCanvas("c13","c13");
 	c3->cd();
