@@ -155,7 +155,6 @@ int main ( int argc, char **argv ) {
 				if(debug_)    cout<<endl;
 			}	  
 		}
-		delete fpga;
 	} 
 
 	for(channel = 0; channel < 128; channel++) {
