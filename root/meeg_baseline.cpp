@@ -34,6 +34,7 @@
 #include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
+#include <DataReadEvio.h>
 #include <unistd.h>
 using namespace std;
 
@@ -48,6 +49,7 @@ int main ( int argc, char **argv ) {
 	bool mux_channels = false;
 	bool skip_corr = false;
 	bool read_temp = false;
+	bool evio_format = false;
 	int fpga = -1;
 	int hybrid = -1;
 	int num_events = -1;
@@ -90,7 +92,7 @@ int main ( int argc, char **argv ) {
 	double          grChan[640];
 	double          grMean[7][640];
 	double          grSigma[7][640];
-	DataRead        dataRead;
+	DataRead        *dataRead;
 	TrackerEvent    event;
 	TrackerSample   *sample;
 	uint            x;
@@ -106,7 +108,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmctH:F:e:")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmctH:F:e:E")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -119,6 +121,7 @@ int main ( int argc, char **argv ) {
 				printf("-F: use only specified FPGA\n");
 				printf("-H: use only specified hybrid\n");
 				printf("-e: stop after specified number of events\n");
+				printf("-E: use EVIO file format\n");
 				return(0);
 				break;
 			case 'o':
@@ -150,12 +153,20 @@ int main ( int argc, char **argv ) {
 			case 'e':
 				num_events = atoi(optarg);
 				break;
+			case 'E':
+				evio_format = true;
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
 			default:
 				abort();
 		}
+
+	if (evio_format)
+		dataRead = new DataReadEvio();
+	else 
+		dataRead = new DataRead();
 
 	gROOT->SetStyle("Plain");
 	gStyle->SetOptStat("emrou");
@@ -209,7 +220,7 @@ int main ( int argc, char **argv ) {
 
 	cout << "Reading data file " <<argv[optind] << endl;
 	// Attempt to open data file
-	if ( ! dataRead.open(argv[optind]) ) return(2);
+	if ( ! dataRead->open(argv[optind]) ) return(2);
 
 	TString confname=argv[optind];
 	confname.ReplaceAll(".bin",".conf");
@@ -221,12 +232,12 @@ int main ( int argc, char **argv ) {
 	cout << "Writing configuration to " <<outdir<<confname << endl;
 	outconfig.open(outdir+confname);
 
-	dataRead.next(&event);
-	dataRead.dumpConfig(outconfig);
+	dataRead->next(&event);
+	dataRead->dumpConfig(outconfig);
 	outconfig.close();
 	//dataRead.dumpStatus();
 
-	runCount = atoi(dataRead.getConfig("RunCount").c_str());
+	runCount = atoi(dataRead->getConfig("RunCount").c_str());
 	double *apv_means[5];
 	for (int i=0;i<5;i++) apv_means[i] = new double[runCount];
 	double *moving_ti = new double[runCount];
@@ -351,8 +362,8 @@ int main ( int argc, char **argv ) {
 			}
 		eventCount++;
 
-	} while ( dataRead.next(&event));
-	dataRead.close();
+	} while ( dataRead->next(&event));
+	dataRead->close();
 
 	if (eventCount != runCount)
 	{
