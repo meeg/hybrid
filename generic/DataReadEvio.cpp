@@ -44,9 +44,11 @@ DataReadEvio::~DataReadEvio ( ) { }
 
 
 // Open file
-bool DataReadEvio::open ( char* file) {
+bool DataReadEvio::open ( string file) {
 	int status;
-	if((status=evOpen(file,"r",&fd_))!=0) {
+	char * filename = (char *) malloc((file.size()+1)*sizeof(char));
+	strcpy(filename,file.c_str());
+	if((status=evOpen(filename,"r",&fd_))!=0) {
 		//      printf("\n ?Unable to open file %s, status=%d\n\n",file,status);
 		cout<<"Unable to open file "<<file<<", status="<<status<<endl;
 		return(false);

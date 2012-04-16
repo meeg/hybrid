@@ -75,7 +75,7 @@ int main ( int argc, char **argv ) {
 	double          grMean[128];
 	double          grRange[128];
 	DataRead    *dataRead;
-	TrackerEvent fpga;
+	TrackerEvent event;
 	TrackerSample   *sample;
 	double          grY[6000];
 	double          grX[6000];
@@ -125,13 +125,13 @@ int main ( int argc, char **argv ) {
 	eventCount = 0;
 	grCnt = 0;
 
-	while (dataRead->next(&fpga)) {
+	while (dataRead->next(&event)) {
 		eventCount++;      
 		cout<<"event number "<<eventCount<<endl;
-		printf("%d\n",fpga.fpgaAddress());
-		if(debug_)cout<<"  fpga #"<<fpga.fpgaAddress()<<"; number of samples = "<<fpga.count()<<endl;
-		for(x=0; x < fpga.count(); x++) {
-			sample = fpga.sample(x);
+		printf("%d\n",event.fpgaAddress());
+		if(debug_)cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
+		for(x=0; x < event.count(); x++) {
+			sample = event.sample(x);
 			channel = sample->channel();
 			if(debug_)	  cout<<"channel #"<<channel<<endl;
 			if ( eventCount > 0 ) {

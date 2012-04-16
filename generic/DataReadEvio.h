@@ -85,7 +85,7 @@ class DataReadEvio : public DataRead {
       //! Deconstructor
       ~DataReadEvio ( );
 
-      bool open ( char* file);
+      bool open ( string file);
 
       //! Get next data record
       /*! 
