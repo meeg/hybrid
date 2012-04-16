@@ -39,14 +39,14 @@ void TrackerEvioEvent::restart ()  {
   nbanks=0;
 }
 
-void TrackerEvioEvent::addFPGAData (TrackerBank* newfpga)  {
+void TrackerEvioEvent::addFPGAData (TrackerEvent* newfpga)  {
   if(nbanks>7) cout<<"Why am I trying to add more than 8 banks???"<<endl;
   banks_[nbanks]=newfpga;
   nbanks++;
 }
 
 // Get sample at index
-TrackerBank *TrackerEvioEvent::getFPGAData (uint index) {
+TrackerEvent *TrackerEvioEvent::getFPGAData (uint index) {
   return banks_[index];
 }
 

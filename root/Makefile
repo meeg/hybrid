@@ -13,8 +13,8 @@ GEN_OBJ := $(patsubst $(GEN_DIR)/%.cpp,$(OBJ)/%.o,$(GEN_SRC))
 
 # Tracker Sources
 TRK_DIR := $(PWD)/../tracker
-TRK_SRC := $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TrackerBank.cpp $(TRK_DIR)/TrackerEvioEvent.cpp
-TRK_HDR := $(TRK_DIR)/TrackerEvent.h   $(TRK_DIR)/TrackerSample.h $(TRK_DIR)/TrackerBank.h $(TRK_DIR)/TrackerEvioEvent.h
+TRK_SRC := $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TrackerEvioEvent.cpp
+TRK_HDR := $(TRK_DIR)/TrackerEvent.h   $(TRK_DIR)/TrackerSample.h $(TRK_DIR)/TrackerEvioEvent.h
 TRK_OBJ := $(patsubst $(TRK_DIR)/%.cpp,$(OBJ)/%.o,$(TRK_SRC))
 
 # Fitter Sources

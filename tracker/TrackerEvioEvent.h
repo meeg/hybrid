@@ -21,15 +21,15 @@
 #include <string>
 #include <unistd.h>
 #include <sys/types.h>
-#include "TrackerBank.h"
+#include <TrackerEvent.h>
 using namespace std;
 
 //! Tracker Event Container Class for an EVIO event with 1 bank-per-FPGA
 class TrackerEvioEvent  {
 
-  int nbanks;
+  uint nbanks;
   // Internal bank contrainer
-  TrackerBank* banks_[8];
+  TrackerEvent* banks_[8];
   
   // Update
   void update();
@@ -46,9 +46,9 @@ class TrackerEvioEvent  {
   /*!
    * Returns sample count
    */
-  int count ( ){return nbanks;};
+  uint count ( ){return nbanks;};
   
-  void addFPGAData(TrackerBank*);
+  void addFPGAData(TrackerEvent*);
   void restart();
   
   //! Get sample at index
@@ -57,7 +57,7 @@ class TrackerEvioEvent  {
    * Contents of returned object will change next time sample() is called.
    * \param index Sample index. 0 - count()-1.
    */
-  TrackerBank *getFPGAData (uint index);
+  TrackerEvent *getFPGAData (uint index);
   
   //! Get sample at index
   /*!

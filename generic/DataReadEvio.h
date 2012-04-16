@@ -22,6 +22,7 @@
 #include <map>
 #include <TrackerEvioEvent.h>
 #include <sys/types.h>
+#include <DataRead.h>
 using namespace std;
 #define MAXEVIOBUF   1000000
 
@@ -29,24 +30,17 @@ using namespace std;
 typedef map<string,string> VariableHolder;
 
 //! Class to contain generic register data.
-class DataReadEvio {
+class DataReadEvio : public DataRead {
   bool debug_;
 
-      // File descriptor
-      int fd_;
-
+  TrackerEvioEvent tee;
+  int tee_fpga;
       //
       int maxbuf ;
       
       // Strip whitespace
       string removeWhite ( string str );
 
-
-      // Config list
-      VariableHolder config_;
-
-      // Status list
-      VariableHolder status_;
 
       void parse_fragment( unsigned int *buf, int fragment_type,TrackerEvioEvent* tee)  ;
       
@@ -91,21 +85,14 @@ class DataReadEvio {
       //! Deconstructor
       ~DataReadEvio ( );
 
-      //! Open File
-      /*! 
-       * \param file Filename
-      */
       bool open ( char* file);
-
-      //! Close File
-      void close ( );
 
       //! Get next data record
       /*! 
        * Returns true on success
        * \param data Data object to store data
       */
-      int  next ( TrackerEvioEvent* );
+      bool  next ( Data *data);
       
       //! Get next data record & create new data object
       /*! 
@@ -113,23 +100,5 @@ class DataReadEvio {
       */
       //      Data *next ( );
 
-      //! Get a config value
-      /*! 
-       * \param var Config variable name
-      */
-      string getConfig ( string var );
-
-      //! Get a status value
-      /*! 
-       * \param var Status variable name
-      */
-      string getStatus ( string var );
-
-      //! Dump config
-      void dumpConfig ( );
-
-      //! Dump status
-      void dumpStatus ( );
-      
 };
 #endif

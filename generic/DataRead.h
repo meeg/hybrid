@@ -30,9 +30,6 @@ typedef map<string,string> VariableHolder;
 //! Class to contain generic register data.
 class DataRead {
 
-      // File descriptor
-      int fd_;
-
       // Strip whitespace
       string removeWhite ( string str );
 
@@ -41,6 +38,11 @@ class DataRead {
 
       // Process level
       void xmlLevel( xmlNode *node, string curr, bool config );
+
+	protected:
+
+      // File descriptor
+      int fd_;
 
       // Config list
       VariableHolder config_;
@@ -54,13 +56,13 @@ class DataRead {
       DataRead ( );
 
       //! Deconstructor
-      ~DataRead ( );
+      virtual ~DataRead ( );
 
       //! Open File
       /*! 
        * \param file Filename
       */
-      bool open ( string file );
+      virtual bool open ( string file );
 
       //! Close File
       void close ( );
@@ -70,7 +72,7 @@ class DataRead {
        * Returns true on success
        * \param data Data object to store data
       */
-      bool next ( Data *data );
+      virtual bool next ( Data *data );
 
       //! Get next data record & create new data object
       /*! 

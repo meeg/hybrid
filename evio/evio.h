@@ -29,6 +29,7 @@
 #define S_EVFILE_BADARG     0x80730007  /* Invalid function argument */
 
 /* macros for swapping ints of various sizes */
+/*
 #define EVIO_SWAP64(x) ( (((x) >> 56) & 0x00000000000000FFL) | \
                          (((x) >> 40) & 0x000000000000FF00L) | \
                          (((x) >> 24) & 0x0000000000FF0000L) | \
@@ -37,6 +38,15 @@
                          (((x) << 24) & 0x0000FF0000000000L) | \
                          (((x) << 40) & 0x00FF000000000000L) | \
                          (((x) << 56) & 0xFF00000000000000L) )
+*/
+#define EVIO_SWAP64(x) ( (((x) >> 56) & ((uint64_t) 0xFF) << 0) | \
+                         (((x) >> 40) & ((uint64_t) 0xFF) << 8) | \
+                         (((x) >> 24) & ((uint64_t) 0xFF) << 16) | \
+                         (((x) >> 8)  & ((uint64_t) 0xFF) << 24) | \
+                         (((x) << 8)  & ((uint64_t) 0xFF) << 32) | \
+                         (((x) << 24) & ((uint64_t) 0xFF) << 40) | \
+                         (((x) << 40) & ((uint64_t) 0xFF) << 48) | \
+                         (((x) << 56) & ((uint64_t) 0xFF) << 56) )
 
 #define EVIO_SWAP32(x) ( (((x) >> 24) & 0x000000FF) | \
                          (((x) >> 8)  & 0x0000FF00) | \
