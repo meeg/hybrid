@@ -56,8 +56,11 @@ TrackerFull::TrackerFull (CommLink *commLink) : System("TrackerFull",commLink) {
    addVariable(new Variable("TholdId", Variable::Status));
    variables_["TholdId"]->setDescription("Threshold ID Value From File");
 
-   addVariable(new Variable("TholdFile", Variable::Status));
-   variables_["TholdFile"]->setDescription("Threshold File");
+   addVariable(new Variable("FilterFile", Variable::Configuration));
+   variables_["FilterFile"]->setDescription("Filter File");
+
+   addVariable(new Variable("FilterId", Variable::Status));
+   variables_["FilterId"]->setDescription("Filter ID Value From File");
 
    addVariable(new Variable("TempPollPer", Variable::Configuration));
    variables_["TempPollPer"]->setDescription("Temperature polling period for epics in seconds");
@@ -66,6 +69,9 @@ TrackerFull::TrackerFull (CommLink *commLink) : System("TrackerFull",commLink) {
 
    addVariable(new Variable("IntTrigEn", Variable::Configuration));
    variables_["IntTrigEn"]->setTrueFalse();
+
+   addVariable(new Variable("LiveDisplay", Variable::Configuration));
+   variables_["LiveDisplay"]->setTrueFalse();
 
    addCommand(new Command("CodaPrestart"));
    commands_["CodaPrestart"]->setDescription("Coda Prestart");
@@ -85,10 +91,14 @@ TrackerFull::TrackerFull (CommLink *commLink) : System("TrackerFull",commLink) {
    addCommand(new Command("DumpThreshold"));
    commands_["DumpThreshold"]->setDescription("Dump Threshold To File");
 
+   addCommand(new Command("DumpFilter"));
+   commands_["DumpFilter"]->setDescription("Dump Filter To File");
+
    epicsDataOpenAndMap(&tempMem_);       
 
    // Init threshold data
    memset(&thold_,0,sizeof(Threshold));
+   memset(&filt_,0,sizeof(Filter));
 }
 
 // Deconstructor
@@ -143,6 +153,10 @@ void TrackerFull::command ( string name, string arg ) {
       tmp.str("");
       tmp << dstr.str() << "_CodaPrestart_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
+
+      tmp.str("");
+      tmp << dstr.str() << "_CodaPrestart_Filter.txt";
+      this->command("DumpFilter",tmp.str());
    }
 
    else if ( name == "CodaGo" ) {
@@ -180,6 +194,10 @@ void TrackerFull::command ( string name, string arg ) {
       tmp.str("");
       tmp << dstr.str() << "_CodaGo_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
+
+      tmp.str("");
+      tmp << dstr.str() << "_CodaGo_Filter.txt";
+      this->command("DumpFilter",tmp.str());
 
       if ( getInt("IntTrigEn") == 1 ) device("tisFpga")->command("IntTrigStart","");
    }
@@ -221,6 +239,10 @@ void TrackerFull::command ( string name, string arg ) {
       tmp.str("");
       tmp << dstr.str() << "_CodaPause_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
+
+      tmp.str("");
+      tmp << dstr.str() << "_CodaPause_Filter.txt";
+      this->command("DumpFilter",tmp.str());
    }
 
    else if ( name == "CodaEnd" ) {
@@ -260,6 +282,10 @@ void TrackerFull::command ( string name, string arg ) {
       tmp.str("");
       tmp << dstr.str() << "_CodaEnd_Threshold.txt";
       this->command("DumpThreshold",tmp.str());
+
+      tmp.str("");
+      tmp << dstr.str() << "_CodaEnd_Filter.txt";
+      this->command("DumpFilter",tmp.str());
    }
 
    else if ( name == "DumpThreshold" ) {
@@ -291,6 +317,70 @@ void TrackerFull::command ( string name, string arg ) {
       }
       os.close();
    }
+
+   else if ( name == "DumpFilter" ) {
+      if ( arg == "" ) fname = "filterDump.txt";
+      else fname = arg;
+
+      os.open(fname.c_str(),ios::out | ios::trunc);
+      if ( ! os.is_open() ) {
+         tmp.str("");
+         tmp << "TrackerFull::command -> Error opening filter file for write: " << arg << endl;
+         if ( debug_ ) cout << tmp.str();
+         throw(tmp.str());
+      }
+
+      os << "Id: " << endl;
+      os << filt_.filterId << endl;
+      os << "FPGA   Hyb    APV    Coeffs" << endl;
+
+      for(fpga=0; fpga < 7; fpga++) {
+         for(hyb=0; hyb <3; hyb++) {
+            for(apv=0; apv <5; apv++) {
+               os << dec << fpga << "      " << dec << hyb << "      " << dec << apv << "      ";
+
+               for(chan=0; chan <10; chan++) {
+                  os << setw(6) << setfill('0') << hex << filt_.filterData[fpga][hyb][apv][chan] << " ";
+               }
+               os << endl;
+            }
+         }
+      }
+      os.close();
+   }
+   else if ( name == "ReadFilter" ) {
+      if ( arg == "" ) fname = "filterDump.txt";
+      else fname = arg;
+
+      ifstream is;
+      string line;
+      is.open(fname.c_str());
+      if ( ! is.is_open() ) {
+         tmp.str("");
+         tmp << "TrackerFull::command -> Error opening filter file for read: " << arg << endl;
+         if ( debug_ ) cout << tmp.str();
+         throw(tmp.str());
+      }
+
+      //discard "Id:"
+      getline(is,line);
+
+      //read filter ID
+      is.getline(filt_.filterId,filt_.IdLength);
+
+      //discard column headers
+      getline(is,line);
+
+      while (getline(is, line))
+      {
+          istringstream iss(line);
+          if (!(iss >> fpga >> hyb >> apv)) { break; } // error
+	  for (int i = 0;i<filt_.CoefCount;i++)
+		  iss >> filt_.filterData[fpga][hyb][apv][i];
+      }
+      is.close();
+   }
+
    else System::command(name,arg);
 }
 
@@ -415,7 +505,8 @@ string TrackerFull::localState() {
 
    // Update user state variable
    stat.str("");
-   stat << dec << fpgaMask << " " << dec << eventSize << " " << dec << errorFlag << " " << dec << getInt("IntTrigEn") << endl;
+   stat << dec << fpgaMask << " " << dec << eventSize << " " << dec << errorFlag << " " << dec << getInt("IntTrigEn") 
+        << " " << dec << getInt("LiveDisplay") << endl;
    variables_["UserStatus"]->set(stat.str());
 
    // Polling is enabled
@@ -525,6 +616,7 @@ void TrackerFull::writeConfig ( bool force ) {
    for (x=0; x < 7; x++) {
       f = (CntrlFpga *)(device("cntrlFpga",x));
       f->setThreshold(&thold_);
+      f->setFilter(&filt_);
    }
 
    // Attempt to open file
@@ -547,6 +639,28 @@ void TrackerFull::writeConfig ( bool force ) {
    } else {
       set("TholdId","None");
       memset(&thold_,0,sizeof(Threshold));
+   }
+
+   // Attempt to open file
+   if ( get("FilterFile") != "" ) {
+      if ( (fd = open(get("FilterFile").c_str(),O_RDONLY)) < 0 ) {
+         cout << "TrackerFull::writeConfig -> Error opening filter file: " << get("FilterFile") << endl;
+         fd = -1;
+      }
+   } else fd = -1;
+
+   // File is valid
+   if ( fd > 0 ) {
+
+      // Read in threshold data
+      read(fd,&filt_,sizeof(Filter));
+
+      // Set ID variable
+      variables_["FilterId"]->set(filt_.filterId);
+
+   } else {
+      set("FilterId","None");
+      memset(&filt_,0,sizeof(Filter));
    }
 
    // Sub devices
