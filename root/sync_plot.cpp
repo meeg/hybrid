@@ -49,7 +49,7 @@ int main ( int argc, char **argv ) {
 	int             adcValue;
 	uint            adcValid;
 	uint            x;
-	stringstream    title;
+	char    title[200];
 	uint            idx;
 	TGraph          *plot;
 	double          value;
@@ -92,9 +92,8 @@ int main ( int argc, char **argv ) {
 	}
 
 	for (x=0; x < 32; x++) {
-		title.str("");
-		title << "sample_" << dec << x;
-		hist[x] = new TH1F(title.str().c_str(),title.str().c_str(),32768,-16383.5,16384.5);
+		sprintf(title,"sample_%d",x);
+		hist[x] = new TH1F(title,title,32768,-16383.5,16384.5);
 		histMin[x] = 16384;
 		histMax[x] = -16384;
 	}

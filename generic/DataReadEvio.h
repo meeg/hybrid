@@ -87,17 +87,19 @@ class DataReadEvio : public DataRead {
 
       bool open ( string file);
 
+      void close();
+
       //! Get next data record
       /*! 
        * Returns true on success
        * \param data Data object to store data
-      */
+       */
       bool  next ( Data *data);
-      
+
       //! Get next data record & create new data object
       /*! 
        * Returns NULL on failure
-      */
+       */
       //      Data *next ( );
 
 };

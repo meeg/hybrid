@@ -65,7 +65,7 @@ class DataRead {
       virtual bool open ( string file );
 
       //! Close File
-      void close ( );
+      virtual void close ( );
 
       //! Get next data record
       /*! 

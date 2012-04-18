@@ -26,7 +26,7 @@ using namespace std;
 
 // Constructor
 DataReadEvio::DataReadEvio ( ) {
-	debug_=true;
+	debug_=false;
 	//  debug_=true;
 	fd_ = -1;
 	maxbuf=MAXEVIOBUF;
@@ -57,6 +57,10 @@ bool DataReadEvio::open ( string file) {
 }
 
 
+void DataReadEvio::close () {
+   evClose(fd_);
+   fd_ = -1;
+}
 
 /*
 // Get next data record

@@ -330,9 +330,9 @@ void TrackerFull::command ( string name, string arg ) {
          throw(tmp.str());
       }
 
-      os << "Id: " << endl;
+      os << "#Id: " << endl;
       os << filt_.filterId << endl;
-      os << "FPGA   Hyb    APV    Coeffs" << endl;
+      os << "#FPGA   Hyb    APV    Coeffs" << endl;
 
       for(fpga=0; fpga < 7; fpga++) {
          for(hyb=0; hyb <3; hyb++) {
@@ -340,7 +340,7 @@ void TrackerFull::command ( string name, string arg ) {
                os << dec << fpga << "      " << dec << hyb << "      " << dec << apv << "      ";
 
                for(chan=0; chan <10; chan++) {
-                  os << setw(6) << setfill('0') << hex << filt_.filterData[fpga][hyb][apv][chan] << " ";
+                  os << setw(6) << setfill('0') << dec << filt_.filterData[fpga][hyb][apv][chan] << " ";
                }
                os << endl;
             }
@@ -352,31 +352,42 @@ void TrackerFull::command ( string name, string arg ) {
       if ( arg == "" ) fname = "filterDump.txt";
       else fname = arg;
 
+      for(fpga=0; fpga < 7; fpga++) {
+	      for(hyb=0; hyb <3; hyb++) {
+		      for(apv=0; apv <5; apv++) {
+			      filt_.filterData[fpga][hyb][apv][0] = 1;
+			      for(chan=1; chan <10; chan++) {
+				      filt_.filterData[fpga][hyb][apv][chan] = 0;
+			      }
+		      }
+	      }
+      }
+
       ifstream is;
       string line;
       is.open(fname.c_str());
       if ( ! is.is_open() ) {
-         tmp.str("");
-         tmp << "TrackerFull::command -> Error opening filter file for read: " << arg << endl;
-         if ( debug_ ) cout << tmp.str();
-         throw(tmp.str());
+	      tmp.str("");
+	      tmp << "TrackerFull::command -> Error opening filter file for read: " << arg << endl;
+	      if ( debug_ ) cout << tmp.str();
+	      throw(tmp.str());
       }
 
-      //discard "Id:"
-      getline(is,line);
-
       //read filter ID
-      is.getline(filt_.filterId,filt_.IdLength);
-
-      //discard column headers
-      getline(is,line);
+      while (getline(is,line))
+      {
+	      if (line[0]!='#') break;
+      }
+      line.copy(filt_.filterId,filt_.IdLength);
 
       while (getline(is, line))
       {
-          istringstream iss(line);
-          if (!(iss >> fpga >> hyb >> apv)) { break; } // error
-	  for (int i = 0;i<filt_.CoefCount;i++)
-		  iss >> filt_.filterData[fpga][hyb][apv][i];
+	      if (line[0]=='#') continue;
+	      //printf("%s\n",line.c_str());
+	      istringstream iss(line);
+	      if (!(iss >> fpga >> hyb >> apv)) { break; } // error
+	      for (int i = 0;i<filt_.CoefCount;i++)
+		      iss >> filt_.filterData[fpga][hyb][apv][i];
       }
       is.close();
    }
@@ -387,284 +398,284 @@ void TrackerFull::command ( string name, string arg ) {
 // Method to set run state
 void TrackerFull::setRunState ( string state ) {
 
-   if ( get("CodaState") != "" ) {
-      cout << "TrackerFull::setRunState -> Can't start manual run while connected to coda!!!!!" << endl;
-      return;
-   }
+	if ( get("CodaState") != "" ) {
+		cout << "TrackerFull::setRunState -> Can't start manual run while connected to coda!!!!!" << endl;
+		return;
+	}
 
-   if ( !swRunning_ ) device("tisFpga",0)->setRunCommand("TisSWTrig");
-   System::setRunState(state);
+	if ( !swRunning_ ) device("tisFpga",0)->setRunCommand("TisSWTrig");
+	System::setRunState(state);
 }
 
 // Get extracted temp value
 double TrackerFull::getTemp(uint fpga, uint index) {
-   string       valName;
-   string       valIn;
-   double       valOut;
-   char         buffa[50];
-   char         buffb[50];
+	string       valName;
+	string       valIn;
+	double       valOut;
+	char         buffa[50];
+	char         buffb[50];
 
-   switch(index) {
-      case  0: valName = "Temp_0_0"; break; 
-      case  1: valName = "Temp_0_1"; break; 
-      case  2: valName = "Temp_0_2"; break; 
-      case  3: valName = "Temp_0_3"; break; 
-      case  4: valName = "Temp_1_0"; break; 
-      case  5: valName = "Temp_1_1"; break; 
-      case  6: valName = "Temp_1_2"; break; 
-      case  7: valName = "Temp_1_3"; break; 
-      case  8: valName = "Temp_2_0"; break; 
-      case  9: valName = "Temp_2_1"; break; 
-      case 10: valName = "Temp_2_2"; break; 
-      case 11: valName = "Temp_2_3"; break; 
-      default: valName = ""; break;
-   }
- 
-   valIn = device("cntrlFpga",fpga)->get(valName);
-   sscanf(valIn.c_str(),"%lf %s %s",&valOut,buffa,buffb);
+	switch(index) {
+		case  0: valName = "Temp_0_0"; break; 
+		case  1: valName = "Temp_0_1"; break; 
+		case  2: valName = "Temp_0_2"; break; 
+		case  3: valName = "Temp_0_3"; break; 
+		case  4: valName = "Temp_1_0"; break; 
+		case  5: valName = "Temp_1_1"; break; 
+		case  6: valName = "Temp_1_2"; break; 
+		case  7: valName = "Temp_1_3"; break; 
+		case  8: valName = "Temp_2_0"; break; 
+		case  9: valName = "Temp_2_1"; break; 
+		case 10: valName = "Temp_2_2"; break; 
+		case 11: valName = "Temp_2_3"; break; 
+		default: valName = ""; break;
+	}
 
-   return(valOut);
+	valIn = device("cntrlFpga",fpga)->get(valName);
+	sscanf(valIn.c_str(),"%lf %s %s",&valOut,buffa,buffb);
+
+	return(valOut);
 }
 
 //! Return local state, specific to each implementation
 string TrackerFull::localState() {
-   stringstream loc;
-   uint         apv;
-   uint         bit;
-   uint         hyb;
-   uint         fpga;
-   uint         tmp;
-   uint         apvCnt;
-   uint         syncCnt;
-   uint         reg;
-   bool         fifoErr;
-   bool         latErr;
-   uint         fpgaMask;
-   uint         eventSize;
-   uint         errorFlag;
-   time_t       currTime;
-   stringstream stat;
-   CntrlFpga    *f;
+	stringstream loc;
+	uint         apv;
+	uint         bit;
+	uint         hyb;
+	uint         fpga;
+	uint         tmp;
+	uint         apvCnt;
+	uint         syncCnt;
+	uint         reg;
+	bool         fifoErr;
+	bool         latErr;
+	uint         fpgaMask;
+	uint         eventSize;
+	uint         errorFlag;
+	time_t       currTime;
+	stringstream stat;
+	CntrlFpga    *f;
 
-   apvCnt    = 0;
-   syncCnt   = 0;
-   fifoErr   = false;
-   latErr    = false;
-   errorFlag = errorFlag_;
-   fpgaMask  = 0x80; // TI Always Enabled
-   loc.str("");
+	apvCnt    = 0;
+	syncCnt   = 0;
+	fifoErr   = false;
+	latErr    = false;
+	errorFlag = errorFlag_;
+	fpgaMask  = 0x80; // TI Always Enabled
+	loc.str("");
 
-   // Check hybrid status
-   for ( fpga = 0; fpga < 7; fpga++ ) { 
-      if ( device("cntrlFpga",fpga)->get("enabled") == "True" ) {
-         fpgaMask |= (1 << fpga);
-      
-         // Get sync register
-         reg = device("cntrlFpga",fpga)->getInt("ApvSyncDetect");
+	// Check hybrid status
+	for ( fpga = 0; fpga < 7; fpga++ ) { 
+		if ( device("cntrlFpga",fpga)->get("enabled") == "True" ) {
+			fpgaMask |= (1 << fpga);
 
-         for ( hyb = 0; hyb < 3; hyb++ ) { 
-            if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->get("enabled") == "True" ) {
+			// Get sync register
+			reg = device("cntrlFpga",fpga)->getInt("ApvSyncDetect");
 
-               // Check APV status registers
-               for ( apv = 0; apv < 5; apv++ ) {
-                  if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->get("enabled") == "True" ) {
-                     if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->getInt("FifoError") != 0 ) {
-                        fifoErr = true;
-                        errorFlag = 1;
-                     }
-                     if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->getInt("LatencyError") != 0 ) {
-                        latErr = true;
-                        errorFlag = 1;
-                     }
+			for ( hyb = 0; hyb < 3; hyb++ ) { 
+				if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->get("enabled") == "True" ) {
 
-                     apvCnt++;
-                  }
+					// Check APV status registers
+					for ( apv = 0; apv < 5; apv++ ) {
+						if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->get("enabled") == "True" ) {
+							if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->getInt("FifoError") != 0 ) {
+								fifoErr = true;
+								errorFlag = 1;
+							}
+							if ( device("cntrlFpga",fpga)->device("hybrid",hyb)->device("apv25",apv)->getInt("LatencyError") != 0 ) {
+								latErr = true;
+								errorFlag = 1;
+							}
 
-                  // Count synced apvs
-                  bit = (hyb * 5) + apv;
-                  if (((reg >> bit) & 0x1 ) != 0) syncCnt++;
-               }
-            }
-         }
-      }
-   }
+							apvCnt++;
+						}
+
+						// Count synced apvs
+						bit = (hyb * 5) + apv;
+						if (((reg >> bit) & 0x1 ) != 0) syncCnt++;
+					}
+				}
+			}
+		}
+	}
 
 
-   // Get Event Size
-   eventSize = device("tisFpga",0)->getInt("EventSize") + 1;
+	// Get Event Size
+	eventSize = device("tisFpga",0)->getInt("EventSize") + 1;
 
-   // Update status message
-   if ( fifoErr ) loc << "APV FIFO Error.\n";
-   if ( latErr  ) loc << "APV Latency Error.\n";
-   loc << dec << syncCnt << " Out Of " << dec << apvCnt << " Apvs Are Synced!\n";
-   if ( fifoErr || latErr ) loc << "Soft Reset Required!\n";
+	// Update status message
+	if ( fifoErr ) loc << "APV FIFO Error.\n";
+	if ( latErr  ) loc << "APV Latency Error.\n";
+	loc << dec << syncCnt << " Out Of " << dec << apvCnt << " Apvs Are Synced!\n";
+	if ( fifoErr || latErr ) loc << "Soft Reset Required!\n";
 
-   // Add coda state
-   if ( variables_["CodaState"]->get() != "" ) 
-      loc << "Coda state is '" << variables_["CodaState"]->get() << "'\n";
+	// Add coda state
+	if ( variables_["CodaState"]->get() != "" ) 
+		loc << "Coda state is '" << variables_["CodaState"]->get() << "'\n";
 
-   // Update user state variable
-   stat.str("");
-   stat << dec << fpgaMask << " " << dec << eventSize << " " << dec << errorFlag << " " << dec << getInt("IntTrigEn") 
-        << " " << dec << getInt("LiveDisplay") << endl;
-   variables_["UserStatus"]->set(stat.str());
+	// Update user state variable
+	stat.str("");
+	stat << dec << fpgaMask << " " << dec << eventSize << " " << dec << errorFlag << " " << dec << getInt("IntTrigEn") 
+		<< " " << dec << getInt("LiveDisplay") << endl;
+	variables_["UserStatus"]->set(stat.str());
 
-   // Polling is enabled
-   time(&currTime);
-   if ( getInt("TempPollPer") > 0 ) {
+	// Polling is enabled
+	time(&currTime);
+	if ( getInt("TempPollPer") > 0 ) {
 
-      // Check if it is time for an update
-      if ( (currTime - lastTemp_) > getInt("TempPollPer") ) {
+		// Check if it is time for an update
+		if ( (currTime - lastTemp_) > getInt("TempPollPer") ) {
 
-         // Poll each fpga
-         for ( fpga = 0; fpga < 7; fpga++ ) { 
-            if ( device("cntrlFpga",fpga)->get("enabled") == "True" ) {
+			// Poll each fpga
+			for ( fpga = 0; fpga < 7; fpga++ ) { 
+				if ( device("cntrlFpga",fpga)->get("enabled") == "True" ) {
 
-               // Read current values
-               try {
-                  f = (CntrlFpga *)(device("cntrlFpga",fpga));
-                  f->readTemps();
-               } catch (string error) {
-                  for (tmp =0; tmp < 12; tmp++) epicsDataSet(tempMem_,fpga*12+tmp,0);
-                  cout << "TrackerFull::localState -> Got error reading temperatures "
-                       << "from fpga " << dec << fpga << ". Ignoring" << endl;
-               }
-               
-               // Get 12 temperatures from each fpga
-               for (tmp =0; tmp < 12; tmp++) epicsDataSet(tempMem_,fpga*12+tmp,getTemp(fpga,tmp));
-            }
-         }
+					// Read current values
+					try {
+						f = (CntrlFpga *)(device("cntrlFpga",fpga));
+						f->readTemps();
+					} catch (string error) {
+						for (tmp =0; tmp < 12; tmp++) epicsDataSet(tempMem_,fpga*12+tmp,0);
+						cout << "TrackerFull::localState -> Got error reading temperatures "
+							<< "from fpga " << dec << fpga << ". Ignoring" << endl;
+					}
 
-         // Mark shared memory as updated
-         epicsDataSetReady(tempMem_);
-         lastTemp_ = currTime;
-      }
-   }
-   else lastTemp_ = currTime;
+					// Get 12 temperatures from each fpga
+					for (tmp =0; tmp < 12; tmp++) epicsDataSet(tempMem_,fpga*12+tmp,getTemp(fpga,tmp));
+				}
+			}
 
-   return(loc.str());
+			// Mark shared memory as updated
+			epicsDataSetReady(tempMem_);
+			lastTemp_ = currTime;
+		}
+	}
+	else lastTemp_ = currTime;
+
+	return(loc.str());
 }
 
 //! Method to perform soft reset
 void TrackerFull::softReset ( ) {
-   uint x;
+	uint x;
 
-   System::softReset();
+	System::softReset();
 
-   for (x=0; x < 7; x++) device("cntrlFpga",x)->command("TrigCntRst","");
-   device("tisFpga",0)->command("TrigCntRst","");
-   
-   for (x=0; x < 7; x++) device("cntrlFpga",x)->command("ApvClkRst","");
-   sleep(1);
-   for (x=0; x < 7; x++) device("cntrlFpga",x)->command("Apv25Reset","");
-   sleep(1);
-   for (x=0; x < 7; x++) device("cntrlFpga",x)->command("Apv25Reset","");
-   sleep(1);
+	for (x=0; x < 7; x++) device("cntrlFpga",x)->command("TrigCntRst","");
+	device("tisFpga",0)->command("TrigCntRst","");
+
+	for (x=0; x < 7; x++) device("cntrlFpga",x)->command("ApvClkRst","");
+	sleep(1);
+	for (x=0; x < 7; x++) device("cntrlFpga",x)->command("Apv25Reset","");
+	sleep(1);
+	for (x=0; x < 7; x++) device("cntrlFpga",x)->command("Apv25Reset","");
+	sleep(1);
 }
 
 //! Method to perform hard reset
 void TrackerFull::hardReset ( ) {
-   stringstream error;
-   bool gotVer = false;
-   uint count = 0;
-   uint x;
+	stringstream error;
+	bool gotVer = false;
+	uint count = 0;
+	uint x;
 
-   variables_["CodaState"]->set("");
+	variables_["CodaState"]->set("");
 
-   for (x=0; x < 7; x++) {
-      device("cntrlFpga",x)->device("hybrid",0)->set("enabled","False");
-      device("cntrlFpga",x)->device("hybrid",1)->set("enabled","False");
-      device("cntrlFpga",x)->device("hybrid",2)->set("enabled","False");
-   }
+	for (x=0; x < 7; x++) {
+		device("cntrlFpga",x)->device("hybrid",0)->set("enabled","False");
+		device("cntrlFpga",x)->device("hybrid",1)->set("enabled","False");
+		device("cntrlFpga",x)->device("hybrid",2)->set("enabled","False");
+	}
 
-   System::hardReset();
+	System::hardReset();
 
-   //for (x=0; x < 7; x++) device("cntrlFpga",x)->command("MasterReset","");
+	//for (x=0; x < 7; x++) device("cntrlFpga",x)->command("MasterReset","");
 
-   do {
-      sleep(1);
-      try { 
-         gotVer = true;
-         for (x=0; x < 7; x++) device("cntrlFpga",x)->readSingle("Version");
-      } catch ( string err ) { 
-         if ( count > 5 ) {
-            gotVer = true;
-            error.str("");
-            error << "TrackerFull::hardReset -> Error reading version regsiter from fpga " << x;
-            cout << error.str() << endl;
-            throw(string(error.str()));
-         }
-         else {
-            count++;
-            gotVer = false;
-         }
-      }
-   } while ( !gotVer );
-   for (x=0; x < 7; x++) device("cntrlFpga",x)->command("Apv25HardReset","");
-   usleep(100);
+	do {
+		sleep(1);
+		try { 
+			gotVer = true;
+			for (x=0; x < 7; x++) device("cntrlFpga",x)->readSingle("Version");
+		} catch ( string err ) { 
+			if ( count > 5 ) {
+				gotVer = true;
+				error.str("");
+				error << "TrackerFull::hardReset -> Error reading version regsiter from fpga " << x;
+				cout << error.str() << endl;
+				throw(string(error.str()));
+			}
+			else {
+				count++;
+				gotVer = false;
+			}
+		}
+	} while ( !gotVer );
+	for (x=0; x < 7; x++) device("cntrlFpga",x)->command("Apv25HardReset","");
+	usleep(100);
 }
 
 // Method to write configuration registers
 void TrackerFull::writeConfig ( bool force ) {
-   CntrlFpga    *f;
-   uint         x;
-   int          fd;
+	CntrlFpga    *f;
+	uint         x;
+	int          fd;
 
-   REGISTER_LOCK
+	REGISTER_LOCK
 
-   // Set threshold pointer to FPGAs
-   for (x=0; x < 7; x++) {
-      f = (CntrlFpga *)(device("cntrlFpga",x));
-      f->setThreshold(&thold_);
-      f->setFilter(&filt_);
-   }
+		// Set threshold pointer to FPGAs
+		for (x=0; x < 7; x++) {
+			f = (CntrlFpga *)(device("cntrlFpga",x));
+			f->setThreshold(&thold_);
+			f->setFilter(&filt_);
+		}
 
-   // Attempt to open file
-   if ( get("TholdFile") != "" ) {
-      if ( (fd = open(get("TholdFile").c_str(),O_RDONLY)) < 0 ) {
-         cout << "TrackerFull::writeConfig -> Error opening threshold file: " << get("TholdFile") << endl;
-         fd = -1;
-      }
-   } else fd = -1;
+	// Attempt to open file
+	if ( get("TholdFile") != "" ) {
+		if ( (fd = open(get("TholdFile").c_str(),O_RDONLY)) < 0 ) {
+			cout << "TrackerFull::writeConfig -> Error opening threshold file: " << get("TholdFile") << endl;
+			fd = -1;
+		}
+	} else fd = -1;
 
-   // File is valid
-   if ( fd > 0 ) {
+	// File is valid
+	if ( fd > 0 ) {
 
-      // Read in threshold data
-      read(fd,&thold_,sizeof(Threshold));
+		// Read in threshold data
+		read(fd,&thold_,sizeof(Threshold));
 
-      // Set ID variable
-      variables_["TholdId"]->set(thold_.thresholdId);
+		// Set ID variable
+		variables_["TholdId"]->set(thold_.thresholdId);
 
-   } else {
-      set("TholdId","None");
-      memset(&thold_,0,sizeof(Threshold));
-   }
+	} else {
+		set("TholdId","None");
+		memset(&thold_,0,sizeof(Threshold));
+	}
 
-   // Attempt to open file
-   if ( get("FilterFile") != "" ) {
-      if ( (fd = open(get("FilterFile").c_str(),O_RDONLY)) < 0 ) {
-         cout << "TrackerFull::writeConfig -> Error opening filter file: " << get("FilterFile") << endl;
-         fd = -1;
-      }
-   } else fd = -1;
+	// Attempt to open file
+	if ( get("FilterFile") != "" ) {
+		if ( (fd = open(get("FilterFile").c_str(),O_RDONLY)) < 0 ) {
+			cout << "TrackerFull::writeConfig -> Error opening filter file: " << get("FilterFile") << endl;
+			fd = -1;
+		}
+	} else fd = -1;
 
-   // File is valid
-   if ( fd > 0 ) {
+	// File is valid
+	if ( fd > 0 ) {
 
-      // Read in threshold data
-      read(fd,&filt_,sizeof(Filter));
+		// Read in threshold data
+		read(fd,&filt_,sizeof(Filter));
 
-      // Set ID variable
-      variables_["FilterId"]->set(filt_.filterId);
+		// Set ID variable
+		variables_["FilterId"]->set(filt_.filterId);
 
-   } else {
-      set("FilterId","None");
-      memset(&filt_,0,sizeof(Filter));
-   }
+	} else {
+		set("FilterId","None");
+		memset(&filt_,0,sizeof(Filter));
+	}
 
-   // Sub devices
-   Device::writeConfig(force);
-   REGISTER_UNLOCK
+	// Sub devices
+	Device::writeConfig(force);
+	REGISTER_UNLOCK
 }
 

@@ -103,7 +103,7 @@ int main ( int argc, char **argv ) {
 	int runCount;
 	TString inname;
 	TString outdir;
-	char            name[100];
+	char            name[200];
 	char title[200];
 	TGraph          *graph[7];
 	TMultiGraph *mg;
@@ -255,11 +255,11 @@ int main ( int argc, char **argv ) {
 		//printf("fpga %d\n",event.fpgaAddress());
 		if (event.fpgaAddress()==7) 
 		{
-			printf("not a data event\n");
+			//printf("not a data event\n");
 			continue;
 		}
 		if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
-		cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
+		//cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
 		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
@@ -402,10 +402,11 @@ int main ( int argc, char **argv ) {
 	}
 	mg->Draw("ap");
 	sprintf(name,"%s_base_apvmeans.png",inname.Data());
+	printf("%s\n",name);
 	c1->SaveAs(name);
 	c1->Clear();
-	for (int i=0;i<5;i++) delete graph[i];
-	//delete mg;
+	//for (int i=0;i<5;i++) delete graph[i];
+	delete mg;
 
 	/*
 	   c1->Clear();
@@ -606,6 +607,12 @@ int main ( int argc, char **argv ) {
 
 	// Close file
 	outfile.close();
+	delete dataRead;
+	for (int i=0;i<640;i++) for (int j=0;j<7;j++)
+	{
+		delete[] allSamples[i][j];
+		for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
+	}
 	return(0);
 }
 
