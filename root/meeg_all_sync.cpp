@@ -293,9 +293,14 @@ int main ( int argc, char **argv ) {
 	}
 
 	for (int fpga = 0;fpga<7;fpga++)
+	{
+		if (use_fpga!=-1 && fpga!=use_fpga) continue;
 		for (int hyb = 0;hyb<3;hyb++)
+		{
+		if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
 			for (int apv = 0;apv<5;apv++)
 			{
+				if (use_apv!=-1 && apv!=use_apv) continue;
 				if (hist[fpga][hyb][apv][0]->GetEntries()<10) continue;
 				double mean[32], rms[32];
 				for (x=0; x < 32; x++) 
@@ -330,10 +335,11 @@ int main ( int argc, char **argv ) {
 
 				if (!no_gui)
 				{
+					c1->cd();
 					sprintf(name,"%s_fits_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
 					c1->SaveAs(name);
 					delete c1;
-					c1 = new TCanvas("c2","c2");
+					c1 = new TCanvas("c1","c1");
 					c1->cd();
 					plot = new TGraph(32,plotX,meanVal);
 					plot->Draw("a*");
@@ -350,6 +356,7 @@ int main ( int argc, char **argv ) {
 				double adjVal[32];
 				for (x=0; x < 32; x++) {
 					adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
+					if (x==0) adjVal[x]*=-1; //invert the coefficients
 					if (print_data)
 						printf("Idx=%d value=%f hex=0x%x adj=%f\n",x,meanVal[x],(uint)meanVal[x],adjVal[x]);
 				}
@@ -367,6 +374,8 @@ int main ( int argc, char **argv ) {
 				}
 				outfile << endl;
 			}
+		}
+	}
 
 	// Close file
 	outfile.close();

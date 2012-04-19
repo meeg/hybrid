@@ -346,6 +346,7 @@ int main ( int argc, char **argv ) {
 	double adjVal[32];
 	for (x=0; x < 32; x++) {
 		adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
+		if (x==0) adjVal[x]*=-1; //invert the coefficients
 		if (print_data)
 			printf("Idx=%d value=%f hex=0x%x adj=%f\n",x,meanVal[x],(uint)meanVal[x],adjVal[x]);
 	}
