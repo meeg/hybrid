@@ -7,14 +7,14 @@ OBJ     := $(PWD)/.obj
 
 # Generic Sources
 GEN_DIR := $(PWD)/../generic
-GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp $(GEN_DIR)/DataReadEvio.cpp
-GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h $(GEN_DIR)/DataReadEvio.h
+GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp
+GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h
 GEN_OBJ := $(patsubst $(GEN_DIR)/%.cpp,$(OBJ)/%.o,$(GEN_SRC))
 
 # Tracker Sources
 TRK_DIR := $(PWD)/../tracker
-TRK_SRC := $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TrackerEvioEvent.cpp
-TRK_HDR := $(TRK_DIR)/TrackerEvent.h   $(TRK_DIR)/TrackerSample.h $(TRK_DIR)/TrackerEvioEvent.h
+TRK_SRC := $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/DataReadEvio.cpp $(TRK_DIR)/TrackerEvioEvent.cpp
+TRK_HDR := $(TRK_DIR)/TrackerEvent.h   $(TRK_DIR)/TrackerSample.h $(TRK_DIR)/DataReadEvio.h $(TRK_DIR)/TrackerEvioEvent.h
 TRK_OBJ := $(patsubst $(TRK_DIR)/%.cpp,$(OBJ)/%.o,$(TRK_SRC))
 
 # Fitter Sources
