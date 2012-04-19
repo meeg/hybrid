@@ -69,9 +69,9 @@ int main ( int argc, char **argv ) {
 	char name[200];
 	
 
-	TH1S            *hist[32];
-	double          histMin[32];
-	double          histMax[32];
+	TH1S            *hist[7][3][5][32];
+	double          histMin[7][3][5][32];
+	double          histMax[7][3][5][32];
 	double          meanVal[32];
 	double          plotX[32];
 	ifstream        inFile;
@@ -80,7 +80,6 @@ int main ( int argc, char **argv ) {
 	string          inValue;
 	stringstream    inValueStream;
 	TGraph          *plot;
-	double          sum;
 
 	while ((c = getopt(argc,argv,"ho:nmctH:F:A:e:Egd")) !=-1)
 		switch (c)
@@ -163,12 +162,15 @@ int main ( int argc, char **argv ) {
 		return(1);
 	}
 
-	for (x=0; x < 32; x++) {
-		sprintf(title,"sample_%d",x);
-		hist[x] = new TH1S(title,title,16384,-0.5,16383.5);
-		histMin[x] = 16384;
-		histMax[x] = 0;
-	}
+	for (int fpga = 0;fpga<7;fpga++)
+		for (int hyb = 0;hyb<3;hyb++)
+			for (int apv = 0;apv<5;apv++)
+				for (x=0; x < 32; x++) {
+					sprintf(title,"sample_%d_F%d_H%d_A%d",x,fpga,hyb,apv);
+					hist[fpga][hyb][apv][x] = new TH1S(title,title,16384,-0.5,16383.5);
+					histMin[fpga][hyb][apv][x] = 16384;
+					histMax[fpga][hyb][apv][x] = 0;
+				}
 
 
 
@@ -184,7 +186,8 @@ int main ( int argc, char **argv ) {
 	ofstream outfile;
 	//if (print_data)
 	cout << "Writing calibration to " << inname+".filter" << endl;
-	outfile.open(inname+".filter",ios::app);
+	outfile.open(inname+".filter");
+	outfile << inname << endl;
 
 	//if (print_data)
 	cout << "Reading data file " <<argv[optind] << endl;
@@ -218,21 +221,15 @@ int main ( int argc, char **argv ) {
 	// Process each event
 	eventCount = 0;
 
-	int readEventCount = 0;
 	do {
-		readEventCount++;
-		if (readEventCount > min (1000,num_events) && hist[0]->GetEntries()==0)
-		{
-			printf("no sync pulses seen\n");
-			return(2);
-		}
+		int fpga = event.fpgaAddress();
 		//printf("fpga %d\n",event.fpgaAddress());
 		if (event.fpgaAddress()==7) 
 		{
 			//printf("not a data event\n");
 			continue;
 		}
-		if (use_fpga!=-1 && event.fpgaAddress()!=use_fpga) continue;
+		if (use_fpga!=-1 && fpga!=use_fpga) continue;
 		//cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		//if (print_data)
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
@@ -248,6 +245,8 @@ int main ( int argc, char **argv ) {
 			for (x=0; x < event.count(); x++) {
 				// Get sample
 				sample  = event.sample(x);
+				int hyb = sample->hybrid();
+				int apv = sample->apv();
 				if (use_hybrid!=-1 && sample->hybrid()!=use_hybrid) continue;
 				if (use_apv!=-1 && sample->apv()!=use_apv) continue;
 				//printf("hybrid %d\n",sample->hybrid());
@@ -268,9 +267,9 @@ int main ( int argc, char **argv ) {
 
 					if ( idx < 32 ) {
 						//cout << "Fill idx=" << dec << idx << " value=0x" << hex << value << endl;
-						hist[idx]->Fill(adcValue);
-						if ( adcValue < histMin[idx] ) histMin[idx] = adcValue;
-						if ( adcValue > histMax[idx] ) histMax[idx] = adcValue;
+						hist[fpga][hyb][apv][idx]->Fill(adcValue);
+						if ( adcValue < histMin[fpga][hyb][apv][idx] ) histMin[fpga][hyb][apv][idx] = adcValue;
+						if ( adcValue > histMax[fpga][hyb][apv][idx] ) histMax[fpga][hyb][apv][idx] = adcValue;
 					}
 					idx++;
 				}
@@ -293,75 +292,90 @@ int main ( int argc, char **argv ) {
 		c1->Divide(8,4,0.0125,0.0125);
 	}
 
-	double mean[32], rms[32];
-	for (x=0; x < 32; x++) 
+	for (int fpga = 0;fpga<7;fpga++)
 	{
-		mean[x] = hist[x]->GetMean();
-		rms[x] = hist[x]->GetRMS();
-		//	for (int i=-16384;i<16384;i++) hist[x]->Fill(i);
-	}
+		if (use_fpga!=-1 && fpga!=use_fpga) continue;
+		for (int hyb = 0;hyb<3;hyb++)
+		{
+		if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
+			for (int apv = 0;apv<5;apv++)
+			{
+				if (use_apv!=-1 && apv!=use_apv) continue;
+				if (hist[fpga][hyb][apv][0]->GetEntries()<10) continue;
+				double mean[32], rms[32];
+				for (x=0; x < 32; x++) 
+				{
+					mean[x] = hist[fpga][hyb][apv][x]->GetMean();
+					rms[x] = hist[fpga][hyb][apv][x]->GetRMS();
+					//	for (int i=-16384;i<16384;i++) hist[x]->Fill(i);
+				}
 
-	for (x=0; x < 32; x++) {
-		TF1 *gaus = new TF1("gaus"+x,"gaus",-16384,16384);
-		if (!no_gui)
-			c1->cd(x+1);
-		gaus->FixParameter(0,0.0);
-		gaus->SetParameter(1,mean[x]);
-		gaus->SetParameter(2,rms[x]);
-		if (no_gui)
-			hist[x]->Fit(gaus,"QL0","",mean[x]-3*rms[x],mean[x]+3*rms[x]);
-		else
-			hist[x]->Fit(gaus,"QL","",mean[x]-3*rms[x],mean[x]+3*rms[x]);
-		hist[x]->GetXaxis()->SetRangeUser(histMin[x]-100,histMax[x]+100);
-		//hist[x]->GetXaxis()->SetRangeUser(mean[x]-3*rms[x],mean[x]+3*rms[x]);
-		if (print_data)
-			printf("mean %f, RMS %f, fitted mean %f, fitted RMS %f\n",mean[x],rms[x],gaus->GetParameter(1),gaus->GetParameter(2));
-		if (!no_gui)
-			hist[x]->Draw();
-		//meanVal[x]  = hist[x]->GetFunction("gaus")->GetParameter(1);
-		//meanVal[x]  = hist[x]->GetMean() / 16383.0;
-		plotX[x] = x;
-		meanVal[x]  = gaus->GetParameter(1);
-	}
+				for (x=0; x < 32; x++) {
+					TF1 *gaus = new TF1("gaus"+x,"gaus",-16384,16384);
+					if (!no_gui)
+						c1->cd(x+1);
+					gaus->FixParameter(0,0.0);
+					gaus->SetParameter(1,mean[x]);
+					gaus->SetParameter(2,rms[x]);
+					if (no_gui)
+						hist[fpga][hyb][apv][x]->Fit(gaus,"QL0","",mean[x]-3*rms[x],mean[x]+3*rms[x]);
+					else
+						hist[fpga][hyb][apv][x]->Fit(gaus,"QL","",mean[x]-3*rms[x],mean[x]+3*rms[x]);
+					hist[fpga][hyb][apv][x]->GetXaxis()->SetRangeUser(histMin[fpga][hyb][apv][x]-100,histMax[fpga][hyb][apv][x]+100);
+					//hist[x]->GetXaxis()->SetRangeUser(mean[x]-3*rms[x],mean[x]+3*rms[x]);
+					if (print_data)
+						printf("mean %f, RMS %f, fitted mean %f, fitted RMS %f\n",mean[x],rms[x],gaus->GetParameter(1),gaus->GetParameter(2));
+					if (!no_gui)
+						hist[fpga][hyb][apv][x]->Draw();
+					//meanVal[x]  = hist[x]->GetFunction("gaus")->GetParameter(1);
+					//meanVal[x]  = hist[x]->GetMean() / 16383.0;
+					plotX[x] = x;
+					meanVal[x]  = gaus->GetParameter(1);
+				}
 
-	if (!no_gui)
-	{
-		sprintf(name,"%s_fits_F%d_H%d_A%d.png",inname.Data(),use_fpga,use_hybrid,use_apv);
-		c1->SaveAs(name);
-		delete c1;
-		c1 = new TCanvas("c2","c2");
-		c1->cd();
-		plot = new TGraph(32,plotX,meanVal);
-		plot->Draw("a*");
-		sprintf(name,"%s_coeffs_F%d_H%d_A%d.png",inname.Data(),use_fpga,use_hybrid,use_apv);
-		c1->SaveAs(name);
-	}
+				if (!no_gui)
+				{
+					c1->cd();
+					sprintf(name,"%s_fits_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
+					c1->SaveAs(name);
+					delete c1;
+					c1 = new TCanvas("c1","c1");
+					c1->cd();
+					plot = new TGraph(32,plotX,meanVal);
+					plot->Draw("a*");
+					sprintf(name,"%s_coeffs_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
+					c1->SaveAs(name);
+				}
 
-	double avg = 0;
-	for (x=22; x < 32; x++) {
-		avg += meanVal[x];
-	}
-	avg/=10;
+				double avg = 0;
+				for (x=22; x < 32; x++) {
+					avg += meanVal[x];
+				}
+				avg/=10;
 
-	double adjVal[32];
-	for (x=0; x < 32; x++) {
-		adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
-		if (x==0) adjVal[x]*=-1; //invert the coefficients
-		if (print_data)
-			printf("Idx=%d value=%f hex=0x%x adj=%f\n",x,meanVal[x],(uint)meanVal[x],adjVal[x]);
-	}
+				double adjVal[32];
+				for (x=0; x < 32; x++) {
+					adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
+					if (x==0) adjVal[x]*=-1; //invert the coefficients
+					if (print_data)
+						printf("Idx=%d value=%f hex=0x%x adj=%f\n",x,meanVal[x],(uint)meanVal[x],adjVal[x]);
+				}
 
-	for (x=0; x < 10; x++) {
-		sum += adjVal[x];
-	}
-	//if (print_data)
-	cout << "Sum=" << sum << endl;
+				double          sum = 0;
+				for (x=0; x < 10; x++) {
+					sum += adjVal[x];
+				}
+				//if (print_data)
+				cout << "Sum=" << sum << endl;
 
-	outfile << use_fpga << "\t" << use_hybrid << "\t" << use_apv;
-	for (x=0; x < 10; x++) {
-		outfile << "\t" << adjVal[x];
+				outfile << fpga << "\t" << hyb << "\t" << apv;
+				for (x=0; x < 10; x++) {
+					outfile << "\t" << adjVal[x];
+				}
+				outfile << endl;
+			}
+		}
 	}
-	outfile << endl;
 
 	// Close file
 	outfile.close();
