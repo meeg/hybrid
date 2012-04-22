@@ -33,10 +33,8 @@ DataReadEvio::DataReadEvio ( ) {
 	fragment_offset[0] = 2;//BANK
 	fragment_offset[1]=1;//SEGMENT
 	fragment_offset[2]=1;//TAGSEGMENT
-	depth=0;
-	nbanks=0;
-
-	tee_fpga = 0;
+	fpga_count = 0;
+	fpga_it = 0;
 }
 
 // Deconstructor
@@ -55,23 +53,26 @@ bool DataReadEvio::open ( string file) {
 	return(true);
 }
 
-
 void DataReadEvio::close () {
 	evClose(fd_);
 	fd_ = -1;
 }
 
-// Get next data record
-bool DataReadEvio::next (Data *data) {
-	if (tee.count() > tee_fpga)
+bool DataReadEvio::next(Data *data) {
+	if(debug_)printf("fpga_count %d, fpga_it %d\n",fpga_count, fpga_it);
+	if (fpga_count>fpga_it)
 	{
-		Data *source_data = tee.getFPGAData(tee_fpga);
+		if(debug_)printf("pulling a bank out of cache\n");
+		TrackerEvent *source_data = fpga_banks[fpga_it++];
 		data->copy(source_data->data(),source_data->size());
-		tee_fpga++;
-		if (tee.count()==tee_fpga)
+		if (fpga_it==fpga_count)
 		{
-			tee.restart();
-			tee_fpga = 0;
+			for (int i=0;i<fpga_count;i++)
+			{
+				delete fpga_banks[i];
+			}
+			fpga_count = 0;
+			fpga_it = 0;
 		}
 		return true;
 	}
@@ -79,7 +80,6 @@ bool DataReadEvio::next (Data *data) {
 	bool nodata = true;
 	int nevents=0;
 	int status;
-	nbanks=0;
 	if ( fd_ < 0 ) {
 		cout<<"DataReadEvio::next error fd_<0...no file open"<<endl;
 		return(false);
@@ -96,8 +96,8 @@ bool DataReadEvio::next (Data *data) {
 			eventInfo(buf);
 			if(debug_)printf("evtTag = %d\n",evtTag);
 			if(evtTag==1){
-				inSVT=false;  // reset the inSVT flag
 				parse_event(buf);
+				//fpga_it = fpga_banks.begin();
 				nodata=false;  
 			}else{
 				if(evtTag==20)return(false); //this is the end of data
@@ -173,10 +173,11 @@ void DataReadEvio::parse_eventBank(unsigned int *buf, int bank_length) {
 				case 1:
 					if (debug_) printf("ECal top bank\n");
 					break;
-				case 3:
-					if (debug_) printf("ECal bottom bank\n");
-					break;
 				case 2:
+				//	if (debug_) printf("ECal bottom bank\n");
+				//	break;
+				//	TODO: this is a temporary fix so I can read Ryan's early test data with incorrect bank tag
+				case 3:
 					if (debug_) printf("SVT bank\n");
 					parse_SVTBank(&buf[ptr+2],length-2);
 					break;
@@ -223,7 +224,7 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
 			if(debug_){
 				cout<<"Made TrackerBank for FPGA = "<<tb->fpgaAddress()<<endl;    
 			}
-			tee.addFPGAData(tb);
+			fpga_banks[fpga_count++] = tb;
 		}
 		else
 			printf("data type of SVT bank should be UINT32 but was %d\n",type);
@@ -256,8 +257,8 @@ int DataReadEvio::getFragType(int type){
 			return(TAGSEGMENT);
 			break;
 		default:
-			printf("?illegal fragment_type in dump_fragment: %d",type);
-			exit(EXIT_FAILURE);
+			printf("Unexpected fragment type: %d",type);
+			return(UNEXPECTED);
 			break;
 	}
 }

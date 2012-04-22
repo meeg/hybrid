@@ -20,9 +20,10 @@
 #include <evio.h>
 #include <string>
 #include <map>
-#include <TrackerEvioEvent.h>
+#include <vector>
 #include <sys/types.h>
 #include <DataRead.h>
+#include <TrackerEvent.h>
 using namespace std;
 #define MAXEVIOBUF   1000000
 
@@ -33,14 +34,9 @@ typedef map<string,string> VariableHolder;
 class DataReadEvio : public DataRead {
 	bool debug_;
 
-	TrackerEvioEvent tee;
-	int tee_fpga;
-	//
 	int maxbuf ;
-
-	// Strip whitespace
-	string removeWhite ( string str );
-
+	TrackerEvent *fpga_banks[8];
+	int fpga_count, fpga_it;
 
 	void parse_event( unsigned int *buf);
 	void parse_eventBank( unsigned int *buf,int bank_length);
@@ -56,29 +52,13 @@ class DataReadEvio : public DataRead {
 		TAGSEGMENT,
 		UINT32,
 		COMPOSITE,
-		UNREXPECTED,
+		UNEXPECTED,
 	};
 	int fragment_offset[3];
-	int depth;
-	bool inSVT;
-	int nbanks;
-	/* formatting info */
-	const static int xtod         = 0;
-	const static int n8           = 8;
-	const static int n16          = 8;
-	const static int n32          = 5;
-	const static int n64          = 2;
-	const static int w8           = 4;
-	const static int w16          = 9;
-	const static int w32          = 14;
-	const static int p32          = 6;
-	const static int w64          = 28;
-	const static int p64          = 20;
 
 	int evtType;
 	unsigned short evtTag;
 	unsigned char evtNum;
-	int position;
 
 	public:
 

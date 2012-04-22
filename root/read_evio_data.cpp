@@ -24,7 +24,6 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
-#include <TrackerEvioEvent.h>
 #include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
