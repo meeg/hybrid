@@ -31,76 +31,79 @@ typedef map<string,string> VariableHolder;
 
 //! Class to contain generic register data.
 class DataReadEvio : public DataRead {
-  bool debug_;
+	bool debug_;
 
-  TrackerEvioEvent tee;
-  int tee_fpga;
-      //
-      int maxbuf ;
-      
-      // Strip whitespace
-      string removeWhite ( string str );
+	TrackerEvioEvent tee;
+	int tee_fpga;
+	//
+	int maxbuf ;
+
+	// Strip whitespace
+	string removeWhite ( string str );
 
 
-      void parse_fragment( unsigned int *buf, int fragment_type,TrackerEvioEvent* tee)  ;
-      
-      void makeTrackerBanks(unsigned int *data, int type, int length, int padding, int tag,TrackerEvioEvent* tee) ;
-      
-      int getFragType(int);
+	void parse_event( unsigned int *buf);
+	void parse_eventBank( unsigned int *buf,int bank_length);
+	void parse_SVTBank( unsigned int *buf,int bank_length);
 
-      void eventInfo(unsigned int *buf);
+	void eventInfo(unsigned int *buf);
 
-      enum {
-	BANK = 0,
-	SEGMENT,
-	TAGSEGMENT,
-      };
-      int fragment_offset[3];
-      int depth;
-      bool inSVT;
-      int nbanks;
-      /* formatting info */
-      const static int xtod         = 0;
-      const static int n8           = 8;
-      const static int n16          = 8;
-      const static int n32          = 5;
-      const static int n64          = 2;
-      const static int w8           = 4;
-      const static int w16          = 9;
-      const static int w32          = 14;
-      const static int p32          = 6;
-      const static int w64          = 28;
-      const static int p64          = 20;
+	int getFragType(int type);
 
-      int evtType;
-      unsigned short evtTag;
-      unsigned char evtNum;
-      int position;
+	enum {
+		BANK = 0,
+		SEGMENT,
+		TAGSEGMENT,
+		UINT32,
+		COMPOSITE,
+		UNREXPECTED,
+	};
+	int fragment_offset[3];
+	int depth;
+	bool inSVT;
+	int nbanks;
+	/* formatting info */
+	const static int xtod         = 0;
+	const static int n8           = 8;
+	const static int n16          = 8;
+	const static int n32          = 5;
+	const static int n64          = 2;
+	const static int w8           = 4;
+	const static int w16          = 9;
+	const static int w32          = 14;
+	const static int p32          = 6;
+	const static int w64          = 28;
+	const static int p64          = 20;
 
-   public:
-     
-      //! Constructor
-      DataReadEvio ( );
+	int evtType;
+	unsigned short evtTag;
+	unsigned char evtNum;
+	int position;
 
-      //! Deconstructor
-      ~DataReadEvio ( );
+	public:
 
-      bool open ( string file);
+	//! Constructor
+	DataReadEvio ( );
 
-      void close();
+	//! Deconstructor
+	~DataReadEvio ( );
 
-      //! Get next data record
-      /*! 
-       * Returns true on success
-       * \param data Data object to store data
-       */
-      bool  next ( Data *data);
+	bool open ( string file);
 
-      //! Get next data record & create new data object
-      /*! 
-       * Returns NULL on failure
-       */
-      //      Data *next ( );
+	void close();
+
+	//! Get next data record
+	/*! 
+	 * Returns true on success
+	 * \param data Data object to store data
+	 */
+	bool  next ( Data *data);
+
+	//! Get next data record & create new data object
+	/*! 
+	 * Returns NULL on failure
+	 */
+	//      Data *next ( );
 
 };
 #endif
