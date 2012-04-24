@@ -325,7 +325,7 @@ int main ( int argc, char **argv ) {
 					if (i/128!=deadAPV)
 					{
 						deadAPV = i/128;
-						printf("No events on channel %d; assuming APV %d is dead\n",i,deadAPV);
+						printf("No events on FPGA %d, hybrid %d, channel %d; assuming APV %d is dead\n",fpga,hyb,i,deadAPV);
 					}
 				}
 			}
@@ -378,7 +378,7 @@ int main ( int argc, char **argv ) {
 				int apv = i/128;
 				if (flip_channels) apv = 4-apv;
 				if (i%128 == 0)
-					outfile << fpga << "," << hyb << "," << apv << ",";
+					outfile << fpga << "," << hyb << "," << apv << endl;
 				outfile << i << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
 				//outfile << fpga << "\t" << hyb << "\t" << i << "\t" << channelMean[6][fpga][hyb][i] << "\t" << channelVariance[6][fpga][hyb][i] << endl;
 			}
