@@ -2,6 +2,7 @@
 CFLAGS  := -g -Wall `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I$(PWD)/../evio -I.
 LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lgsl -lgslcblas
 CC      := g++
+GCC      := gcc
 BIN     := $(PWD)/../bin
 OBJ     := $(PWD)/.obj
 
@@ -60,7 +61,7 @@ $(OBJ)/%.o: $(FIT_DIR)/%.cc $(FIT_DIR)/%.hh
 
 # Compile EVIO Sources
 $(OBJ)/%.o: $(EVIO_DIR)/%.c
-	$(CC) -c $(CFLAGS) $(DEF) -o $@ $<
+	$(GCC) -c $(CFLAGS) $(DEF) -o $@ $<
 
 # Compile ROOT Sources
 $(OBJ)/%.o: $(ROOT_DIR)/%.cc $(ROOT_DIR)/%.hh

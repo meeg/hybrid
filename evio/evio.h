@@ -29,7 +29,6 @@
 #define S_EVFILE_BADARG     0x80730007  /* Invalid function argument */
 
 /* macros for swapping ints of various sizes */
-/*
 #define EVIO_SWAP64(x) ( (((x) >> 56) & 0x00000000000000FFL) | \
                          (((x) >> 40) & 0x000000000000FF00L) | \
                          (((x) >> 24) & 0x0000000000FF0000L) | \
@@ -38,15 +37,6 @@
                          (((x) << 24) & 0x0000FF0000000000L) | \
                          (((x) << 40) & 0x00FF000000000000L) | \
                          (((x) << 56) & 0xFF00000000000000L) )
-*/
-#define EVIO_SWAP64(x) ( (((x) >> 56) & ((uint64_t) 0xFF) << 0) | \
-                         (((x) >> 40) & ((uint64_t) 0xFF) << 8) | \
-                         (((x) >> 24) & ((uint64_t) 0xFF) << 16) | \
-                         (((x) >> 8)  & ((uint64_t) 0xFF) << 24) | \
-                         (((x) << 8)  & ((uint64_t) 0xFF) << 32) | \
-                         (((x) << 24) & ((uint64_t) 0xFF) << 40) | \
-                         (((x) << 40) & ((uint64_t) 0xFF) << 48) | \
-                         (((x) << 56) & ((uint64_t) 0xFF) << 56) )
 
 #define EVIO_SWAP32(x) ( (((x) >> 24) & 0x000000FF) | \
                          (((x) >> 8)  & 0x0000FF00) | \
@@ -88,16 +78,20 @@ int evOpenSocket(int sockFd, char *flags, int *handle);
 
 int evRead(int handle, uint32_t *buffer, int size);
 int evReadAlloc(int handle, uint32_t **buffer, int *buflen);
+int evReadNoCopy(int handle, const uint32_t **buffer, int *buflen);
 
 int evWrite(int handle, const uint32_t *buffer);
 int evIoctl(int handle, char *request, void *argp);
 int evClose(int handle);
+int evGetBufferLength(int handle, int *length);
 
 int evGetDictionary(int handle, char **dictionary, int *len);
 int evWriteDictionary(int handle, char *xmlDictionary);
 
 int evIsContainer(int type);
 const char *evGetTypename(int type);
+char *evPerror(int error);
+
 
 #ifdef __cplusplus
 }

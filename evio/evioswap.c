@@ -75,7 +75,7 @@
 
 // from Sergey's composite swap library
 int eviofmt(char *fmt, unsigned char *ifmt, int ifmtLen);
-int eviofmtswap(uint32_t *iarr, int nwrd, unsigned char *ifmt, int nfmt, int tolocal);
+int eviofmtswap(int *iarr, int nwrd, unsigned char *ifmt, int nfmt, int tolocal);
 
 
 
