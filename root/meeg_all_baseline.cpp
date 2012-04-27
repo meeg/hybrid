@@ -376,10 +376,11 @@ int main ( int argc, char **argv ) {
 			for (int i=0;i<640;i++)
 			{
 				int apv = i/128;
+				int channel = i%128;
 				if (flip_channels) apv = 4-apv;
-				if (i%128 == 0)
+				if (channel == 0)
 					outfile << fpga << "," << hyb << "," << apv << endl;
-				outfile << i << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
+				outfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
 				//outfile << fpga << "\t" << hyb << "\t" << i << "\t" << channelMean[6][fpga][hyb][i] << "\t" << channelVariance[6][fpga][hyb][i] << endl;
 			}
 		}
