@@ -36,6 +36,16 @@
 #include <DataRead.h>
 #include <DataReadEvio.h>
 #include <unistd.h>
+#include <Filter.h>
+
+#include <math.h>
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_fft_complex.h>
+#include <gsl/gsl_complex.h>
+#include <gsl/gsl_complex_math.h>
+
+#define REAL(z,i) ((z)[2*(i)])
+#define IMAG(z,i) ((z)[2*(i)+1])
 using namespace std;
 
 //#define corr1 599
@@ -49,12 +59,14 @@ int main ( int argc, char **argv ) {
 	bool evio_format = false;
 	bool no_gui = false;
 	bool print_data = false;
+	bool use_filter = false;
 	int use_fpga = -1;
 	int use_hybrid = -1;
 	int use_apv = -1;
 	int num_events = -1;
 	int c;
 
+	Filter filt_;
 
 	DataRead        *dataRead;
 	TrackerEvent    event;
@@ -67,11 +79,15 @@ int main ( int argc, char **argv ) {
 	TString outdir;
 	char title[200];
 	char name[200];
-	
+
 
 	TH1S            *hist[7][3][5][32];
 	double          histMin[7][3][5][32];
 	double          histMax[7][3][5][32];
+	double          pedestal[7][3][5];
+	int          pedestalCount[7][3][5];
+	double          syncSize[7][3][5];
+	int          syncCount[7][3][5];
 	double          meanVal[32];
 	double          plotX[32];
 	ifstream        inFile;
@@ -79,17 +95,14 @@ int main ( int argc, char **argv ) {
 	stringstream    inLineStream;
 	string          inValue;
 	stringstream    inValueStream;
-	TGraph          *plot;
 
-	while ((c = getopt(argc,argv,"ho:nmctH:F:A:e:Egd")) !=-1)
+	while ((c = getopt(argc,argv,"ho:ntH:F:A:e:Egdf:")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
 				printf("-n: physical channel numbering\n");
-				printf("-m: number channels in raw mux order\n");
-				printf("-c: don't compute correlations\n");
 				printf("-t: print temperature\n");
 				printf("-F: use only specified FPGA\n");
 				printf("-H: use only specified hybrid\n");
@@ -98,6 +111,7 @@ int main ( int argc, char **argv ) {
 				printf("-E: use EVIO file format\n");
 				printf("-g: no GUI\n");
 				printf("-d: no printing of fits\n");
+				printf("-f: read and apply filter\n");
 				return(0);
 				break;
 			case 'o':
@@ -132,6 +146,44 @@ int main ( int argc, char **argv ) {
 			case 'E':
 				evio_format = true;
 				break;
+			case 'f':
+				use_filter = true;
+				int fpga,hyb,apv,chan;
+				for(fpga=0; fpga < 7; fpga++) {
+					for(hyb=0; hyb <3; hyb++) {
+						for(apv=0; apv <5; apv++) {
+							filt_.filterData[fpga][hyb][apv][0] = 1;
+							for(chan=1; chan <10; chan++) {
+								filt_.filterData[fpga][hyb][apv][chan] = 0;
+							}
+						}
+					}
+				}
+
+				{
+					ifstream is;
+					string line;
+					is.open(optarg);
+
+					//read filter ID
+					while (getline(is,line))
+					{
+						if (line[0]!='#') break;
+					}
+					line.copy(filt_.filterId,filt_.IdLength);
+
+					while (getline(is, line))
+					{
+						if (line[0]=='#') continue;
+						//printf("%s\n",line.c_str());
+						istringstream iss(line);
+						if (!(iss >> fpga >> hyb >> apv)) { return 1; } // error
+						for (int i = 0;i<filt_.CoefCount;i++)
+							if (!(iss >> filt_.filterData[fpga][hyb][apv][i])) {return 1;};
+					}
+					is.close();
+				}
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
@@ -165,13 +217,18 @@ int main ( int argc, char **argv ) {
 	for (int fpga = 0;fpga<7;fpga++)
 		for (int hyb = 0;hyb<3;hyb++)
 			for (int apv = 0;apv<5;apv++)
+			{
+				pedestal[fpga][hyb][apv] = 0;
+				pedestalCount[fpga][hyb][apv] = 0;
+				syncSize[fpga][hyb][apv] = 0;
+				syncCount[fpga][hyb][apv] = 0;
 				for (x=0; x < 32; x++) {
 					sprintf(title,"sample_%d_F%d_H%d_A%d",x,fpga,hyb,apv);
-					hist[fpga][hyb][apv][x] = new TH1S(title,title,16384,-0.5,16383.5);
+					hist[fpga][hyb][apv][x] = new TH1S(title,title,10000,-0.5,1.5);
 					histMin[fpga][hyb][apv][x] = 16384;
-					histMax[fpga][hyb][apv][x] = 0;
+					histMax[fpga][hyb][apv][x] = -16384;
 				}
-
+			}
 
 
 	if (inname=="")
@@ -241,37 +298,84 @@ int main ( int argc, char **argv ) {
 				read_temp = false;
 			}
 		for ( y=0; y < 6; y++ ) {
-			int idx = 10000;
-			for (x=0; x < event.count(); x++) {
-				// Get sample
-				sample  = event.sample(x);
-				int hyb = sample->hybrid();
-				int apv = sample->apv();
-				if (use_hybrid!=-1 && sample->hybrid()!=use_hybrid) continue;
-				if (use_apv!=-1 && sample->apv()!=use_apv) continue;
-				//printf("hybrid %d\n",sample->hybrid());
+			for (int block=0; block < event.count()/128; block++) {
+				int idx = 10000;
+				double syncValue;
+				int filterBuffer[10];
+				int filterPtr = -1;
+				for (int channel=0; channel < 128; channel++) {
+					x = channel;
+					// Get sample
+					sample  = event.sample(block*128+channel);
+					int hyb = sample->hybrid();
+					int apv = sample->apv();
+					if (use_hybrid!=-1 && sample->hybrid()!=use_hybrid) continue;
+					if (use_apv!=-1 && sample->apv()!=use_apv) continue;
+					//printf("hybrid %d\n",sample->hybrid());
 
 
-				int adcValue = sample->value(y) & 0x3FFF;
-				int adcValid = sample->value(y) >> 15;
-				//printf("fpga: %d, x: %d, val: %x, adcValid: %d\n",event.fpgaAddress(),x, adcValue, adcValid);
-				if (adcValid)
-				{
+					int adcValue = sample->value(y) & 0x3FFF;
+					int adcValid = sample->value(y) >> 15;
+
+					if (++filterPtr==10) filterPtr = 0;
+					filterBuffer[filterPtr] = adcValue;
+
+					double pedValue = adcValue;
+					if (use_filter) {
+						if (x<10) continue;
+						else {
+							pedValue = 0;
+							for (int i=0;i<10;i++) {
+								//pedValue += filt_.filterData[fpga][hyb][apv][i]*filterBuffer[(filterPtr+i)%10];
+								pedValue += filt_.filterData[fpga][hyb][apv][i]*filterBuffer[(filterPtr-i+10)%10];
+							}
+						}
+					}
+					pedValue -= pedestal[fpga][hyb][apv];
+
 					//printf("fpga: %d, x: %d, val: %x, adcValid: %d\n",event.fpgaAddress(),x, adcValue, adcValid);
+					if (adcValid)
+					{
+						//printf("fpga: %d, x: %d, val: %x, adcValid: %d\n",event.fpgaAddress(),x, adcValue, adcValid);
 
-					//if ( idx==10000 && adcValue > 0x2000 ) idx = 0;
-					if ( adcValue > 0x2000 ) {
-						idx = 0;
-						//printf("sync! event: %d, fpga: %d, hybrid: %d, apv: %d, samples: %d, x: %d, val: %x, adcValid: %d\n",eventCount,event.fpgaAddress(),sample->hybrid(),sample->apv(),y, x, adcValue, adcValid);
-					}
+						//if ( idx==10000 && adcValue > 0x2000 ) idx = 0;
+						if ( adcValue > 0x2000 ) {
+							syncValue = pedValue;
 
-					if ( idx < 32 ) {
-						//cout << "Fill idx=" << dec << idx << " value=0x" << hex << value << endl;
-						hist[fpga][hyb][apv][idx]->Fill(adcValue);
-						if ( adcValue < histMin[fpga][hyb][apv][idx] ) histMin[fpga][hyb][apv][idx] = adcValue;
-						if ( adcValue > histMax[fpga][hyb][apv][idx] ) histMax[fpga][hyb][apv][idx] = adcValue;
+							double delta = syncValue-syncSize[fpga][hyb][apv];
+							syncCount[fpga][hyb][apv]++;
+							if (syncCount[fpga][hyb][apv]==1)
+							{
+								syncSize[fpga][hyb][apv] = syncValue;
+							}
+							else
+							{
+								syncSize[fpga][hyb][apv] += delta/syncCount[fpga][hyb][apv];
+							}
+							idx = 0;
+							//printf("sync! event: %d, fpga: %d, hybrid: %d, apv: %d, samples: %d, x: %d, val: %x, adcValid: %d\n",eventCount,event.fpgaAddress(),sample->hybrid(),sample->apv(),y, x, adcValue, adcValid);
+						}
+
+						if ( idx < 32 ) {
+							//cout << "Fill idx=" << dec << idx << " value=0x" << hex << value << endl;
+							hist[fpga][hyb][apv][idx]->Fill(pedValue/syncValue);
+							if ( pedValue < histMin[fpga][hyb][apv][idx] ) histMin[fpga][hyb][apv][idx] = pedValue;
+							if ( pedValue > histMax[fpga][hyb][apv][idx] ) histMax[fpga][hyb][apv][idx] = pedValue;
+						}
+						if (idx > 20 && idx < 35) {
+							pedestalCount[fpga][hyb][apv]++;
+							double delta = adcValue-pedestal[fpga][hyb][apv];
+							if (pedestalCount[fpga][hyb][apv]==1)
+							{
+								pedestal[fpga][hyb][apv] = adcValue;
+							}
+							else
+							{
+								pedestal[fpga][hyb][apv] += delta/pedestalCount[fpga][hyb][apv];
+							}
+						}
+						idx++;
 					}
-					idx++;
 				}
 			}
 		}
@@ -287,21 +391,21 @@ int main ( int argc, char **argv ) {
 	}
 
 
-	if (!no_gui) {
-		c1 = new TCanvas("c1","c1",1200,900);
-		c1->Divide(8,4,0.0125,0.0125);
-	}
 
 	for (int fpga = 0;fpga<7;fpga++)
 	{
 		if (use_fpga!=-1 && fpga!=use_fpga) continue;
 		for (int hyb = 0;hyb<3;hyb++)
 		{
-		if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
+			if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
 			for (int apv = 0;apv<5;apv++)
 			{
 				if (use_apv!=-1 && apv!=use_apv) continue;
 				if (hist[fpga][hyb][apv][0]->GetEntries()<10) continue;
+				if (!no_gui) {
+					c1 = new TCanvas("c1","c1",1200,900);
+					c1->Divide(8,4,0.0125,0.0125);
+				}
 				double mean[32], rms[32];
 				for (x=0; x < 32; x++) 
 				{
@@ -312,39 +416,70 @@ int main ( int argc, char **argv ) {
 
 				for (x=0; x < 32; x++) {
 					TF1 *gaus = new TF1("gaus"+x,"gaus",-16384,16384);
-					if (!no_gui)
-						c1->cd(x+1);
 					gaus->FixParameter(0,0.0);
 					gaus->SetParameter(1,mean[x]);
 					gaus->SetParameter(2,rms[x]);
+					/*
 					if (no_gui)
 						hist[fpga][hyb][apv][x]->Fit(gaus,"QL0","",mean[x]-3*rms[x],mean[x]+3*rms[x]);
-					else
+					else {
+						c1->cd(x+1);
 						hist[fpga][hyb][apv][x]->Fit(gaus,"QL","",mean[x]-3*rms[x],mean[x]+3*rms[x]);
-					hist[fpga][hyb][apv][x]->GetXaxis()->SetRangeUser(histMin[fpga][hyb][apv][x]-100,histMax[fpga][hyb][apv][x]+100);
-					//hist[x]->GetXaxis()->SetRangeUser(mean[x]-3*rms[x],mean[x]+3*rms[x]);
-					if (print_data)
-						printf("mean %f, RMS %f, fitted mean %f, fitted RMS %f\n",mean[x],rms[x],gaus->GetParameter(1),gaus->GetParameter(2));
-					if (!no_gui)
+						//	hist[fpga][hyb][apv][x]->GetXaxis()->SetRangeUser(histMin[fpga][hyb][apv][x]-100,histMax[fpga][hyb][apv][x]+100);
+						hist[fpga][hyb][apv][x]->GetXaxis()->SetRangeUser(mean[x]-5*rms[x],mean[x]+5*rms[x]);
 						hist[fpga][hyb][apv][x]->Draw();
+					}
+					*/
+					if (print_data)
+						printf("mean %f, RMS %f, mode %f, fitted mean %f, fitted RMS %f\n",mean[x],rms[x],hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin()),gaus->GetParameter(1),gaus->GetParameter(2));
 					//meanVal[x]  = hist[x]->GetFunction("gaus")->GetParameter(1);
 					//meanVal[x]  = hist[x]->GetMean() / 16383.0;
 					plotX[x] = x;
-					meanVal[x]  = gaus->GetParameter(1);
+					/*
+					   meanVal[x]  = gaus->GetParameter(1);
+					   if (x==0) meanVal[x]  = mean[x];
+					   */
+					//meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
+					mean[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
+					meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin())+pedestal[fpga][hyb][apv]/syncSize[fpga][hyb][apv];
 				}
 
-				if (!no_gui)
+				int n=10;
+				double data[2*n];
+				gsl_fft_complex_wavetable * wavetable;
+				gsl_fft_complex_workspace * workspace;
+
+				for (int i = 0; i < n; i++)
 				{
-					c1->cd();
-					sprintf(name,"%s_fits_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
-					c1->SaveAs(name);
-					delete c1;
-					c1 = new TCanvas("c1","c1");
-					c1->cd();
-					plot = new TGraph(32,plotX,meanVal);
-					plot->Draw("a*");
-					sprintf(name,"%s_coeffs_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
-					c1->SaveAs(name);
+					REAL(data,i) = meanVal[(i+5)%n];
+					IMAG(data,i) = 0.0;
+					//					printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
+				}
+
+				wavetable = gsl_fft_complex_wavetable_alloc (n);
+				workspace = gsl_fft_complex_workspace_alloc (n);
+				gsl_fft_complex_forward (data, 1, n, wavetable, workspace);
+				for (int i = 0; i < n; i++)
+				{
+					//printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
+				}
+
+				for (int i = 0; i < n; i++)
+				{
+					gsl_complex temp = gsl_complex_rect (REAL(data,i), IMAG(data,i));
+					temp = gsl_complex_inverse(temp);
+					REAL(data,i) = GSL_REAL(temp);
+					IMAG(data,i) = GSL_IMAG(temp);
+					//printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
+				}
+
+				REAL(data,0) = 1.0;
+
+				gsl_fft_complex_inverse (data, 1, n, wavetable, workspace);
+				for (int i = 0; i < n; i++)
+				{
+					//					printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
+					meanVal[i]  = REAL(data,(i+5)%n);
 				}
 
 				double avg = 0;
@@ -355,8 +490,9 @@ int main ( int argc, char **argv ) {
 
 				double adjVal[32];
 				for (x=0; x < 32; x++) {
-					adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
-					if (x==0) adjVal[x]*=-1; //invert the coefficients
+					adjVal[x] = meanVal[x];
+					//adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
+					//if (x!=0) adjVal[x]*=-1; //invert the coefficients
 					if (print_data)
 						printf("Idx=%d value=%f hex=0x%x adj=%f\n",x,meanVal[x],(uint)meanVal[x],adjVal[x]);
 				}
@@ -373,6 +509,31 @@ int main ( int argc, char **argv ) {
 					outfile << "\t" << adjVal[x];
 				}
 				outfile << endl;
+
+				if (!no_gui)
+				{
+					c1->cd();
+					sprintf(name,"%s_fits_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
+					c1->SaveAs(name);
+					delete c1;
+					c1 = new TCanvas("c1","c1");
+					c1->cd();
+					TGraph          *plot;
+					TGraph          *plot2;
+					TMultiGraph          *mg = new TMultiGraph();
+					plot = new TGraph(10,plotX,adjVal);
+					plot2 = new TGraph(10,plotX,mean);
+					plot2->SetMarkerColor(2);
+					mg->Add(plot);
+					mg->Add(plot2);
+					mg->Draw("a*");
+					sprintf(name,"%s_coeffs_F%d_H%d_A%d.png",inname.Data(),fpga,hyb,apv);
+					c1->SaveAs(name);
+					delete plot;
+					delete plot2;
+					delete mg;
+					delete c1;
+				}
 			}
 		}
 	}
