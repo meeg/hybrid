@@ -180,10 +180,12 @@ int main ( int argc, char **argv ) {
 	ofstream threshfile;
 	cout << "Writing thresholds to " << inname+".thresholds" << endl;
 	threshfile.open(inname+".thresholds");
+	threshfile << "%" << inname << endl;
 
 	ofstream outfile;
 	cout << "Writing calibration to " << inname+".base" << endl;
 	outfile.open(inname+".base");
+	outfile << "#" << inname << endl;
 
 	cout << "Reading data file " <<argv[optind] << endl;
 	// Attempt to open data file
@@ -386,7 +388,7 @@ int main ( int argc, char **argv ) {
 					threshfile << fpga << "," << hyb << "," << apv << endl;
 				threshfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
 			}
-			for (int i=0;i<640;i++)
+			for (int i=0;i<640;i++) if (channelCount[fpga][hyb][i]>0)
 			{
 				int apv = i/128;
 				int channel = i%128;
