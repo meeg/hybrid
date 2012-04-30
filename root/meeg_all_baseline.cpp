@@ -99,7 +99,7 @@ int main ( int argc, char **argv ) {
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
-				printf("-n: physical channel numbering\n");
+				printf("-n: don't use physical channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
 				printf("-t: print temperature\n");
@@ -177,6 +177,10 @@ int main ( int argc, char **argv ) {
 			inname.Remove(0,inname.Last('/')+1);
 		}
 	}
+	ofstream threshfile;
+	cout << "Writing thresholds to " << inname+".thresholds" << endl;
+	threshfile.open(inname+".thresholds");
+
 	ofstream outfile;
 	cout << "Writing calibration to " << inname+".base" << endl;
 	outfile.open(inname+".base");
@@ -234,7 +238,7 @@ int main ( int argc, char **argv ) {
 			if (mux_channels) channel = chanMap[sample->channel()];
 			else channel = sample->channel();
 
-			if (flip_channels)
+			if (!flip_channels)
 				channel += (4-sample->apv())*128;
 			else
 				channel += sample->apv()*128;
@@ -377,11 +381,18 @@ int main ( int argc, char **argv ) {
 			{
 				int apv = i/128;
 				int channel = i%128;
-				if (flip_channels) apv = 4-apv;
+				if (!flip_channels) apv = 4-apv;
 				if (channel == 0)
-					outfile << fpga << "," << hyb << "," << apv << endl;
-				outfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
-				//outfile << fpga << "\t" << hyb << "\t" << i << "\t" << channelMean[6][fpga][hyb][i] << "\t" << channelVariance[6][fpga][hyb][i] << endl;
+					threshfile << fpga << "," << hyb << "," << apv << endl;
+				threshfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
+			}
+			for (int i=0;i<640;i++)
+			{
+				int apv = i/128;
+				int channel = i%128;
+				if (flip_channels) apv = 4-apv;
+				int sensorChannel =  apv*128+channel;
+				outfile << fpga << "\t" << hyb << "\t" << sensorChannel << "\t" << channelMean[6][fpga][hyb][i] << "\t" << channelVariance[6][fpga][hyb][i] << endl;
 			}
 		}
 	// Start X-Windows
