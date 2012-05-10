@@ -41,6 +41,8 @@ class DataReadEvio : public DataRead {
 	void parse_event( unsigned int *buf);
 	void parse_eventBank( unsigned int *buf,int bank_length);
 	void parse_SVTBank( unsigned int *buf,int bank_length);
+	void parse_ECalBank( unsigned int *buf,int bank_length);
+	void parse_ECalCompositeData( unsigned int *buf,int bank_length);
 
 	void eventInfo(unsigned int *buf);
 
@@ -52,6 +54,7 @@ class DataReadEvio : public DataRead {
 		TAGSEGMENT,
 		UINT32,
 		COMPOSITE,
+		CHARSTAR8,
 		UNEXPECTED,
 	};
 	int fragment_offset[3];

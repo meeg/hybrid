@@ -67,6 +67,7 @@ int main ( int argc, char **argv ) {
 	int c;
 
 	Filter filt_;
+	int coefOrder[] = {0,5,1,6,2,7,3,8,4,9};
 
 	DataRead        *dataRead;
 	TrackerEvent    event;
@@ -179,6 +180,7 @@ int main ( int argc, char **argv ) {
 						istringstream iss(line);
 						if (!(iss >> fpga >> hyb >> apv)) { return 1; } // error
 						for (int i = 0;i<filt_.CoefCount;i++)
+							//if (!(iss >> filt_.filterData[fpga][hyb][apv][coefOrder[i]])) {return 1;};
 							if (!(iss >> filt_.filterData[fpga][hyb][apv][i])) {return 1;};
 					}
 					is.close();
@@ -406,6 +408,7 @@ int main ( int argc, char **argv ) {
 					c1 = new TCanvas("c1","c1",1200,900);
 					c1->Divide(7,5,0.0125,0.0125);
 				}
+				printf("F%d, H%d, A%d: pedestal %f, sync %f\n",fpga,hyb,apv,pedestal[fpga][hyb][apv],syncSize[fpga][hyb][apv]);
 				double mean[35], rms[35];
 				for (x=0; x < 35; x++) 
 				{
@@ -434,10 +437,11 @@ int main ( int argc, char **argv ) {
 					//meanVal[x]  = hist[x]->GetMean() / 16383.0;
 					plotX[x] = x;
 					/*
-					   meanVal[x]  = gaus->GetParameter(1);
-					   if (x==0) meanVal[x]  = mean[x];
-					   */
-					meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
+					meanVal[x]  = gaus->GetParameter(1);
+					if (x==0) meanVal[x]  = mean[x];
+					*/
+					meanVal[x]  = hist[fpga][hyb][apv][x]->GetMean();
+					//meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
 					//meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin())+pedestal[fpga][hyb][apv]/syncSize[fpga][hyb][apv];
 				}
 
@@ -475,16 +479,37 @@ int main ( int argc, char **argv ) {
 					//printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
 				}
 
+				/*
+				double last_filter[2*n];
+				if (use_filter) {
+					for (int i = 0; i < n; i++)
+					{
+						//REAL(data,(i+5)%n) = meanVal[i];
+						REAL(last_filter,i) = filt_.filterData[fpga][hyb][apv][i];
+						IMAG(last_filter,i) = 0.0;
+						//					printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
+					}
+					gsl_fft_complex_forward (last_filter, 1, n, wavetable, workspace);
+				}
+				*/
+
+
 				for (int i = 0; i < n; i++)
 				{
 					gsl_complex temp = gsl_complex_rect (REAL(data,i), IMAG(data,i));
 					temp = gsl_complex_inverse(temp);
+					/*
+					if (use_filter) {
+						gsl_complex temp2 = gsl_complex_rect (REAL(last_filter,i), IMAG(last_filter,i));
+						temp = gsl_complex_mul(temp,temp2);
+					}
+					*/
 					REAL(data,i) = GSL_REAL(temp);
 					IMAG(data,i) = GSL_IMAG(temp);
 					//printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
 				}
 
-				REAL(data,0) = 1.0;
+				//REAL(data,0) = 1.0;
 
 				gsl_fft_complex_inverse (data, 1, n, wavetable, workspace);
 				for (int i = 0; i < n; i++)

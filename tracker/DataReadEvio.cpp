@@ -172,11 +172,12 @@ void DataReadEvio::parse_eventBank(unsigned int *buf, int bank_length) {
 			switch (tag) {
 				case 1:
 					if (debug_) printf("ECal top bank\n");
+					parse_ECalBank(&buf[ptr+2],length-2);
 					break;
 				case 2:
-				//	if (debug_) printf("ECal bottom bank\n");
-				//	break;
-				//	TODO: this is a temporary fix so I can read Ryan's early test data with incorrect bank tag
+					if (debug_) printf("ECal bottom bank\n");
+					parse_ECalBank(&buf[ptr+2],length-2);
+					break;
 				case 3:
 					if (debug_) printf("SVT bank\n");
 					parse_SVTBank(&buf[ptr+2],length-2);
@@ -232,11 +233,92 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
 	}
 }
 
+void DataReadEvio::parse_ECalBank(unsigned int *buf, int bank_length) {
+	int ptr = 0;
+	int length,type, padding=0;
+	unsigned short tag;
+	unsigned short num;
+	while (ptr<bank_length) {
+		if (debug_) printf("ptr = %d, bank_length = %d\n",ptr,bank_length);
+		length      = buf[ptr]+1;
+		tag         = (buf[ptr+1]>>16)&0xffff;
+		type        = (buf[ptr+1]>>8)&0x3f;
+		padding     = (buf[ptr+1]>>14)&0x3;
+		num         = buf[ptr+1]&0xff;
+		if(debug_)
+		{
+			cout<<"Spitting out ECal bank header data: "<<endl;
+			cout<<"length: "<<length<<", tag: "<<tag<<endl;
+			cout<<"padding: "<<padding<<", type: "<<type<<", num: "<<num<<endl;
+		}
+		int fragType = getFragType(type);
+
+		if (fragType==COMPOSITE)
+		{
+			parse_ECalCompositeData(&buf[ptr+2],length-2);
+		}
+		else
+			printf("data type of ECal bank should be COMPOSITE but was %d\n",type);
+		ptr+=length;
+	}
+}
+
+void DataReadEvio::parse_ECalCompositeData(unsigned int *buf, int bank_length) {
+	int ptr = 0;
+	int length,type, padding=0;
+	unsigned short tag;
+	unsigned short num;
+	int fragType; 
+
+	if (debug_) printf("ptr = %d, bank_length = %d\n",ptr,bank_length);
+	tag         = (buf[ptr]>>20)&0xfff;
+	type        = (buf[ptr]>>16)&0xf;
+	length      = (buf[ptr]&0xffff) + 1;
+	fragType = getFragType(type);
+	if(debug_)
+	{
+		cout<<"Spitting out ECal composite data sub-TAGSEGMENT header data: "<<endl;
+		cout<<"length: "<<length<<", tag: "<<tag<<", type: "<<type<<endl;
+		for (int i=1;i<length;i++)
+		{
+			char c;
+			//printf("%x\n",buf[ptr+i]);
+			c = (buf[ptr+i])&0xff;
+			printf("%c",c);
+			c = (buf[ptr+i]>>8)&0xff;
+			printf("%c",c);
+			c = (buf[ptr+i]>>16)&0xff;
+			printf("%c",c);
+			c = (buf[ptr+i]>>24)&0xff;
+			printf("%c",c);
+		}
+		printf("\n");
+	}
+
+	ptr+=length;
+	if (debug_) printf("ptr = %d, bank_length = %d\n",ptr,bank_length);
+	length      = buf[ptr]+1;
+	tag         = (buf[ptr+1]>>16)&0xffff;
+	type        = (buf[ptr+1]>>8)&0x3f;
+	padding     = (buf[ptr+1]>>14)&0x3;
+	num         = buf[ptr+1]&0xff;
+	if(debug_)
+	{
+		cout<<"Spitting out ECal composite data sub-BANK header data: "<<endl;
+		cout<<"length: "<<length<<", tag: "<<tag<<endl;
+		cout<<"padding: "<<padding<<", type: "<<type<<", num: "<<num<<endl;
+	}
+}
+
 int DataReadEvio::getFragType(int type){
 	switch (type) {
 		case 0x1:
 			if(debug_)cout<<"found UINT32 data"<<endl;
 			return(UINT32);
+			break;
+		case 0x3:
+			if(debug_)cout<<"found CHARSTAR8 data"<<endl;
+			return(CHARSTAR8);
 			break;
 		case 0xe:
 		case 0x10:
