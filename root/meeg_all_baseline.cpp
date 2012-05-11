@@ -52,6 +52,7 @@ int main ( int argc, char **argv ) {
 	int use_fpga = -1;
 	int use_hybrid = -1;
 	int num_events = -1;
+	double threshold_sigma = 2.0;
 	int c;
 	TCanvas         *c1;
 	int chanMap[128];
@@ -93,7 +94,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmctH:F:e:E")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmctH:F:e:Es:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -107,6 +108,7 @@ int main ( int argc, char **argv ) {
 				printf("-H: use only specified hybrid\n");
 				printf("-e: stop after specified number of events\n");
 				printf("-E: use EVIO file format\n");
+				printf("-s: number of sigmas for threshold file (default 2)\n");
 				return(0);
 				break;
 			case 'o':
@@ -137,6 +139,9 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'E':
 				evio_format = true;
+				break;
+			case 's':
+				threshold_sigma = atof(optarg);
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -386,7 +391,7 @@ int main ( int argc, char **argv ) {
 				if (!flip_channels) apv = 4-apv;
 				if (channel == 0)
 					threshfile << fpga << "," << hyb << "," << apv << endl;
-				threshfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + 3*channelVariance[6][fpga][hyb][i] << endl;
+				threshfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + threshold_sigma*channelVariance[6][fpga][hyb][i] << endl;
 			}
 			for (int i=0;i<640;i++) if (channelCount[fpga][hyb][i]>0)
 			{
