@@ -319,7 +319,7 @@ int main ( int argc, char **argv ) {
 					//printf("hybrid %d\n",sample->hybrid());
 
 
-					double adcValue = sample->value(y) & 0x3FFF;
+					double adcValue = (double) (sample->value(y) & 0x3FFF);
 					int adcValid = sample->value(y) >> 15;
 
 					if (adcValid)
@@ -367,7 +367,7 @@ int main ( int argc, char **argv ) {
 							if ( pedValue < histMin[fpga][hyb][apv][idx] ) histMin[fpga][hyb][apv][idx] = pedValue;
 							if ( pedValue > histMax[fpga][hyb][apv][idx] ) histMax[fpga][hyb][apv][idx] = pedValue;
 						}
-						if (idx > 20 && idx < 35) {
+						if (idx > 20 && idx < 32) {
 							pedestalCount[fpga][hyb][apv]++;
 							double delta = adcValue-pedestal[fpga][hyb][apv];
 							if (pedestalCount[fpga][hyb][apv]==1)
@@ -443,8 +443,8 @@ int main ( int argc, char **argv ) {
 					meanVal[(x+n_delay)%35]  = gaus->GetParameter(1);
 					if (x==0) meanVal[(x+n_delay)%35]  = mean[x];
 					
-					//meanVal[(x+2)%35]  = hist[fpga][hyb][apv][x]->GetMean();
-					//meanVal[(x+2)%35]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
+					//meanVal[(x+n_delay)%35]  = hist[fpga][hyb][apv][x]->GetMean();
+					//meanVal[(x+n_delay)%35]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
 					//meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin())+pedestal[fpga][hyb][apv]/syncSize[fpga][hyb][apv];
 				}
 
@@ -458,7 +458,7 @@ int main ( int argc, char **argv ) {
 				for (x=0; x < 35; x++) {
 					adjVal[x] = meanVal[x];
 					//adjVal[x] = (meanVal[x]-avg)/(meanVal[0]-avg);
-					//if (x!=0) adjVal[x]*=-1; //invert the coefficients
+					//if (x!=n_delay) adjVal[x]*=-1; //invert the coefficients
 				}
 
 				double data[2*n_coeffs];
@@ -521,6 +521,13 @@ int main ( int argc, char **argv ) {
 					adjVal[i]  = REAL(data,i);
 					//meanVal[i]  = REAL(data,(i+5)%n);
 				}
+
+				/*
+				for (x=0; x < 35; x++) {
+					adjVal[x] = meanVal[x];
+					if (x!=n_delay) adjVal[x]*=-1; //invert the coefficients
+				}
+				*/
 
 				double          sum = 0;
 				for (x=0; x < n_coeffs; x++) {
