@@ -66,6 +66,9 @@ int main ( int argc, char **argv ) {
 	int num_events = -1;
 	int c;
 
+	int n_coeffs = 10;
+	int n_delay = 1;
+
 	Filter filt_;
 	int coefOrder[] = {0,5,1,6,2,7,3,8,4,9};
 
@@ -316,7 +319,7 @@ int main ( int argc, char **argv ) {
 					//printf("hybrid %d\n",sample->hybrid());
 
 
-					int adcValue = sample->value(y) & 0x3FFF;
+					double adcValue = sample->value(y) & 0x3FFF;
 					int adcValid = sample->value(y) >> 15;
 
 					if (adcValid)
@@ -330,7 +333,7 @@ int main ( int argc, char **argv ) {
 								adcValue = 0;
 								for (int i=0;i<10;i++) {
 									//pedValue += filt_.filterData[fpga][hyb][apv][i]*filterBuffer[(filterPtr+i)%10];
-									adcValue += (int) round(filt_.filterData[fpga][hyb][apv][i]*filterBuffer[(filterPtr-i+10)%10]);
+									adcValue += filt_.filterData[fpga][hyb][apv][i]*filterBuffer[(filterPtr-i+10)%10];
 								}
 							}
 						}
@@ -436,17 +439,17 @@ int main ( int argc, char **argv ) {
 					//meanVal[x]  = hist[x]->GetFunction("gaus")->GetParameter(1);
 					//meanVal[x]  = hist[x]->GetMean() / 16383.0;
 					plotX[x] = x;
-					/*
-					meanVal[x]  = gaus->GetParameter(1);
-					if (x==0) meanVal[x]  = mean[x];
-					*/
-					meanVal[x]  = hist[fpga][hyb][apv][x]->GetMean();
-					//meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
+					
+					meanVal[(x+n_delay)%35]  = gaus->GetParameter(1);
+					if (x==0) meanVal[(x+n_delay)%35]  = mean[x];
+					
+					//meanVal[(x+2)%35]  = hist[fpga][hyb][apv][x]->GetMean();
+					//meanVal[(x+2)%35]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin());
 					//meanVal[x]  = hist[fpga][hyb][apv][x]->GetBinCenter(hist[fpga][hyb][apv][x]->GetMaximumBin())+pedestal[fpga][hyb][apv]/syncSize[fpga][hyb][apv];
 				}
 
 				double avg = 0;
-				for (x=22; x < 35; x++) {
+				for (x=22; x < 32; x++) {
 					avg += meanVal[x];
 				}
 				avg/=10;
@@ -458,12 +461,11 @@ int main ( int argc, char **argv ) {
 					//if (x!=0) adjVal[x]*=-1; //invert the coefficients
 				}
 
-				int n=10;
-				double data[2*n];
+				double data[2*n_coeffs];
 				gsl_fft_complex_wavetable * wavetable;
 				gsl_fft_complex_workspace * workspace;
 
-				for (int i = 0; i < n; i++)
+				for (int i = 0; i < n_coeffs; i++)
 				{
 					//REAL(data,(i+5)%n) = meanVal[i];
 					REAL(data,i) = adjVal[i];
@@ -471,10 +473,10 @@ int main ( int argc, char **argv ) {
 					//					printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
 				}
 
-				wavetable = gsl_fft_complex_wavetable_alloc (n);
-				workspace = gsl_fft_complex_workspace_alloc (n);
-				gsl_fft_complex_forward (data, 1, n, wavetable, workspace);
-				for (int i = 0; i < n; i++)
+				wavetable = gsl_fft_complex_wavetable_alloc (n_coeffs);
+				workspace = gsl_fft_complex_workspace_alloc (n_coeffs);
+				gsl_fft_complex_forward (data, 1, n_coeffs, wavetable, workspace);
+				for (int i = 0; i < n_coeffs; i++)
 				{
 					//printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
 				}
@@ -494,16 +496,17 @@ int main ( int argc, char **argv ) {
 				*/
 
 
-				for (int i = 0; i < n; i++)
+				for (int i = 0; i < n_coeffs; i++)
 				{
 					gsl_complex temp = gsl_complex_rect (REAL(data,i), IMAG(data,i));
 					temp = gsl_complex_inverse(temp);
+					temp = gsl_complex_mul(temp,gsl_complex_polar(1,-2*n_delay*i*M_PI*2.0/n_coeffs));
 					/*
-					if (use_filter) {
-						gsl_complex temp2 = gsl_complex_rect (REAL(last_filter,i), IMAG(last_filter,i));
-						temp = gsl_complex_mul(temp,temp2);
-					}
-					*/
+					   if (use_filter) {
+					   gsl_complex temp2 = gsl_complex_rect (REAL(last_filter,i), IMAG(last_filter,i));
+					   temp = gsl_complex_mul(temp,temp2);
+					   }
+					   */
 					REAL(data,i) = GSL_REAL(temp);
 					IMAG(data,i) = GSL_IMAG(temp);
 					//printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
@@ -511,8 +514,8 @@ int main ( int argc, char **argv ) {
 
 				//REAL(data,0) = 1.0;
 
-				gsl_fft_complex_inverse (data, 1, n, wavetable, workspace);
-				for (int i = 0; i < n; i++)
+				gsl_fft_complex_inverse (data, 1, n_coeffs, wavetable, workspace);
+				for (int i = 0; i < n_coeffs; i++)
 				{
 					//					printf ("%d: %e %e\n", i, REAL(data,i), IMAG(data,i));
 					adjVal[i]  = REAL(data,i);
@@ -520,7 +523,7 @@ int main ( int argc, char **argv ) {
 				}
 
 				double          sum = 0;
-				for (x=0; x < 10; x++) {
+				for (x=0; x < n_coeffs; x++) {
 					sum += adjVal[x];
 					if (print_data)
 						printf("Idx=%d value=%f adj=%f\n",x,meanVal[x],adjVal[x]);
@@ -529,7 +532,7 @@ int main ( int argc, char **argv ) {
 				cout << "Sum=" << sum << endl;
 
 				outfile << fpga << "\t" << hyb << "\t" << apv;
-				for (x=0; x < 10; x++) {
+				for (x=0; x < n_coeffs; x++) {
 					outfile << "\t" << adjVal[x];
 				}
 				outfile << endl;
@@ -545,7 +548,7 @@ int main ( int argc, char **argv ) {
 					TGraph          *plot;
 					TGraph          *plot2;
 					TMultiGraph          *mg = new TMultiGraph();
-					plot = new TGraph(10,plotX,adjVal);
+					plot = new TGraph(n_coeffs,plotX,adjVal);
 					plot2 = new TGraph(35,plotX,meanVal);
 					plot2->SetMarkerColor(2);
 					mg->Add(plot);
