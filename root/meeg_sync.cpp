@@ -367,7 +367,7 @@ int main ( int argc, char **argv ) {
 							if ( pedValue < histMin[fpga][hyb][apv][idx] ) histMin[fpga][hyb][apv][idx] = pedValue;
 							if ( pedValue > histMax[fpga][hyb][apv][idx] ) histMax[fpga][hyb][apv][idx] = pedValue;
 						}
-						if (idx > 20 && idx < 35) {
+						if (idx > 20 && idx < 32) {
 							pedestalCount[fpga][hyb][apv]++;
 							double delta = adcValue-pedestal[fpga][hyb][apv];
 							if (pedestalCount[fpga][hyb][apv]==1)

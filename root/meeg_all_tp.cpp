@@ -62,12 +62,15 @@ int main ( int argc, char **argv ) {
 	int cal_delay = 0;
 	double delay_step = SAMPLE_INTERVAL/8;
 	TCanvas         *c1;
-	int allCounts[7][3][640][48];
-	double allMeans[7][3][640][48];
-	double allVariances[7][3][640][48];
+	int *allCounts[7][3][640];
+	double *allMeans[7][3][640];
+	double *allVariances[7][3][640];
 	for (int fpga = 0;fpga<7;fpga++)
 		for (int hyb = 0;hyb<3;hyb++)
 			for (int chan=0;chan<640;chan++) {
+				allCounts[fpga][hyb][chan] = new int[48];
+				allMeans[fpga][hyb][chan] = new double[48];
+				allVariances[fpga][hyb][chan] = new double[48];
 				for (int i=0;i<48;i++) {
 					allCounts[fpga][hyb][chan][i] = 0;
 					allMeans[fpga][hyb][chan][i] = 0;
@@ -198,41 +201,45 @@ int main ( int argc, char **argv ) {
 	noisefile.open(inname+".noise");
 	noisefile << "#" << inname << endl;
 
+	if (!force_cal_grp) cal_grp = 0;
+	cal_delay = 1;
+
 	while (optind<argc)
 	{
 		cout << "Reading data file " <<argv[optind] << endl;
 		// Attempt to open data file
-		if ( ! dataRead->open(argv[optind]) ) return(2);
-
-		TString confname=argv[optind];
-		confname.ReplaceAll(".bin","");
-		confname.Append(".conf");
-		if (confname.Contains('/')) {
-			confname.Remove(0,confname.Last('/')+1);
+		if ( ! dataRead->open(argv[optind]) ) {
+			printf("bad file: %s\n",argv[optind]);
 		}
 
-		ofstream outconfig;
-		cout << "Writing configuration to " <<outdir<<confname << endl;
-		outconfig.open(outdir+confname);
 
 		dataRead->next(&event);
-		dataRead->dumpConfig(outconfig);
-		outconfig.close();
 
-		runCount = atoi(dataRead->getConfig("RunCount").c_str());
+		if (!evio_format) {
+			TString confname=argv[optind];
+			confname.ReplaceAll(".bin","");
+			confname.Append(".conf");
+			if (confname.Contains('/')) {
+				confname.Remove(0,confname.Last('/')+1);
+			}
 
-		if (!force_cal_grp)
-		{
-			cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
-			cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
-		}
+			ofstream outconfig;
+			cout << "Writing configuration to " <<outdir<<confname << endl;
+			outconfig.open(outdir+confname);
 
-		cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
-		cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
-		if (cal_delay==0)
-		{
-			cal_delay=8;
-			cout<<"Force cal_delay=8 to keep sample time in range"<<endl;
+			if (!force_cal_grp)
+			{
+				cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
+				cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
+			}
+
+			cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
+			cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
+			if (cal_delay==0)
+			{
+				cal_delay=8;
+				cout<<"Force cal_delay=8 to keep sample time in range"<<endl;
+			}
 		}
 
 
@@ -242,6 +249,7 @@ int main ( int argc, char **argv ) {
 			int fpga = event.fpgaAddress();
 			if (use_fpga!=-1 && fpga!=use_fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
+			if (num_events!=-1 && eventCount >= num_events) break;
 			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 				if (event.temperature(i)!=0.0)
 				{
@@ -304,6 +312,14 @@ int main ( int argc, char **argv ) {
 			printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
 		}
 		optind++;
+		if (evio_format) {
+			if (!force_cal_grp) cal_grp++;
+			if (cal_grp==8)
+			{
+				cal_grp = 0;
+				cal_delay++;
+			}
+		}
 	}
 
 

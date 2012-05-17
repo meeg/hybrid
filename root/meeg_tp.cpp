@@ -264,35 +264,44 @@ int main ( int argc, char **argv ) {
 		// Attempt to open data file
 		if ( ! dataRead->open(argv[optind]) ) return(2);
 
-		TString confname=argv[optind];
-		confname.ReplaceAll(".bin",".conf");
-		if (confname.Contains('/')) {
-			confname.Remove(0,confname.Last('/')+1);
-		}
-
-		ofstream outconfig;
-		cout << "Writing configuration to " <<outdir<<confname << endl;
-		outconfig.open(outdir+confname);
-
 		dataRead->next(&event);
-		dataRead->dumpConfig(outconfig);
-		outconfig.close();
-		//dataRead.dumpStatus();
 
-		runCount = atoi(dataRead->getConfig("RunCount").c_str());
+		if (!evio_format) {
+			TString confname=argv[optind];
+			confname.ReplaceAll(".bin","");
+			confname.Append(".conf");
+			if (confname.Contains('/')) {
+				confname.Remove(0,confname.Last('/')+1);
+			}
 
-		if (!force_cal_grp)
+			ofstream outconfig;
+			cout << "Writing configuration to " <<outdir<<confname << endl;
+			outconfig.open(outdir+confname);
+
+			dataRead->dumpConfig(outconfig);
+			outconfig.close();
+			//dataRead.dumpStatus();
+
+			runCount = atoi(dataRead->getConfig("RunCount").c_str());
+
+			if (!force_cal_grp)
+			{
+				cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
+				cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
+			}
+
+			cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
+			cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
+			if (cal_delay==0)
+			{
+				cal_delay=8;
+				cout<<"Force cal_delay=8 to keep sample time in range"<<endl;
+			}
+		} else
 		{
-			cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
-			cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
-		}
-
-		cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
-		cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
-		if (cal_delay==0)
-		{
-			cal_delay=8;
-			cout<<"Force cal_delay=8 to keep sample time in range"<<endl;
+			runCount = 0;
+			if (!force_cal_grp) cal_grp = 0;
+			cal_delay = 1;
 		}
 
 
@@ -312,6 +321,7 @@ int main ( int argc, char **argv ) {
 			//goodEvent = true;
 			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
+			if (num_events!=-1 && eventCount >= num_events) break;
 			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 				if (event.temperature(i)!=0.0)
 				{
