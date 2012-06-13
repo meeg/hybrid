@@ -125,7 +125,7 @@ void doStats_mean(int n, int nmin, int nmax, short int *y, int &count, double &c
 	int *newy = new int[n];
 	for (int i=nmin; i<=nmax; i++) newy[i] = y[i];
 	doStats_mean(n, nmin, nmax, newy, count, center, spread);
-	delete newy;
+	delete[] newy;
 }
 
 void plotResults(const char *title, const char *name, const char *filename, int n, double *x, double *y, TCanvas *canvas)

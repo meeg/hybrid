@@ -141,8 +141,12 @@ void DataRead::xmlLevel( xmlNode *node, string curr, bool config ) {
 // Open file
 bool DataRead::open ( string file ) {
 
+	int flags = O_RDONLY;
+#ifdef O_LARGEFILE
+	flags |= O_LARGEFILE;
+#endif
    // Attempt to open file
-   if ( (fd_ = ::open (file.c_str(),O_RDONLY | O_LARGEFILE)) < 0 ) {
+   if ( (fd_ = ::open (file.c_str(),flags)) < 0 ) {
       cout << "DataRead::open -> Failed to open file: " << file << endl;
       return(false);
    }

@@ -55,6 +55,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
 
    // Init threshold data
    thold_ = NULL;
+   filt_  = NULL;
 
    variables_["enabled"]->set("False");
 
@@ -84,6 +85,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("ThresholdA",      0x01200000, 640)); // Hybrid 0
    addRegister(new Register("ThresholdB",      0x01200400, 640)); // Hybrid 1
    addRegister(new Register("ThresholdC",      0x01200800, 640)); // Hybrid 2
+   addRegister(new Register("FilterCoef",      0x01300000, 32));
 
    // Setup variables
    addVariable(new Variable("FpgaVersion", Variable::Status));
@@ -729,6 +731,20 @@ void CntrlFpga::writeConfig ( bool force ) {
       }
    }
 
+   // Filter data
+   if ( filt_ != NULL ) {
+ 
+      // Convert and load filter data here
+
+
+
+
+
+
+
+
+   }
+
    // Sub devices
    Device::writeConfig(force);
    REGISTER_UNLOCK
@@ -763,3 +779,7 @@ void CntrlFpga::setThreshold (Threshold *thold) {
    thold_ = thold;
 }
 
+//! Set Filter data pointer
+void CntrlFpga::setFilter (Filter *filt) {
+   filt_ = filt_;
+}

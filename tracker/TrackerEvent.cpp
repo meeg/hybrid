@@ -104,6 +104,13 @@ TrackerSample *TrackerEvent::sample (uint index) {
    else if ( index >= count() ) return(NULL);
    else {
       sample_.setData(&(data_[headSize_+(index*sampleSize_)]));
+         // Improper frame size
+	     if ( ((size_ - (headSize_ + tailSize_)) % sampleSize_) != 0 ) {
+	           data_  = NULL;
+	                 size_  = 0;
+	                       cout<<"Improper frame size ... "<<endl;
+	                             return(false);
+	                                }
       return(&sample_);
    }
 }

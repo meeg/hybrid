@@ -18,6 +18,7 @@
 
 #include <Device.h>
 #include <Threshold.h>
+#include <Filter.h>
 using namespace std;
 
 //! Class to contain APV25 
@@ -45,6 +46,9 @@ class CntrlFpga : public Device {
 
       // Threshold data
       Threshold *thold_;
+
+      // Filter data
+      Filter *filt_;
 
    public:
 
@@ -96,6 +100,9 @@ class CntrlFpga : public Device {
 
       //! Set Threshold data pointer
       void setThreshold (Threshold *thold);
+
+      //! Set Filter    data pointer
+      void setFilter (Filter *filt);
 
 };
 #endif

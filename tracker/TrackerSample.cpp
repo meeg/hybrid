@@ -66,12 +66,12 @@ uint TrackerSample::fpgaAddress ( ) {
 // Get adc value at index.
 uint TrackerSample::value ( uint index ) {
    switch(index) {
-      case 0: return(data_[1]&0x3FFF);
-      case 1: return((data_[1]>>16)&0x3FFF);
-      case 2: return(data_[2]&0x3FFF);
-      case 3: return((data_[2]>>16)&0x3FFF);
-      case 4: return(data_[3]&0x3FFF);
-      case 5: return((data_[3]>>16)&0x3FFF);
+      case 0: return(data_[1]&0xFFFF);
+      case 1: return((data_[1]>>16)&0xFFFF);
+      case 2: return(data_[2]&0xFFFF);
+      case 3: return((data_[2]>>16)&0xFFFF);
+      case 4: return(data_[3]&0xFFFF);
+      case 5: return((data_[3]>>16)&0xFFFF);
       default: return(0);
    }
 }

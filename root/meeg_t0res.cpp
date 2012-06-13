@@ -32,6 +32,7 @@
 #include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
+#include <DataReadEvio.h>
 #include "ShapingCurve.hh"
 #include "SmoothShapingCurve.hh"
 #include "Samples.hh"
@@ -56,6 +57,10 @@ int main ( int argc, char **argv ) {
 	bool use_shape = false;
 	bool shift_t0 = false;
 	bool use_dist = false;
+	bool evio_format = false;
+	int fpga = -1;
+	int hybrid = -1;
+	int num_events = -1;
 	double dist_window;
 	bool make_shape = false;
 	int single_channel = -1;
@@ -80,7 +85,7 @@ int main ( int argc, char **argv ) {
 	double calA[2][640] = {{0.0}};
 	double calT0[2][640] = {{0.0}};
 	double calChisq[2][640] = {{0.0}};
-	DataRead        dataRead;
+	DataRead        *dataRead;
 	TrackerEvent    event;
 	TrackerSample   *sample;
 	uint            x;
@@ -114,7 +119,7 @@ int main ( int argc, char **argv ) {
 	double T0_dist_b[2],T0_dist_m[2];
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tbn")) !=-1)
+	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tbnH:F:e:E")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -130,6 +135,10 @@ int main ( int argc, char **argv ) {
 				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
 				printf("-n: physical channel numbering\n");
+				printf("-F: use only specified FPGA\n");
+				printf("-H: use only specified hybrid\n");
+				printf("-e: stop after specified number of events\n");
+				printf("-E: use EVIO file format\n");
 				return(0);
 				break;
 			case 'f':
@@ -172,12 +181,29 @@ int main ( int argc, char **argv ) {
 			case 't':
 				make_shape = true;
 				break;
+			case 'F':
+				fpga = atoi(optarg);
+				break;
+			case 'H':
+				hybrid = atoi(optarg);
+				break;
+			case 'e':
+				num_events = atoi(optarg);
+				break;
+			case 'E':
+				evio_format = true;
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
 			default:
 				abort();
 		}
+
+	if (evio_format)
+		dataRead = new DataReadEvio();
+	else 
+		dataRead = new DataRead();
 
 	gROOT->SetStyle("Plain");
 	gStyle->SetOptStat("emrou");
@@ -446,7 +472,7 @@ int main ( int argc, char **argv ) {
 	{
 		cout << "Reading data file " <<argv[optind] << endl;
 		// Attempt to open data file
-		if ( ! dataRead.open(argv[optind]) ) return(2);
+		if ( ! dataRead->open(argv[optind]) ) return(2);
 
 		TString confname=argv[optind];
 		confname.ReplaceAll(".bin",".conf");
@@ -458,19 +484,19 @@ int main ( int argc, char **argv ) {
 		cout << "Writing configuration to " <<outdir<<confname << endl;
 		outconfig.open(outdir+confname);
 
-		dataRead.next(&event);
-		dataRead.dumpConfig(outconfig);
+		dataRead->next(&event);
+		dataRead->dumpConfig(outconfig);
 		outconfig.close();
 		//dataRead.dumpStatus();
 		
-		runCount = atoi(dataRead.getConfig("RunCount").c_str());
+		runCount = atoi(dataRead->getConfig("RunCount").c_str());
 		if (!force_cal_grp)
 		{
-			cal_grp = atoi(dataRead.getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
+			cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
 			cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
 		}
 
-		cal_delay = atoi(dataRead.getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
+		cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
 		cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
 		if (cal_delay==0)
 		{
@@ -483,11 +509,13 @@ int main ( int argc, char **argv ) {
 		eventCount = 0;
 
 		do {
+			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
 			for (x=0; x < event.count(); x++) {
-
 				// Get sample
 				sample  = event.sample(x);
+				if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
+
 				channel = sample->channel();
 				if (flip_channels)
 					channel += (4-sample->apv())*128;
@@ -587,8 +615,8 @@ int main ( int argc, char **argv ) {
 			}
 			eventCount++;
 
-		} while ( dataRead.next(&event) );
-		dataRead.close();
+		} while ( dataRead->next(&event) );
+		dataRead->close();
 		if (eventCount != runCount)
 		{
 			printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
@@ -777,7 +805,6 @@ int main ( int argc, char **argv ) {
 	//	theApp.Run();
 
 	// Close file
-	dataRead.close();
 	if (print_fit_status) fitfile.close();
 	outfile[0].close();
 	outfile[1].close();

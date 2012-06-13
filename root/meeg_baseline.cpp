@@ -34,6 +34,7 @@
 #include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
+#include <DataReadEvio.h>
 #include <unistd.h>
 using namespace std;
 
@@ -48,6 +49,10 @@ int main ( int argc, char **argv ) {
 	bool mux_channels = false;
 	bool skip_corr = false;
 	bool read_temp = false;
+	bool evio_format = false;
+	int fpga = -1;
+	int hybrid = -1;
+	int num_events = -1;
 	int c;
 	TCanvas         *c1;
 	TH2F            *histAll[7];
@@ -87,7 +92,7 @@ int main ( int argc, char **argv ) {
 	double          grChan[640];
 	double          grMean[7][640];
 	double          grSigma[7][640];
-	DataRead        dataRead;
+	DataRead        *dataRead;
 	TrackerEvent    event;
 	TrackerSample   *sample;
 	uint            x;
@@ -98,12 +103,12 @@ int main ( int argc, char **argv ) {
 	int runCount;
 	TString inname;
 	TString outdir;
-	char            name[100];
+	char            name[200];
 	char title[200];
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmct")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmctH:F:e:E")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -113,6 +118,10 @@ int main ( int argc, char **argv ) {
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
 				printf("-t: print temperature\n");
+				printf("-F: use only specified FPGA\n");
+				printf("-H: use only specified hybrid\n");
+				printf("-e: stop after specified number of events\n");
+				printf("-E: use EVIO file format\n");
 				return(0);
 				break;
 			case 'o':
@@ -135,12 +144,29 @@ int main ( int argc, char **argv ) {
 			case 't':
 				read_temp = true;
 				break;
+			case 'F':
+				fpga = atoi(optarg);
+				break;
+			case 'H':
+				hybrid = atoi(optarg);
+				break;
+			case 'e':
+				num_events = atoi(optarg);
+				break;
+			case 'E':
+				evio_format = true;
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
 			default:
 				abort();
 		}
+
+	if (evio_format)
+		dataRead = new DataReadEvio();
+	else 
+		dataRead = new DataRead();
 
 	gROOT->SetStyle("Plain");
 	gStyle->SetOptStat("emrou");
@@ -194,10 +220,11 @@ int main ( int argc, char **argv ) {
 
 	cout << "Reading data file " <<argv[optind] << endl;
 	// Attempt to open data file
-	if ( ! dataRead.open(argv[optind]) ) return(2);
+	if ( ! dataRead->open(argv[optind]) ) return(2);
 
 	TString confname=argv[optind];
-	confname.ReplaceAll(".bin",".conf");
+	confname.ReplaceAll(".bin","");
+	confname.Append(".conf");
 	if (confname.Contains('/')) {
 		confname.Remove(0,confname.Last('/')+1);
 	}
@@ -206,12 +233,12 @@ int main ( int argc, char **argv ) {
 	cout << "Writing configuration to " <<outdir<<confname << endl;
 	outconfig.open(outdir+confname);
 
-	dataRead.next(&event);
-	dataRead.dumpConfig(outconfig);
+	dataRead->next(&event);
+	dataRead->dumpConfig(outconfig);
 	outconfig.close();
 	//dataRead.dumpStatus();
 
-	runCount = atoi(dataRead.getConfig("RunCount").c_str());
+	runCount = atoi(dataRead->getConfig("RunCount").c_str());
 	double *apv_means[5];
 	for (int i=0;i<5;i++) apv_means[i] = new double[runCount];
 	double *moving_ti = new double[runCount];
@@ -225,7 +252,16 @@ int main ( int argc, char **argv ) {
 	eventCount = 0;
 
 	do {
+		//printf("fpga %d\n",event.fpgaAddress());
+		if (event.fpgaAddress()==7) 
+		{
+			//printf("not a data event\n");
+			continue;
+		}
+		if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
+		//cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
+		if (num_events!=-1 && eventCount >= num_events) break;
 		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
 			if (event.temperature(i)!=0.0)
 			{
@@ -239,9 +275,10 @@ int main ( int argc, char **argv ) {
 			channelActive[i] = false;
 		}
 		for (x=0; x < event.count(); x++) {
-
 			// Get sample
 			sample  = event.sample(x);
+			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
+			//printf("hybrid %d\n",sample->hybrid());
 
 			if (mux_channels) channel = chanMap[sample->channel()];
 			else channel = sample->channel();
@@ -258,6 +295,7 @@ int main ( int argc, char **argv ) {
 				cout << "Apv = " << dec << sample->apv() << endl;
 				cout << "Chan = " << dec << sample->channel() << endl;
 			}
+
 
 			// Filter APVs
 			if ( eventCount >= 20 ) {
@@ -331,8 +369,8 @@ int main ( int argc, char **argv ) {
 			}
 		eventCount++;
 
-	} while ( dataRead.next(&event));
-	dataRead.close();
+	} while ( dataRead->next(&event));
+	dataRead->close();
 
 	if (eventCount != runCount)
 	{
@@ -364,10 +402,11 @@ int main ( int argc, char **argv ) {
 	}
 	mg->Draw("ap");
 	sprintf(name,"%s_base_apvmeans.png",inname.Data());
+	printf("%s\n",name);
 	c1->SaveAs(name);
 	c1->Clear();
-	for (int i=0;i<5;i++) delete graph[i];
-	//delete mg;
+	//for (int i=0;i<5;i++) delete graph[i];
+	delete mg;
 
 	/*
 	   c1->Clear();
@@ -568,6 +607,12 @@ int main ( int argc, char **argv ) {
 
 	// Close file
 	outfile.close();
+	delete dataRead;
+	for (int i=0;i<640;i++) for (int j=0;j<7;j++)
+	{
+		delete[] allSamples[i][j];
+		for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
+	}
 	return(0);
 }
 
