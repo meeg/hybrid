@@ -407,6 +407,7 @@ int main ( int argc, char **argv ) {
 
 		if (plot_tp_fits)
 		{
+			gStyle->SetOptStat(0);
 			sprintf(name,"samples_%s_%i",sgn?"neg":"pos",channel);
 			sprintf(title,"APV25 pulse shape, channel %d, %s pulses;Time [ns];Amplitude [ADC counts]",channel,sgn?"negative":"positive");
 			if (use_baseline_cal)
@@ -492,6 +493,7 @@ int main ( int argc, char **argv ) {
 			sprintf(name,"%s_tp_fit_%s_%i.png",inname.Data(),sgn?"neg":"pos",channel);
 			c1->SaveAs(name);
 			delete histSamples;
+			gStyle->SetOptStat("emrou");
 		}
 		delete fitcurve;
 
