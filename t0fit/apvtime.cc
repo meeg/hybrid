@@ -8,6 +8,7 @@
 #include "AnalyticFitter.hh"
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_vector.h>
@@ -19,17 +20,37 @@
 
 int main(int argc,char** argv) //fitter type (1: Minuit, 2: linear, 3: analytic); nEvents; nPeaks (1 or 2)
 {
-	int fitterType, nPeaks, nEvents;
+	int c;
 
-	if (argc>1)
-		fitterType = atoi(argv[1]);
-	else fitterType = 3;
-	if (argc>2)
-		nEvents = atoi(argv[2]);
-	else nEvents = 100;
-	if (argc>3)
-		nPeaks = atoi(argv[3]);
-	else nPeaks = 1;
+	int fitterType = 3;
+	int nPeaks = 1;
+	int nEvents = 100;
+
+	while ((c = getopt(argc,argv,"hf:n:p:")) !=-1)
+		switch (c)
+		{
+			case 'h':
+				printf("-h: print this help\n");
+				printf("-f: fitter type\n");
+				printf("-n: number of events\n");
+				printf("-p: number of peaks per event\n");
+				return(0);
+				break;
+			case 'f':
+				fitterType = atoi(optarg);
+				break;
+			case 'n':
+				nEvents = atoi(optarg);
+				break;
+			case 'p':
+				nPeaks = atoi(optarg);
+				break;
+			case '?':
+				printf("Invalid option or missing option argument; -h to list options\n");
+				return(1);
+			default:
+				abort();
+		}
 
 	printf("type %d, nEvents %d, nPeaks %d\n", fitterType, nEvents, nPeaks);
 

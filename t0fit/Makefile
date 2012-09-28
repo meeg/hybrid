@@ -1,6 +1,6 @@
 CPP = g++
 
-CPPFLAGS = -g -I$(ROOTSYS)/include
+CPPFLAGS = -g -I$(ROOTSYS)/include -I$(ROOTSYS)/include/root
 CXXFLAGS =
 
 ROOTLIBS = `$(ROOTSYS)/bin/root-config --glibs`
