@@ -497,11 +497,12 @@ int main ( int argc, char **argv ) {
 		}
 		if (plot_tp_fits)
 		{
+			fitcurve->SetLineWidth(3);
 			fitcurve->Draw();
 			if (move_fitstart)
 			{
 				shapingFunction->SetLineStyle(1);
-				shapingFunction->SetLineWidth(1);
+				shapingFunction->SetLineWidth(3);
 				shapingFunction->SetLineColor(2);
 				shapingFunction->SetRange(fit_start,5*SAMPLE_INTERVAL);
 				shapingFunction->DrawCopy("LSAME");
@@ -512,7 +513,7 @@ int main ( int argc, char **argv ) {
 			else
 			{
 				shapingFunction->SetLineStyle(1);
-				shapingFunction->SetLineWidth(1);
+				shapingFunction->SetLineWidth(3);
 				shapingFunction->SetLineColor(2);
 				shapingFunction->SetRange(-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
 				shapingFunction->Draw("LSAME");
