@@ -40,7 +40,7 @@ Hybrid::Hybrid ( uint destination, uint baseAddress, uint index, Device *parent 
    addDevice(new Apv25  (destination,baseAddress + 0x00003300, 4,this));
    addDevice(new Ads7924(destination,baseAddress + 0x00004800, 0,this));
 
-   variables_["enabled"]->set("False");
+   variables_["Enabled"]->set("False");
 }
 
 // Deconstructor

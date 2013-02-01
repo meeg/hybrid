@@ -99,7 +99,7 @@ class Device {
 
       // Verify register
       // Throws string on verify fail
-      void verifyRegister ( Register *reg );
+      void verifyRegister ( Register *reg, bool warnOnly = false );
 
       // Method to set variable values from xml tree
       bool setXmlConfig ( xmlNode *node );
@@ -111,13 +111,13 @@ class Device {
       // determines if hidden variables should be included in the
       // string. Hidden variables will always be sent for the top
       // level device, determine by the top flag.
-      string getXmlConfig ( bool top, bool common, bool hidden );
+      string getXmlConfig ( bool top, bool common, bool hidden, uint level );
 
       // Method to get status variable values in xml form.
       // The hidden flag determines if hidden status variables should 
       // be included in the string. Hidden variables will always be sent 
       // for the top level device, determine by the top flag.
-      string getXmlStatus (bool top, bool hidden );
+      string getXmlStatus (bool top, bool hidden, uint level );
 
       // Method to execute commands from xml tree
       // Throws string on error
@@ -129,7 +129,7 @@ class Device {
       // is to be returned. The hidden flag determines if hidden entries 
       // should be included in the string. Hidden values will always be 
       // sent for the top level device, determine by the top flag.
-      string getXmlStructure ( bool top, bool common, bool hidden);
+      string getXmlStructure ( bool top, bool common, bool hidden, uint level);
 
       // Add registers
       void addRegister(Register *reg);
@@ -142,6 +142,15 @@ class Device {
 
       // Add commands
       void addCommand(Command *cmd);
+
+      // Return register, throws exception when not found
+      Register *getRegister(string name);
+
+      // Return variable, throw exception when not found
+      Variable *getVariable(string name);
+
+      // Return command, throw exception when not found
+      Command *getCommand(string name);
 
    public:
 

@@ -31,17 +31,26 @@ ControlServer::ControlServer ( ) {
    bzero((char *) &servAddr_,sizeof(servAddr_));
    bzero((char *) &connAddr_,sizeof(connAddr_));
 
-   // Attempt to open and init shared memory
-   if ( (smemFd_ = controlCmdOpenAndMap ( &smem_ )) < 0 ) 
-      throw string("ControlServer::ControlServer -> Failed to open shared memory");
-
-   // Init shared memory
-   controlCmdInit(smem_);
+   smem_ = NULL;
 }
 
 // DeConstructor
 ControlServer::~ControlServer ( ) {
+   if ( smem_ != NULL ) controlCmdClose(smem_);
    stopListen();
+}
+
+// Enable shared 
+void ControlServer::enableSharedMemory ( string system, uint id ) {
+
+   // Attempt to open and init shared memory
+   if ( (smemFd_ = controlCmdOpenAndMap ( &smem_ , system.c_str(), id )) < 0 ) {
+      smem_ = NULL;
+      throw string("ControlServer::ControlServer -> Failed to open shared memory");
+   }
+
+   // Init shared memory
+   controlCmdInit(smem_);
 }
 
 // Set debug flag
@@ -55,7 +64,7 @@ void ControlServer::setSystem ( System *system ) {
 }
 
 // Start tcpip listen socket
-void ControlServer::startListen ( int port ) {
+int ControlServer::startListen ( int port ) {
    stringstream err;
 
    // Init structures
@@ -63,15 +72,36 @@ void ControlServer::startListen ( int port ) {
    bzero((char *)&servAddr_,sizeof(servAddr_));
    servAddr_.sin_family = AF_INET;
    servAddr_.sin_addr.s_addr = INADDR_ANY;
-   servAddr_.sin_port = htons(port);
 
-   // Attempt to bind socket
-   if ( bind(servFd_, (struct sockaddr *) &servAddr_, sizeof(servAddr_)) < 0 ) {
-      err.str("");
-      err << "ControlServer::startListen -> Failed to bind socket " << dec << port << endl;
-      servFd_ = -1;
-      if ( debug_ ) cout << err.str();
-      throw(err.str());
+   // port number if passed
+   if ( port != 0 ) {
+      servAddr_.sin_port = htons(port);
+
+      // Attempt to bind socket
+      if ( bind(servFd_, (struct sockaddr *) &servAddr_, sizeof(servAddr_)) < 0 ) {
+         err.str("");
+         err << "ControlServer::startListen -> Failed to bind socket " << dec << port << endl;
+         servFd_ = -1;
+         if ( debug_ ) cout << err.str();
+         throw(err.str());
+      }
+   }
+
+   // Find a free port
+   else {
+      for ( port = 8090; port < 8100; port++ ) {
+         servAddr_.sin_port = htons(port);
+         if ( bind(servFd_, (struct sockaddr *) &servAddr_, sizeof(servAddr_)) >= 0 ) break;
+      }
+
+      // Port not found
+      if ( port == 8100 ) {
+         err.str("");
+         err << "ControlServer::startListen -> Failed to find free socket" << endl;
+         servFd_ = -1;
+         if ( debug_ ) cout << err.str();
+         throw(err.str());
+      }
    }
 
    // Start listen
@@ -80,6 +110,8 @@ void ControlServer::startListen ( int port ) {
    // Debug
    if ( debug_ ) 
       cout << "ControlServer::startListen -> Listening on port " << dec << port << endl;
+
+   return(port);
 }
 
 // Close tcpip listen socket
@@ -162,9 +194,9 @@ void ControlServer::receive ( uint timeout ) {
 
             msg.str("");
             msg << "<system>" << endl;
-            msg << system_->structureString(false);
-            msg << system_->configString(false);
-            msg << system_->statusString(false);
+            msg << system_->structureString(false,false);
+            msg << system_->configString(false,false);
+            msg << system_->statusString(false,false);
             msg << "</system>" << endl;
             msg << "\f";
             write(connFd_[x],msg.str().c_str(),msg.str().length());
@@ -212,7 +244,7 @@ void ControlServer::receive ( uint timeout ) {
    }
 
    // Shared memory commands
-   if ( controlCmdPending(smem_) ) {
+   if ( smem_ != NULL && controlCmdPending(smem_) ) {
       if ( debug_ ) cout << "ControlServer::receive -> Processing shared memory message: " << endl;
       system_->parseXmlString(controlCmdBuffer(smem_));
       cmdPend = true;
@@ -220,14 +252,12 @@ void ControlServer::receive ( uint timeout ) {
    else cmdPend = false;
 
    // Poll
-   pmsg = system_->poll();
+   pmsg = system_->poll(smem_);
 
-   // Copy resulting system state to buffer
-   if ( cmdPend ) {
-      strcpy(controlStatBuffer(smem_),system_->get("SystemState").c_str());
-      strcpy(controlUserBuffer(smem_),system_->get("UserStatus").c_str());
-      controlCmdAck(smem_);
+   // Ack pending command
+   if ( smem_ != NULL && cmdPend ) {
       if ( debug_ ) cout << "CodaServer::receive -> Done Processing shared memory message: " << endl;
+      controlCmdAck(smem_);
       cmdPend = false;
    }
 

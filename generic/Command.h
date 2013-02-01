@@ -74,8 +74,9 @@ class Command {
       //! Method to get variable information in xml form.
       /*! 
        * \param hidden Include hidden commands.
+       * \param level  level for indents
       */
-      string getXmlStructure ( bool hidden );
+      string getXmlStructure ( bool hidden, uint level );
 
       //! Set hidden status
       /*! 

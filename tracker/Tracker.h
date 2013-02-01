@@ -17,6 +17,9 @@
 #define __TRACKER_H__
 
 #include <System.h>
+#include <EpicsDataMem.h>
+#include <Threshold.h>
+#include <Filter.h>
 using namespace std;
 
 class CommLink;
@@ -24,10 +27,31 @@ class CommLink;
 //! Class to contain APV25 
 class Tracker : public System {
 
+      // Shared memory
+      EpicsDataMem *tempMem_;
+
+      // Get extracted temp value
+      double getTemp(uint fpga, uint index);
+
+      // last temp poll time
+      time_t lastTemp_;
+      time_t lastTrig_;
+
+      bool softResetPressed_;
+
+      uint fpgaCount_;
+      bool tisEnable_;
+
+      // Threshold data
+      Threshold thold_;
+
+      // Filter data
+      Filter filt_;
+
    public:
 
       //! Constructor
-      Tracker (CommLink *commLink);
+      Tracker (CommLink *commLink, string defaults, uint fpgaCount, bool tisEnable );
 
       //! Deconstructor
       ~Tracker ( );
@@ -56,6 +80,13 @@ class Tracker : public System {
 
       //! Method to perform hard reset
       void hardReset ( );
+
+      //! Method to write configuration registers
+      /*! 
+       * Throws string on error.
+       * \param force Write all registers if true, only stale if false
+      */
+      void writeConfig ( bool force );
 
 };
 #endif

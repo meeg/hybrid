@@ -172,7 +172,8 @@ class Variable {
       //! Method to get variable information in xml form.
       /*!
        * \param hidden include hidden variables
+       * \param level  level for indents
       */
-      string getXmlStructure ( bool hidden );
+      string getXmlStructure ( bool hidden, uint level );
 };
 #endif

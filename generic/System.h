@@ -21,6 +21,7 @@
 #include <sstream>
 #include <map>
 #include <vector>
+#include <ControlCmdMem.h>
 #include <libxml/tree.h>
 using namespace std;
 
@@ -126,19 +127,38 @@ class System : public Device {
       virtual string localState();
 
       //! Poll system level status and process return messages
-      string poll();
+      string poll(ControlCmdMemory *cmem);
 
       //! Return structure string
       /*! 
        * \param hidden Set true to include hidden variables & commands
       */
-      string structureString(bool hidden);
+      string structureString(bool hidden, bool indent);
 
       //! Return status string
-      string statusString(bool hidden);
+      string statusString(bool hidden, bool indent);
 
       //! Return config string
-      string configString(bool hidden);
+      string configString(bool hidden, bool indent);
+
+      //! Method to write configuration registers
+      /*! 
+       * Throws string on error.
+       * \param force Write all registers if true, only stale if false
+      */
+      virtual void writeConfig ( bool force );
+
+      //! Set debug flag
+      /*! 
+       * \param enable    Debug state
+      */
+      void setDebug( bool enable );
+
+      //! Generate timestamp from passed time value
+      /*! 
+       * \param time    Unix timestamp
+      */
+      static string genTime( time_t tme );
 
 };
 #endif

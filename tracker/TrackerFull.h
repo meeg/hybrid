@@ -35,6 +35,9 @@ class TrackerFull : public System {
 
       // last temp poll time
       time_t lastTemp_;
+      time_t lastTrig_;
+
+      bool softResetPressed_;
 
       // Threshold data
       Threshold thold_;

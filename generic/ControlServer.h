@@ -28,6 +28,8 @@
 #include <ControlCmdMem.h>
 using namespace std;
 
+class System;
+
 //! Class to manage control interface
 class ControlServer {
 
@@ -82,12 +84,20 @@ class ControlServer {
 
       //! Start tcpip listen socket
       /*! 
-       * \param port Listen port number
+       * \param port Listen port number, pass zero to auto assign
+       * resulting port number is returned
       */
-      void startListen ( int port );
+      int startListen ( int port );
 
       //! Stop tcpip listen socket
       void stopListen ( );
+
+      //! Enable shared memory for control
+      /*! 
+       * \param system System name
+       * \param id ID to identify your process
+      */
+      void enableSharedMemory ( string system, uint id );
 
       //! Receive and process data if ready
       /*! 

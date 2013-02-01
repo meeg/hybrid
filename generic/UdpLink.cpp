@@ -119,7 +119,7 @@ void UdpLink::rxHandler() {
             }
 
             // Bad size
-            if ( ret < 16 || (udpcnt % 2) != 0 )  {
+            if ( ret < 6 || (udpcnt % 2) != 0 )  {
                cout << "UdpLink::rxHandler -> Bad length in header. udpcnt=" 
                     << dec << udpcnt << ", ret=" << dec << ret
                     << ", iov_len=" << dec << vecHdr[1].iov_len << endl;
@@ -354,7 +354,7 @@ void UdpLink::open ( int port, uint count, ... ) {
       if ( udpFd_[x] == -1 ) throw string("UdpLink::open -> Could Not Create Socket");
 
       // Set receive size
-      size = 5000000;
+      size = 20000000;
       setsockopt(udpFd_[x], SOL_SOCKET, SO_RCVBUF, (char*)&size, sizeof(size));
       getsockopt(udpFd_[x], SOL_SOCKET, SO_RCVBUF, &rwin, &rwin_size);
       if(size > rwin) {

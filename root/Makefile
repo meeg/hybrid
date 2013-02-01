@@ -8,8 +8,8 @@ OBJ     := $(PWD)/.obj
 
 # Generic Sources
 GEN_DIR := $(PWD)/../generic
-GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp
-GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h
+GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp $(GEN_DIR)/XmlVariables.cpp
+GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h $(GEN_DIR)/XmlVariables.h
 GEN_OBJ := $(patsubst $(GEN_DIR)/%.cpp,$(OBJ)/%.o,$(GEN_SRC))
 
 # Tracker Sources

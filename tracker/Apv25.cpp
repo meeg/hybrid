@@ -317,6 +317,8 @@ void Apv25::writeConfig ( bool force ) {
    uint temp;
    uint idx;
 
+   //debug_ = true;
+
    REGISTER_LOCK
 
    // Set registers
@@ -414,23 +416,23 @@ void Apv25::verifyConfig ( ) {
    REGISTER_LOCK
 
    // Read Configuration
-   verifyRegister(registers_["MuxGain"]);
-   verifyRegister(registers_["Latency"]);
-   verifyRegister(registers_["Mode"]);
-   verifyRegister(registers_["Csel"]);
-   verifyRegister(registers_["Cdrv"]);
-   verifyRegister(registers_["Vpsp"]);
-   verifyRegister(registers_["Vfs"]);
-   verifyRegister(registers_["Vfp"]);
-   verifyRegister(registers_["Ical"]);
-   verifyRegister(registers_["Ispare"]);
-   verifyRegister(registers_["ImuxIn"]);
-   verifyRegister(registers_["Ipsp"]);
-   verifyRegister(registers_["Issf"]);
-   verifyRegister(registers_["Isha"]);
-   verifyRegister(registers_["Ipsf"]);
-   verifyRegister(registers_["Ipcasc"]);
-   verifyRegister(registers_["Ipre"]);
+   verifyRegister(registers_["MuxGain"],true);
+   verifyRegister(registers_["Latency"],true);
+   verifyRegister(registers_["Mode"],true);
+   verifyRegister(registers_["Csel"],true);
+   verifyRegister(registers_["Cdrv"],true);
+   verifyRegister(registers_["Vpsp"],true);
+   verifyRegister(registers_["Vfs"],true);
+   verifyRegister(registers_["Vfp"],true);
+   verifyRegister(registers_["Ical"],true);
+   verifyRegister(registers_["Ispare"],true);
+   verifyRegister(registers_["ImuxIn"],true);
+   verifyRegister(registers_["Ipsp"],true);
+   verifyRegister(registers_["Issf"],true);
+   verifyRegister(registers_["Isha"],true);
+   verifyRegister(registers_["Ipsf"],true);
+   verifyRegister(registers_["Ipcasc"],true);
+   verifyRegister(registers_["Ipre"],true);
 
    REGISTER_UNLOCK
 }
