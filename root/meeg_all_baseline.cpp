@@ -59,12 +59,14 @@ int main ( int argc, char **argv ) {
 		chanMap[(32*(idx%4)) + (8*(idx/4)) - (31*(idx/16))] = idx;
 	}
 
+	int hybridCount[7][3];
 	int channelCount[7][3][640];
 	int channelAllCount[7][3][640];
 	double channelMean[7][7][3][640];
 	double channelVariance[7][7][3][640];
 	for (int fpga = 0;fpga<7;fpga++)
-		for (int hyb = 0;hyb<3;hyb++)
+		for (int hyb = 0;hyb<3;hyb++) {
+			hybridCount[fpga][hyb] = 0;
 			for (int i=0;i<640;i++) {
 				channelCount[fpga][hyb][i] = 0;
 				channelAllCount[fpga][hyb][i] = 0;
@@ -73,6 +75,7 @@ int main ( int argc, char **argv ) {
 					channelVariance[j][fpga][hyb][i] = 0.0;
 				}
 			}
+		}
 
 	double          grChan[640];
 	for (int i=0;i<640;i++)
@@ -256,6 +259,7 @@ int main ( int argc, char **argv ) {
 
 			// Filter APVs
 			if ( eventCount >= 20 ) {
+				hybridCount[fpga][hyb]++;
 				channelCount[fpga][hyb][channel]++;
 				for ( y=0; y < 6; y++ ) {
 					//printf("%x\n",sample->value(y));
@@ -297,13 +301,13 @@ int main ( int argc, char **argv ) {
 	} while ( dataRead->next(&event));
 	dataRead->close();
 
-	if (eventCount != runCount)
+	if (!evio_format && eventCount != runCount)
 	{
 		printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
 	}
 
 	for (int fpga = 0;fpga<7;fpga++)
-		for (int hyb = 0;hyb<3;hyb++)
+		for (int hyb = 0;hyb<3;hyb++) if (hybridCount[fpga][hyb])
 		{
 			int deadAPV = -1;
 			for (int i=0;i<640;i++)
@@ -341,7 +345,7 @@ int main ( int argc, char **argv ) {
 	//printf("correlation %f\n",channelCovar[corr1][corr2]);
 
 	for (int fpga = 0;fpga<7;fpga++)
-		for (int hyb = 0;hyb<3;hyb++)
+		for (int hyb = 0;hyb<3;hyb++) if (hybridCount[fpga][hyb]) 
 		{
 			c1->Clear();
 			mg = new TMultiGraph();
