@@ -50,6 +50,7 @@ TisFpga::TisFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("DataBypass",      0x0100000E));
    addRegister(new Register("EventSize",       0x0100000F));
    addRegister(new Register("TrigDropCount",   0x01000010));
+   addRegister(new Register("TisAckSel",       0x01000011));
    addRegister(new Register("MasterReset",     0x01000100));
 
    // Setup variables
@@ -129,6 +130,10 @@ TisFpga::TisFpga ( uint destination, uint index, Device *parent ) :
    addVariable(new Variable("TrigDropCount", Variable::Status));
    variables_["TrigDropCount"]->setDescription("Trigger Drop Counter");
 
+   addVariable(new Variable("TisAckSel", Variable::Configuration));
+   variables_["TisAckSel"]->setDescription("Tis Ack Selection");
+   variables_["TisAckSel"]->setRange(0,3);
+
    // Commands
    addCommand(new Command("TisSWTrig",0x02));
    commands_["TisSWTrig"]->setDescription("Generate TIS software trigger.");
@@ -188,16 +193,21 @@ void TisFpga::command ( string name, string arg) {
    else Device::command(name, arg);
 }
 
+void TisFpga::readTrig ( ) {
+
+   readRegister(registers_["TrigCount"]);
+   variables_["TrigCount"]->setInt(registers_["TrigCount"]->get());
+
+   readRegister(registers_["TrigDropCount"]);
+   variables_["TrigDropCount"]->setInt(registers_["TrigDropCount"]->get());
+}
+
 // Method to read status registers and update variables
 void TisFpga::readStatus ( ) {
-   REGISTER_LOCK
 
    // Read status
    readRegister(registers_["Version"]);
    variables_["FpgaVersion"]->setInt(registers_["Version"]->get());
-
-   readRegister(registers_["TrigCount"]);
-   variables_["TrigCount"]->setInt(registers_["TrigCount"]->get());
 
    readRegister(registers_["TisReady"]);
    variables_["TisReady"]->setInt(registers_["TisReady"]->get());
@@ -205,12 +215,10 @@ void TisFpga::readStatus ( ) {
    readRegister(registers_["SyncRegister"]);
    variables_["SyncRegister"]->setInt(registers_["SyncRegister"]->get());
 
-   readRegister(registers_["TrigDropCount"]);
-   variables_["TrigDropCount"]->setInt(registers_["TrigDropCount"]->get());
+   readTrig();
 
    // Sub devices
    Device::readStatus();
-   REGISTER_UNLOCK
 }
 
 // Method to read configuration registers and update variables
@@ -250,6 +258,9 @@ void TisFpga::readConfig () {
 
    readRegister(registers_["EventSize"]);
    variables_["EventSize"]->setInt(registers_["EventSize"]->get());
+
+   readRegister(registers_["TisAckSel"]);
+   variables_["TisAckSel"]->setInt(registers_["TisAckSel"]->get());
 
    // Sub devices
    Device::readConfig();
@@ -294,6 +305,9 @@ void TisFpga::writeConfig ( bool force ) {
    registers_["EventSize"]->set(variables_["EventSize"]->getInt());
    writeRegister(registers_["EventSize"],force);
 
+   registers_["TisAckSel"]->set(variables_["TisAckSel"]->getInt());
+   writeRegister(registers_["TisAckSel"],force);
+
    // Sub devices
    Device::writeConfig(force);
    REGISTER_UNLOCK
@@ -312,6 +326,7 @@ void TisFpga::verifyConfig () {
    verifyRegister(registers_["IntTrigPeriod"]);
    verifyRegister(registers_["DataBypass"]);
    verifyRegister(registers_["EventSize"]);
+   verifyRegister(registers_["TisAckSel"]);
    Device::verifyConfig();
    REGISTER_UNLOCK
 }

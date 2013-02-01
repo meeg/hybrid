@@ -567,6 +567,11 @@ int main ( int argc, char **argv ) {
 
 	c1->Clear();
 	mg = new TMultiGraph();
+	double max = 0;
+	for (int i=0;i<7;i++)
+		for (int j=0;j<ni;j++)
+			if (grSigma[i][j]>max) max = grSigma[i][j];
+
 	for (int i=0;i<7;i++)
 	{
 		graph[i] = new TGraph(ni,grChan,grSigma[i]);
@@ -575,8 +580,8 @@ int main ( int argc, char **argv ) {
 	}
 	graph[6]->SetMarkerColor(1);
 	mg->SetTitle("Noise;Channel;ADC counts");
-	//mg->GetXaxis()->SetRangeUser(0,640);
 	mg->Draw("a*");
+	mg->GetYaxis()->SetRangeUser(0,1.2*max);
 	sprintf(name,"%s_base_noise.png",inname.Data());
 	c1->SaveAs(name);
 	for (int i=0;i<7;i++)
@@ -611,7 +616,7 @@ int main ( int argc, char **argv ) {
 	for (int i=0;i<640;i++) for (int j=0;j<7;j++)
 	{
 		delete[] allSamples[i][j];
-		for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
+		//for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
 	}
 	return(0);
 }

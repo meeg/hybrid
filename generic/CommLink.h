@@ -82,10 +82,10 @@ class CommLink {
       uint      runReqCnt_;
 
       // Config/Status request queue
-      string    cfgReqEntry_;
-      bool      cfgIsConfig_;
-      uint      cfgReqCnt_;
-      uint      cfgRespCnt_;
+      string    xmlReqEntry_;
+      uint      xmlType_;
+      uint      xmlReqCnt_;
+      uint      xmlRespCnt_;
 
       // Thread pointers
       pthread_t rxThread_;
@@ -100,8 +100,8 @@ class CommLink {
       // Run enable
       bool runEnable_;
 
-      // Config/status Store Enable
-      bool cfgStoreEn_;
+      // Config/status/start/stop Store Enable
+      bool xmlStoreEn_;
 
       // Data routine
       virtual void dataHandler();
@@ -123,6 +123,9 @@ class CommLink {
 
       // Buffer for pending register transactions
       uint *regBuff_;
+
+      // Timeout disable flag
+      bool toDisable_;
 
    public:
 
@@ -253,11 +256,23 @@ class CommLink {
       */
       void addStatus ( string status );
 
-      //! Enable store of config/status to data file & callback
+      //! Add run start to data file
       /*! 
-       * \param enable Enable of config/status
+       * \param xml Run start data
       */
-      void setConfigStore ( bool enable );
+      void addRunStart ( string xml );
+
+      //! Add run stop to data file
+      /*! 
+       * \param xml Run stop data
+      */
+      void addRunStop ( string xml );
+
+      //! Enable store of config/status/start/stop to data file & callback
+      /*! 
+       * \param enable Enable of config/status/start/stop
+      */
+      void setXmlStore ( bool enable );
 
 };
 

@@ -50,6 +50,9 @@ class CntrlFpga : public Device {
       // Filter data
       Filter *filt_;
 
+      // Coefficant order lookup. Pass order index, returns coef to load at that position
+      static uint coefOrder  ( uint  idxIn);
+
    public:
 
       //! Constructor

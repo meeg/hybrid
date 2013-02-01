@@ -1,0 +1,3 @@
+[submodule "t0fit"]
+	path = t0fit
+	url = /afs/slac.stanford.edu/g/hps/git/t0fit/

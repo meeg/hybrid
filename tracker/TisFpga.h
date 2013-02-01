@@ -46,6 +46,7 @@ class TisFpga : public Device {
       /*! 
        * Throws string on error.
       */
+      void readTrig   ( );
       void readStatus ( );
 
       //! Method to read configuration registers and update variables

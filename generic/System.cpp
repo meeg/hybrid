@@ -23,6 +23,7 @@
 #include <string.h>
 #include <Variable.h>
 #include <time.h>
+#include <ControlCmdMem.h>
 using namespace std;
 
 // Constructor
@@ -44,108 +45,110 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    lastTime_       = 0;
    commLink_       = commLink;
 
+   xmlInitParser();
+
    // Commands
    addCommand(new Command("SetDefaults"));
-   commands_["SetDefaults"]->setDescription("Read XML defaults file.");
-   commands_["SetDefaults"]->setHidden(true);
+   getCommand("SetDefaults")->setDescription("Read XML defaults file.");
+   getCommand("SetDefaults")->setHidden(true);
 
    addCommand(new Command("ReadXmlFile"));
-   commands_["ReadXmlFile"]->setDescription("Read XML command or config file from disk. Pass filename as arg.");
-   commands_["ReadXmlFile"]->setHidden(true);
-   commands_["ReadXmlFile"]->setHasArg(true);
+   getCommand("ReadXmlFile")->setDescription("Read XML command or config file from disk. Pass filename as arg.");
+   getCommand("ReadXmlFile")->setHidden(true);
+   getCommand("ReadXmlFile")->setHasArg(true);
 
    addCommand(new Command("WriteConfigXml"));
-   commands_["WriteConfigXml"]->setDescription("Write configuration to disk. Pass filename as arg.");
-   commands_["WriteConfigXml"]->setHidden(true);
-   commands_["WriteConfigXml"]->setHasArg(true);
+   getCommand("WriteConfigXml")->setDescription("Write configuration to disk. Pass filename as arg.");
+   getCommand("WriteConfigXml")->setHidden(true);
+   getCommand("WriteConfigXml")->setHasArg(true);
 
    addCommand(new Command("WriteStatusXml"));
-   commands_["WriteStatusXml"]->setDescription("Write status to disk. Pass filename as arg.");
-   commands_["WriteStatusXml"]->setHidden(true);
-   commands_["WriteStatusXml"]->setHasArg(true);
+   getCommand("WriteStatusXml")->setDescription("Write status to disk. Pass filename as arg.");
+   getCommand("WriteStatusXml")->setHidden(true);
+   getCommand("WriteStatusXml")->setHasArg(true);
 
    addCommand(new Command("WriteStructureXml"));
-   commands_["WriteStructureXml"]->setDescription("Write system structure to disk. Pass filename as arg.");
-   commands_["WriteStructureXml"]->setHidden(true);
-   commands_["WriteStructureXml"]->setHasArg(true);
+   getCommand("WriteStructureXml")->setDescription("Write system structure to disk. Pass filename as arg.");
+   getCommand("WriteStructureXml")->setHidden(true);
+   getCommand("WriteStructureXml")->setHasArg(true);
 
    addCommand(new Command("OpenDataFile"));
-   commands_["OpenDataFile"]->setDescription("Open data file. Pass filename as arg.");
-   commands_["OpenDataFile"]->setHidden(true);
+   getCommand("OpenDataFile")->setDescription("Open data file. Pass filename as arg.");
+   getCommand("OpenDataFile")->setHidden(true);
 
    addCommand(new Command("CloseDataFile"));
-   commands_["CloseDataFile"]->setDescription("Close data file.");
-   commands_["CloseDataFile"]->setHidden(true);
+   getCommand("CloseDataFile")->setDescription("Close data file.");
+   getCommand("CloseDataFile")->setHidden(true);
 
    addCommand(new Command("ReadConfig"));
-   commands_["ReadConfig"]->setDescription("Read configuration.");
-   commands_["ReadConfig"]->setHidden(true);
+   getCommand("ReadConfig")->setDescription("Read configuration.");
+   getCommand("ReadConfig")->setHidden(true);
 
    addCommand(new Command("ReadStatus"));
-   commands_["ReadStatus"]->setDescription("Read status.");
-   commands_["ReadStatus"]->setHidden(true);
+   getCommand("ReadStatus")->setDescription("Read status.");
+   getCommand("ReadStatus")->setHidden(true);
 
    addCommand(new Command("VerifyConfig"));
-   commands_["VerifyConfig"]->setDescription("Verify configuration");
-   commands_["VerifyConfig"]->setHidden(true);
+   getCommand("VerifyConfig")->setDescription("Verify configuration");
+   getCommand("VerifyConfig")->setHidden(true);
 
    addCommand(new Command("ResetCount"));
-   commands_["ResetCount"]->setDescription("Reset top level counters.");
-   commands_["ResetCount"]->setHidden(true);
+   getCommand("ResetCount")->setDescription("Reset top level counters.");
+   getCommand("ResetCount")->setHidden(true);
 
    addCommand(new Command("SetRunState"));
-   commands_["SetRunState"]->setDescription("Set run state");
-   commands_["SetRunState"]->setHidden(true);
+   getCommand("SetRunState")->setDescription("Set run state");
+   getCommand("SetRunState")->setHidden(true);
 
    addCommand(new Command("HardReset"));
-   commands_["HardReset"]->setDescription("Hard reset System.");
-   commands_["HardReset"]->setHidden(true);
+   getCommand("HardReset")->setDescription("Hard reset System.");
+   getCommand("HardReset")->setHidden(true);
 
    addCommand(new Command("SoftReset"));
-   commands_["SoftReset"]->setDescription("Soft reset System.");
-   commands_["SoftReset"]->setHidden(true);
+   getCommand("SoftReset")->setDescription("Soft reset System.");
+   getCommand("SoftReset")->setHidden(true);
 
    addCommand(new Command("RefreshState"));
-   commands_["RefreshState"]->setDescription("Refresh System State.");
-   commands_["RefreshState"]->setHidden(true);
+   getCommand("RefreshState")->setDescription("Refresh System State.");
+   getCommand("RefreshState")->setHidden(true);
 
    // Variables
    addVariable(new Variable("DataFileCount",Variable::Status));
-   variables_["DataFileCount"]->setDescription("Number of events written to the data file");
-   variables_["DataFileCount"]->setHidden(true);
+   getVariable("DataFileCount")->setDescription("Number of events written to the data file");
+   getVariable("DataFileCount")->setHidden(true);
 
    addVariable(new Variable("DataFile",Variable::Configuration));
-   variables_["DataFile"]->setDescription("Data File For Write");
-   variables_["DataFile"]->setHidden(true);
+   getVariable("DataFile")->setDescription("Data File For Write");
+   getVariable("DataFile")->setHidden(true);
 
    addVariable(new Variable("DataRxCount",Variable::Status));
-   variables_["DataRxCount"]->setDescription("Number of events received");
-   variables_["DataRxCount"]->setHidden(true);
+   getVariable("DataRxCount")->setDescription("Number of events received");
+   getVariable("DataRxCount")->setHidden(true);
 
    addVariable(new Variable("RegRxCount",Variable::Status));
-   variables_["RegRxCount"]->setDescription("Number of register responses received");
-   variables_["RegRxCount"]->setHidden(true);
+   getVariable("RegRxCount")->setDescription("Number of register responses received");
+   getVariable("RegRxCount")->setHidden(true);
 
    addVariable(new Variable("UnexpectedCount",Variable::Status));
-   variables_["UnexpectedCount"]->setDescription("Number of unexpected receive packets");
-   variables_["UnexpectedCount"]->setHidden(true);
+   getVariable("UnexpectedCount")->setDescription("Number of unexpected receive packets");
+   getVariable("UnexpectedCount")->setHidden(true);
 
    addVariable(new Variable("TimeoutCount",Variable::Status));
-   variables_["TimeoutCount"]->setDescription("Number of timeout errors");
-   variables_["TimeoutCount"]->setHidden(true);
+   getVariable("TimeoutCount")->setDescription("Number of timeout errors");
+   getVariable("TimeoutCount")->setHidden(true);
 
    addVariable(new Variable("ErrorCount",Variable::Status));
-   variables_["ErrorCount"]->setDescription("Number of errors");
-   variables_["ErrorCount"]->setHidden(true);
+   getVariable("ErrorCount")->setDescription("Number of errors");
+   getVariable("ErrorCount")->setHidden(true);
 
    addVariable(new Variable("DataOpen",Variable::Status));
-   variables_["DataOpen"]->setDescription("Data file is open");
-   variables_["DataOpen"]->setTrueFalse();
-   variables_["DataOpen"]->setHidden(true);
+   getVariable("DataOpen")->setDescription("Data file is open");
+   getVariable("DataOpen")->setTrueFalse();
+   getVariable("DataOpen")->setHidden(true);
 
    addVariable(new Variable("RunRate",Variable::Configuration));
-   variables_["RunRate"]->setDescription("Run rate");
-   variables_["RunRate"]->setHidden(true);
+   getVariable("RunRate")->setDescription("Run rate");
+   getVariable("RunRate")->setHidden(true);
    vector<string> rates;
    rates.resize(6);
    rates[0] = "1Hz";
@@ -154,49 +157,61 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    rates[3] = "120Hz";
    rates[4] = "1000Hz";
    rates[5] = "2000Hz";
-   variables_["RunRate"]->setEnums(rates);
+   getVariable("RunRate")->setEnums(rates);
 
    addVariable(new Variable("RunCount",Variable::Configuration));
-   variables_["RunCount"]->setDescription("SW Run Count");
-   variables_["RunCount"]->setHidden(true);
-   variables_["RunCount"]->setInt(1000);
+   getVariable("RunCount")->setDescription("SW Run Count");
+   getVariable("RunCount")->setHidden(true);
+   getVariable("RunCount")->setInt(1000);
 
    addVariable(new Variable("RunState",Variable::Status));
-   variables_["RunState"]->setDescription("Run state");
-   variables_["RunState"]->setHidden(true);
+   getVariable("RunState")->setDescription("Run state");
+   getVariable("RunState")->setHidden(true);
    vector<string> states;
    states.resize(2);
    states[0] = "Stopped";
    states[1] = "Running";
-   variables_["RunState"]->setEnums(states);
+   getVariable("RunState")->setEnums(states);
 
    addVariable(new Variable("RunProgress",Variable::Status));
-   variables_["RunProgress"]->setDescription("Run Total");
-   variables_["RunProgress"]->setHidden(true);
+   getVariable("RunProgress")->setDescription("Run Total");
+   getVariable("RunProgress")->setHidden(true);
 
    addVariable(new Variable("DebugEnable",Variable::Configuration));
-   variables_["DebugEnable"]->setDescription("Enable console debug messages.");
-   variables_["DebugEnable"]->setTrueFalse();
-   variables_["DebugEnable"]->set("True");
+   getVariable("DebugEnable")->setDescription("Enable console debug messages.");
+   getVariable("DebugEnable")->setTrueFalse();
+   getVariable("DebugEnable")->set("False");
 
    addVariable(new Variable("DebugCmdTime",Variable::Configuration));
-   variables_["DebugCmdTime"]->setDescription("Enable showing command execution time.");
-   variables_["DebugCmdTime"]->setTrueFalse();
-   variables_["DebugCmdTime"]->set("True");
+   getVariable("DebugCmdTime")->setDescription("Enable showing command execution time.");
+   getVariable("DebugCmdTime")->setTrueFalse();
+   getVariable("DebugCmdTime")->set("True");
 
    addVariable(new Variable("SystemState",Variable::Status));
-   variables_["SystemState"]->setDescription("Current system state.");
-   variables_["SystemState"]->setHidden(true);
+   getVariable("SystemState")->setDescription("Current system state.");
+   getVariable("SystemState")->setHidden(true);
 
    addVariable(new Variable("UserStatus",Variable::Status));
-   variables_["UserStatus"]->setDescription("User defined status string.");
-   variables_["UserStatus"]->setHidden(true);
+   getVariable("UserStatus")->setDescription("User defined status string.");
+   getVariable("UserStatus")->setHidden(true);
 
-   variables_["enabled"]->setHidden(true);
+   addVariable(new Variable("RunNumber",Variable::Status));
+   getVariable("RunNumber")->setDescription("Run Number Since Start");
+   getVariable("RunNumber")->setInt(0);
+
+#ifdef MAKE_SW_VERSION
+   addVariable(new Variable("SwVersion",Variable::Status));
+   getVariable("SwVersion")->setDescription("Software version");
+   getVariable("SwVersion")->set(MAKE_SW_VERSION);
+#endif
+
+   getVariable("Enabled")->setHidden(true);
 }
 
 // Deconstructor
 System::~System ( ) {
+   xmlCleanupParser();
+   xmlMemoryDump();
 }
 
 
@@ -218,6 +233,8 @@ void System::swRunThread() {
    ulong           ctime;
    ulong           ltime;
    uint            runTotal;
+   stringstream    xml;
+   uint            runNumber;
 
    swRunning_ = true;
    swRunError_  = "";
@@ -234,8 +251,21 @@ void System::swRunThread() {
            << ", RunPeriod=" << dec << swRunPeriod_ << endl;
    }
 
+   // Increment run number
+   runNumber = getVariable("RunNumber")->getInt() + 1;
+   getVariable("RunNumber")->setInt(runNumber);
+
+   // Add record to data file
+   xml.str("");
+   xml << "<runStart>" << endl;
+   xml << "<runNumber>" << runNumber << "</runNumber>" << endl;
+   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
+   xml << "<user>" << getlogin() << "</user>" << endl;
+   xml << "</runStart>" << endl;
+   commLink_->addRunStart(xml.str());
+
    // Run
-   while ( swRunEnable_ && runTotal < swRunCount_ ) {
+   while ( swRunEnable_ && (runTotal < swRunCount_ || swRunCount_ == 0 )) {
 
       // Delay
       do {
@@ -248,7 +278,8 @@ void System::swRunThread() {
       ltime = ctime;
       commLink_->queueRunCommand();
       runTotal++;
-      variables_["RunProgress"]->setInt((uint)(((double)runTotal/(double)swRunCount_)*100.0));
+      if ( swRunCount_ == 0 ) getVariable("RunProgress")->setInt(0);
+      else getVariable("RunProgress")->setInt((uint)(((double)runTotal/(double)swRunCount_)*100.0));
    }
 
    if ( debug_ ) {
@@ -256,17 +287,28 @@ void System::swRunThread() {
            << ", Run Stopped, RunTotal = " << dec << runTotal << endl;
    }
 
-   // Set run
    sleep(1);
-   variables_["RunProgress"]->setInt((uint)(((double)runTotal/(double)swRunCount_)*100.0));
-   variables_["RunState"]->set(swRunRetState_);
+
+   // Add record to data file
+   xml.str("");
+   xml << "<runStop>" << endl;
+   xml << "<runNumber>" << runNumber << "</runNumber>" << endl;
+   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
+   xml << "<user>" << getlogin() << "</user>" << endl;
+   xml << "</runStop>" << endl;
+   commLink_->addRunStop(xml.str());
+
+   // Set run
+   if ( swRunCount_ == 0 ) getVariable("RunProgress")->setInt(100);
+   else getVariable("RunProgress")->setInt((uint)(((double)runTotal/(double)swRunCount_)*100.0));
+   getVariable("RunState")->set(swRunRetState_);
    swRunning_ = false;
-   pthread_exit(NULL);
 }
 
 // Start Run
 void System::setRunState(string state) {
    stringstream err;
+   stringstream tmp;
    uint         toCount;
 
    // Stopped state is requested
@@ -276,7 +318,7 @@ void System::setRunState(string state) {
    else if ( state == "Running" && !swRunning_ ) {
       swRunRetState_ = get("RunState");
       swRunEnable_   = true;
-      variables_["RunState"]->set("Running");
+      getVariable("RunState")->set("Running");
 
       // Setup run parameters
       swRunCount_ = getInt("RunCount");
@@ -292,10 +334,10 @@ void System::setRunState(string state) {
       //device->setRuncommand("command");
 
       // Start thread
-      if ( swRunCount_ > 0 && pthread_create(&swRunThread_,NULL,swRunStatic,this) ) {
+      if ( swRunCount_ == 0 || pthread_create(&swRunThread_,NULL,swRunStatic,this) ) {
          err << "System::startRun -> Failed to create runThread" << endl;
          if ( debug_ ) cout << err.str();
-         variables_["RunState"]->set(swRunRetState_);
+         getVariable("RunState")->set(swRunRetState_);
          throw(err.str());
       }
 
@@ -308,7 +350,7 @@ void System::setRunState(string state) {
             swRunEnable_ = false;
             err << "System::startRun -> Timeout waiting for runthread" << endl;
             if ( debug_ ) cout << err.str();
-            variables_["RunState"]->set(swRunRetState_);
+            getVariable("RunState")->set(swRunRetState_);
             throw(err.str());
          }
       }
@@ -321,6 +363,7 @@ void System::command ( string name, string arg ) {
    stringstream tmp;
    struct timespec stme;
    struct timespec etme;
+   time_t          ctme;
 
    clock_gettime(CLOCK_REALTIME,&stme);
 
@@ -346,7 +389,7 @@ void System::command ( string name, string arg ) {
          if ( debug_ ) cout << tmp.str();
          throw(tmp.str());
       }
-      os << "<system>" << endl << configString(true) << "</system>" << endl;
+      os << "<system>" << endl << configString(true,true) << "</system>" << endl;
       os.close();
    }
 
@@ -360,7 +403,7 @@ void System::command ( string name, string arg ) {
          if ( debug_ ) cout << tmp.str();
          throw(tmp.str());
       }
-      os << "<system>" << endl << statusString(true) << "</system>" << endl;
+      os << "<system>" << endl << statusString(true,true) << "</system>" << endl;
       os.close();
    }
 
@@ -373,27 +416,27 @@ void System::command ( string name, string arg ) {
          if ( debug_ ) cout << tmp.str();
          throw(tmp.str());
       }
-      os << "<system>" << structureString(true) << "</system>" << endl;
+      os << "<system>" << endl << structureString(true,true) << "</system>" << endl;
       os.close();
    }
 
    // Open data file
    else if ( name == "OpenDataFile" ) {
       command("CloseDataFile","");
-      commLink_->openDataFile(variables_["DataFile"]->get());
-      commLink_->addConfig(configString(true));
+      commLink_->openDataFile(getVariable("DataFile")->get());
+      commLink_->addConfig(configString(true,false));
       readStatus();
-      commLink_->addStatus(statusString(true));
-      variables_["DataOpen"]->set("True");
+      commLink_->addStatus(statusString(true,false));
+      getVariable("DataOpen")->set("True");
    }
 
    // Close data file
    else if ( name == "CloseDataFile" ) {
       if ( get("DataOpen") == "True" ) {
          readStatus();
-         commLink_->addStatus(statusString(true));
+         commLink_->addStatus(statusString(true,false));
          commLink_->closeDataFile();
-         variables_["DataOpen"]->set("False");
+         getVariable("DataOpen")->set("False");
       }
    }
 
@@ -430,10 +473,11 @@ void System::command ( string name, string arg ) {
 
    clock_gettime(CLOCK_REALTIME,&etme);
 
+   time(&ctme);
    if ( get("DebugCmdTime") == "True" ) {
       cout << "System::command -> Command " << name << " time results: " << endl
            << "   Start Time: " << dec << stme.tv_sec << "." << stme.tv_nsec << endl
-           << "     End Time: " << dec << etme.tv_sec << "." << etme.tv_nsec << endl;
+           << "     End Time: " << dec << etme.tv_sec << "." << etme.tv_nsec << " - " << ctime(&ctme);
    }
 }
 
@@ -446,13 +490,19 @@ bool System::parseXml ( string xml, bool force ) {
    string       err;
    string       stat;
    bool         configUpdate;
+   uint         num;
+   string       id;
+ 
+   // Generate a random number for xml string name;
+   num = rand(); 
+   id = num;
 
    stat = "";
    configUpdate = false;
    try {
 
       // Parse string
-      doc = xmlReadMemory(xml.c_str(), strlen(xml.c_str()), "string.xml", NULL, 0);
+      doc = xmlReadMemory(xml.c_str(), strlen(xml.c_str()), id.c_str(), NULL, 0);
       if (doc == NULL) {
          err = "System::parseXml -> Failed to parse string\n";
          if ( debug_ ) cout << err;
@@ -484,8 +534,6 @@ bool System::parseXml ( string xml, bool force ) {
 
    // Cleanup
    xmlFreeDoc(doc);
-   xmlCleanupParser();
-   xmlMemoryDump();
 
    if ( stat != "" ) throw(stat);
    return(configUpdate);
@@ -564,7 +612,7 @@ string System::localState () {
 }
 
 //! Method to return state string
-string System::poll () {
+string System::poll (ControlCmdMemory *cmem) {
    uint         curr;
    uint         rate;
    stringstream msg;
@@ -574,21 +622,10 @@ string System::poll () {
 
    time(&currTime);
 
-   // Update debug state
-   if ( debug_ == true && get("DebugEnable") == "False" ) {
-      cout << "System::writeConfig -> Name: " << name_ << " Disabling debug messages." << endl;
-      commLink_->setDebug(false);
-      setDebug(0);
-   }
-   else if ( debug_ == false && get("DebugEnable") == "True" ) {
-      cout << "System::writeConfig -> Name: " << name_ << " Enabling debug messages." << endl;
-      commLink_->setDebug(true);
-      setDebug(1);
-   }
-
    // Detect run stop
    if ( swRunEnable_ && !swRunning_ ) {
       swRunEnable_ = false;
+      pthread_join(swRunThread_,NULL);
       allStatusReq_ = true;
       if ( swRunError_ != "" ) {
          errorBuffer_.append("<error>");
@@ -622,17 +659,17 @@ string System::poll () {
    msg << configureMsg_;
    msg << "System is is in run state '" << get("RunState") << "'" << endl;
    msg << stateIn;
-   variables_["SystemState"]->set(msg.str());
+   getVariable("SystemState")->set(msg.str());
 
    // Once a second updates
    if ( currTime != lastTime_ ) {
       lastTime_ = currTime;
 
       // File counters
-      variables_["RegRxCount"]->setInt(commLink_->regRxCount());
-      variables_["TimeoutCount"]->setInt(commLink_->timeoutCount());
-      variables_["ErrorCount"]->setInt(commLink_->errorCount());
-      variables_["UnexpectedCount"]->setInt(commLink_->unexpectedCount());
+      getVariable("RegRxCount")->setInt(commLink_->regRxCount());
+      getVariable("TimeoutCount")->setInt(commLink_->timeoutCount());
+      getVariable("ErrorCount")->setInt(commLink_->errorCount());
+      getVariable("UnexpectedCount")->setInt(commLink_->unexpectedCount());
 
       curr = commLink_->dataFileCount();
       if ( curr < lastFileCount_ ) rate = 0;
@@ -640,7 +677,7 @@ string System::poll () {
       lastFileCount_ = curr;
       msg.str("");
       msg << dec << curr << " - " << dec << rate << " Hz";
-      variables_["DataFileCount"]->set(msg.str());
+      getVariable("DataFileCount")->set(msg.str());
    
       curr = commLink_->dataRxCount();
       if ( curr < lastDataCount_ ) rate = 0;
@@ -648,7 +685,7 @@ string System::poll () {
       lastDataCount_ = curr;
       msg.str("");
       msg << dec << curr << " - " << dec << rate << " Hz";
-      variables_["DataRxCount"]->set(msg.str());
+      getVariable("DataRxCount")->set(msg.str());
 
       // Top status once a second
       topStatusReq_ = true;
@@ -659,13 +696,24 @@ string System::poll () {
    msg.str("");
    msg << "<system>" << endl;
    if ( errorBuffer_ != "" ) { msg << errorBuffer_; send = true; }
-   if ( topStatusReq_ || allStatusReq_ ) { msg << statusString(false); send=true; }
-   if ( allConfigReq_ ) { msg << configString(false); send=true; }
+   if ( topStatusReq_ || allStatusReq_ ) { msg << statusString(false,false); send=true; }
+   if ( allConfigReq_ ) { msg << configString(false,false); send=true; }
    msg << "</system>" << endl;
 
    // Do we add configuration updates to file?
-   if ( allConfigReq_ ) commLink_->addConfig(configString(true));
-   if ( allStatusReq_ || allConfigReq_ ) commLink_->addStatus(statusString(true));
+   if ( allConfigReq_ ) commLink_->addConfig(configString(true,false));
+   if ( allStatusReq_ || allConfigReq_ ) commLink_->addStatus(statusString(true,false));
+
+   // Update shared memory
+   if ( cmem != NULL ) {
+      if ( errorBuffer_ != "" ) strcpy(controlErrorBuffer(cmem),errorBuffer_.c_str());
+      if ( topStatusReq_ || allStatusReq_ ) strcpy(controlXmlStatusBuffer(cmem), statusString(true,false).c_str());
+      if ( allConfigReq_ ) strcpy(controlXmlConfigBuffer(cmem), configString(true,false).c_str());
+      if ( topStatusReq_ || allStatusReq_ || allConfigReq_ ) {
+         strcpy(controlStatBuffer(cmem),get("SystemState").c_str());
+         strcpy(controlUserBuffer(cmem),get("UserStatus").c_str());
+      }
+   }
 
    // Clear send requests
    errorBuffer_ = "";
@@ -679,34 +727,72 @@ string System::poll () {
 }
 
 // Return status string
-string System::statusString(bool hidden) {
+string System::statusString(bool hidden, bool indent) {
    stringstream tmp;
    tmp.str("");
+   if ( indent ) tmp << "   ";
    tmp << "<status>" << endl;
-   tmp << getXmlStatus(true,hidden);
+   tmp << getXmlStatus(true,hidden,((indent)?2:0));
+   if ( indent ) tmp << "   ";
    tmp << "</status>" << endl;
    return(tmp.str());
 }
 
 // Return config string
-string System::configString(bool hidden) {
+string System::configString(bool hidden, bool indent) {
    stringstream tmp;
    tmp.str("");
+   if ( indent ) tmp << "   ";
    tmp << "<config>" << endl;
-   tmp << getXmlConfig(true,true,hidden);  // Common
-   tmp << getXmlConfig(true,false,hidden); // Per-Instance
+   tmp << getXmlConfig(true,true,hidden,((indent)?2:0));  // Common
+   tmp << getXmlConfig(true,false,hidden,((indent)?2:0)); // Per-Instance
+   if ( indent ) tmp << "   ";
    tmp << "</config>" << endl;
    return(tmp.str());
 }
 
 // Return structure string
-string System::structureString (bool hidden) {
+string System::structureString (bool hidden, bool indent) {
    stringstream tmp;
    tmp.str("");
+   if ( indent ) tmp << "   ";
    tmp << "<structure>" << endl;
-   tmp << getXmlStructure(true,true,hidden);  // General
-   tmp << getXmlStructure(true,false,hidden); // Per-Instance
+   tmp << getXmlStructure(true,true,hidden,((indent)?2:0));  // General
+   tmp << getXmlStructure(true,false,hidden,((indent)?2:0)); // Per-Instance
+   if ( indent ) tmp << "   ";
    tmp << "</structure>" << endl;
    return(tmp.str());
+}
+
+// Method to write configuration registers
+void System::writeConfig ( bool force ) {
+   
+   // Update debug
+   setDebug(getVariable("DebugEnable")->getInt());
+   commLink_->setDebug(getVariable("DebugEnable")->getInt());
+
+   Device::writeConfig(force);
+}
+
+// Set debug flag
+void System::setDebug( bool enable ) {
+   if ( enable && !debug_ ) cout << "System::setDebug -> Name: " << name_ << " Enabling debug messages." << endl;
+   if ( debug_ && !enable ) cout << "System::setDebug -> Name: " << name_ << " Disabling debug messages." << endl;
+
+   getVariable("DebugEnable")->setInt(enable);
+   Device::setDebug(enable);
+}
+
+// Generate timestamp from passed time value
+string System::genTime( time_t tme ) {
+   char   tstr[200];
+   struct tm *timeinfo;
+   string ret;
+
+   timeinfo = localtime(&tme);
+
+   strftime(tstr,200,"%Y_%m_%d_%H_%M_%S",timeinfo);
+   ret = tstr;
+   return(ret); 
 }
 

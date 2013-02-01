@@ -36,6 +36,8 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    double       res;
    double       volt;
    unsigned int idx;
+   unsigned int hyb, apv;
+   stringstream regName;
 
    // Fill temperature lookup table
    temp = minTemp_;
@@ -57,7 +59,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    thold_ = NULL;
    filt_  = NULL;
 
-   variables_["enabled"]->set("False");
+   variables_["Enabled"]->set("False");
 
    // Create Registers: name, address
    addRegister(new Register("Version",         0x01000000));
@@ -82,10 +84,22 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("FrameDelayB",     0x01000031));
    addRegister(new Register("AdcClkDelay",     0x01000032));
    addRegister(new Register("SyncData",        0x01000040, 15));
+   addRegister(new Register("TrigEdgeNeg",     0x01000050));
    addRegister(new Register("ThresholdA",      0x01200000, 640)); // Hybrid 0
    addRegister(new Register("ThresholdB",      0x01200400, 640)); // Hybrid 1
    addRegister(new Register("ThresholdC",      0x01200800, 640)); // Hybrid 2
-   addRegister(new Register("FilterCoef",      0x01300000, 32));
+
+   for ( hyb = 0; hyb < 3; hyb++ ) {
+      for ( apv = 0; apv < 5; apv++ ) {
+         regName.str("");
+         regName << "FilterLd" << dec << hyb << apv;
+         addRegister(new Register(regName.str(), 0x01300000 + (hyb*5+apv)*2));
+
+         regName.str("");
+         regName << "FilterWr" << dec << hyb << apv;
+         addRegister(new Register(regName.str(), 0x01300001 + (hyb*5+apv)*2));
+      }
+   }
 
    // Setup variables
    addVariable(new Variable("FpgaVersion", Variable::Status));
@@ -102,6 +116,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addVariable(new Variable("AdcClkInvert", Variable::Configuration));
    variables_["AdcClkInvert"]->setDescription("Invert ADC clock");
    variables_["AdcClkInvert"]->setTrueFalse();
+   variables_["AdcClkInvert"]->setPerInstance(true);
 
    addVariable(new Variable("TisClkEn",Variable::Configuration));
    variables_["TisClkEn"]->setDescription("TIS Clock Enable");
@@ -118,12 +133,13 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addVariable(new Variable("ApvTrigType", Variable::Configuration));
    variables_["ApvTrigType"]->setDescription("Set APV trigger type. Double or single.");
    vector<string> trigTypes;
-   trigTypes.resize(5);
+   trigTypes.resize(6);
    trigTypes[0] = "Test";
    trigTypes[1] = "SingleTrig";
    trigTypes[2] = "DoubleTrig";
    trigTypes[3] = "SingleCalib";
    trigTypes[4] = "DoubleCalib";
+   trigTypes[5] = "SyncRead";
    variables_["ApvTrigType"]->setEnums(trigTypes);
 
    addVariable(new Variable("ApvTrigSource", Variable::Configuration));
@@ -262,6 +278,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    variables_["AdcClkDelay"]->setDescription("ADC Output Clock Delay.");
    variables_["AdcClkDelay"]->setRange(0,63);
    variables_["AdcClkDelay"]->setComp(0,78,0,"pS");
+   variables_["AdcClkDelay"]->setPerInstance(true);
 
    addVariable(new Variable("Temp_0_0", Variable::Status));
    variables_["Temp_0_0"]->setDescription("Hybrid 0, Temp 0");
@@ -347,6 +364,10 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addVariable(new Variable("NewRegisters", Variable::Configuration));
    variables_["NewRegisters"]->setDescription("Enable new registers");
    variables_["NewRegisters"]->setTrueFalse();
+
+   addVariable(new Variable("TrigEdgeNeg", Variable::Configuration));
+   variables_["TrigEdgeNeg"]->setDescription("Trigger Edge Negative");
+   variables_["TrigEdgeNeg"]->setTrueFalse();
 
    // Commands
    addCommand(new Command("ApvSWTrig",0x0));
@@ -447,6 +468,11 @@ void CntrlFpga::readTemps ( ) {
          variables_[name.str()]->set(txt.str());
       }
    }
+
+   readRegister(registers_["ApvSyncStatus"]);
+   variables_["ApvSyncDetect"]->setInt(registers_["ApvSyncStatus"]->get(0,0x7FFF));
+   variables_["FramePolA"]->setInt(registers_["ApvSyncStatus"]->get(16,0x1));
+   variables_["FramePolB"]->setInt(registers_["ApvSyncStatus"]->get(17,0x1));
 }
 
 // Method to read status registers and update variables
@@ -462,11 +488,6 @@ void CntrlFpga::readStatus ( ) {
 
    readRegister(registers_["Version"]);
    variables_["FpgaVersion"]->setInt(registers_["Version"]->get());
-
-   readRegister(registers_["ApvSyncStatus"]);
-   variables_["ApvSyncDetect"]->setInt(registers_["ApvSyncStatus"]->get(0,0x7FFF));
-   variables_["FramePolA"]->setInt(registers_["ApvSyncStatus"]->get(16,0x1));
-   variables_["FramePolB"]->setInt(registers_["ApvSyncStatus"]->get(17,0x1));
 
    readTemps();
 
@@ -612,6 +633,9 @@ void CntrlFpga::readConfig ( ) {
    readRegister(registers_["TempPollPer"]);
    variables_["TempPollPer"]->setInt(registers_["TempPollPer"]->get());
 
+   readRegister(registers_["TrigEdgeNeg"]);
+   variables_["TrigEdgeNeg"]->setInt(registers_["TrigEdgeNeg"]->get());
+
    readRegister(registers_["InputDelay"]);
    variables_["InputDelayA"]->setInt(registers_["InputDelay"]->getIndex(0));
    variables_["InputDelayB"]->setInt(registers_["InputDelay"]->getIndex(1));
@@ -646,8 +670,29 @@ void CntrlFpga::readConfig ( ) {
    REGISTER_UNLOCK
 }
 
+// Coefficant order lookup. Pass order index, returns coef to load at that position
+uint CntrlFpga::coefOrder  ( uint  idxIn) {
+   switch (idxIn) {
+      case 0:  return(0); break;
+      case 1:  return(5); break;
+      case 2:  return(1); break;
+      case 3:  return(6); break;
+      case 4:  return(2); break;
+      case 5:  return(7); break;
+      case 6:  return(3); break;
+      case 7:  return(8); break;
+      case 8:  return(4); break;
+      case 9:  return(9); break;
+      default: return(0); break;
+   }
+}
+
 // Method to write configuration registers
 void CntrlFpga::writeConfig ( bool force ) {
+   stringstream regName;
+   uint hyb, apv, coef;
+   uint coefVal;
+
    REGISTER_LOCK
 
    registers_["ClockSelect"]->set(variables_["ClockSelect"]->getInt(),0,0x1);
@@ -704,6 +749,28 @@ void CntrlFpga::writeConfig ( bool force ) {
    registers_["TholdEnable"]->set(variables_["TholdEnable"]->getInt(),0,0x1);
    writeRegister(registers_["TholdEnable"],force);
 
+   registers_["TrigEdgeNeg"]->set(variables_["TrigEdgeNeg"]->getInt(),0,0x1);
+   writeRegister(registers_["TrigEdgeNeg"],force);
+
+
+
+
+
+
+
+/*
+
+   //if ( index_ != 0 ) {
+      for (hyb=0; hyb < 3; hyb++) {
+         for (apv=0; apv < 5; apv++) {
+            for (chan=0; chan < 128; chan++) {
+               thold_->threshData[index_][hyb][apv][chan] = 0x0370;
+            }
+         }
+      }
+   //}
+*/
+
    // Threshold data
    if ( thold_ != NULL ) {
 
@@ -731,19 +798,31 @@ void CntrlFpga::writeConfig ( bool force ) {
       }
    }
 
-   // Filter data
-   if ( filt_ != NULL ) {
- 
-      // Convert and load filter data here
+   // debug_ = true;
 
+   // Filter data when force = true
+   if ( filt_ != NULL && force ) {
+      for ( hyb=0; hyb < 3; hyb++) {
+         for ( apv=0; apv<5; apv++) {
+         
+            // Start reload 
+            regName.str("");
+            regName << "FilterLd" << dec << hyb << apv;
+            writeRegister(registers_[regName.str()],true);
 
+            // Each coef, scale factor = 2, total bits = 16, fractional bits = 14, signed
+            for ( coef = 0; coef < 10; coef++ ) {
+               coefVal = (unsigned int)(((filt_->filterData[index_][hyb][apv][coefOrder(coef)]) / 2.0) * (double)pow(2,15));
 
-
-
-
-
-
+               regName.str("");
+               regName << "FilterWr" << dec << hyb << apv;
+               registers_[regName.str()]->set(coefVal);
+               writeRegister(registers_[regName.str()],true);
+            }
+         }
+      }
    }
+   // debug_ = false;
 
    // Sub devices
    Device::writeConfig(force);
@@ -759,7 +838,7 @@ void CntrlFpga::verifyConfig ( ) {
    verifyRegister(registers_["ApvTrigSrcType"]);
    verifyRegister(registers_["ApvTrigGenPause"]);
    verifyRegister(registers_["CalDelay"]);
-   //verifyRegister(registers_["ClockSelect"]);
+   verifyRegister(registers_["ClockSelect"]);
    verifyRegister(registers_["TempPollPer"]);
    verifyRegister(registers_["InputDelay"]);
    verifyRegister(registers_["FrameDelayA"]);
@@ -769,6 +848,7 @@ void CntrlFpga::verifyConfig ( ) {
    verifyRegister(registers_["ThresholdA"]);
    verifyRegister(registers_["ThresholdB"]);
    verifyRegister(registers_["ThresholdC"]);
+   verifyRegister(registers_["TrigEdgeNeg"]);
 
    Device::verifyConfig();
    REGISTER_UNLOCK
@@ -781,5 +861,5 @@ void CntrlFpga::setThreshold (Threshold *thold) {
 
 //! Set Filter data pointer
 void CntrlFpga::setFilter (Filter *filt) {
-   filt_ = filt_;
+   filt_ = filt;
 }

@@ -37,7 +37,7 @@ ApvMux::ApvMux ( uint destination, uint baseAddress, Device *parent ) :
    addVariable(new Variable("Resistor", Variable::Configuration));
    variables_["Resistor"]->setDescription("Resistor Data.");
 
-   variables_["enabled"]->set("False");
+   variables_["Enabled"]->set("False");
 
 }
 

@@ -31,7 +31,7 @@ void Device::writeRegister ( Register *reg, bool force, bool wait ) {
    stringstream msg;
    msg.str("");
 
-   if ( getInt("enabled") == 0 || ( (!reg->stale()) && (!force) )) return;
+   if ( getInt("Enabled") == 0 || ( (!reg->stale()) && (!force) )) return;
 
    // Call function to set register value
    system_->commLink()->queueRegister(destination_,reg,true,wait);
@@ -47,7 +47,10 @@ void Device::writeRegister ( Register *reg, bool force, bool wait ) {
 
    if ( debug_ ) cout << msg.str();
 
-   if ( reg->status() != 0 ) throw(msg.str());
+   if ( reg->status() != 0 ) {
+      cout << msg.str() << endl;
+      throw(msg.str());
+   }
 }
 
 // Read register
@@ -55,7 +58,7 @@ void Device::readRegister ( Register *reg ) {
    stringstream msg;
    msg.str("");
 
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
    // Call function to get register value
    system_->commLink()->queueRegister(destination_,reg,false,true);
@@ -71,18 +74,21 @@ void Device::readRegister ( Register *reg ) {
 
    if ( debug_ ) cout << msg.str();
 
-   if ( reg->status() != 0 ) throw(msg.str());
+   if ( reg->status() != 0 ) {
+      cout << msg.str() << endl;
+      throw(msg.str());
+   }
 }
 
 // Verify register
-void Device::verifyRegister ( Register *reg ) {
+void Device::verifyRegister ( Register *reg, bool warnOnly ) {
    stringstream msg;
    Register     *temp;
    bool         match;
    uint         x;
    bool         err;
 
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
    // Cal function to read register value
    temp = new Register(reg);
@@ -126,7 +132,10 @@ void Device::verifyRegister ( Register *reg ) {
    delete temp;
 
    // throw message on error or verify failure
-   if ( err || (!match) ) throw(msg.str());
+   if ( err || (!match) ) {
+      cout << msg.str() << endl;
+      if ( !warnOnly ) throw(msg.str());
+   }
 }
 
 // to set variable values from xml tree
@@ -200,13 +209,14 @@ bool Device::setXmlConfig( xmlNode *node ) {
 }
 
 // Method to return variables in xml string
-string Device::getXmlConfig(bool top, bool common, bool hidden) {
+string Device::getXmlConfig(bool top, bool common, bool hidden, uint level) {
    DeviceMap::iterator    devMapIter;
    DeviceVector           *dev;
    DeviceVector::iterator devIter;
    stringstream           loc;
    stringstream           tmp;
    VariableMap::iterator  varIter;
+   uint                   locLevel = level;;
 
    loc.str("");
    tmp.str("");
@@ -216,6 +226,10 @@ string Device::getXmlConfig(bool top, bool common, bool hidden) {
 
    // Start device tag if not top level
    if ( !top ) {
+      if ( level != 0 ) {
+         for (uint l=0; l < (level*3); l++) loc << " ";
+         locLevel++;
+      }
       loc << "<" << name_;
       if ( ! common ) loc << " index=\"" << dec << index_ << "\"";
       loc << ">" << endl;
@@ -227,6 +241,7 @@ string Device::getXmlConfig(bool top, bool common, bool hidden) {
       // Return all config variables at the top, return variables based upon the hidden variable at other levels
       if ( varIter->second->type() != Variable::Status && ((!varIter->second->hidden()) || top || hidden )) {
          if ( common == true || varIter->second->perInstance() ) {
+            if ( locLevel != 0 ) for (uint l=0; l < (locLevel*3); l++) tmp << " ";
             tmp << "<" << varIter->first << ">";
             tmp << varIter->second->get();
             tmp << "</" << varIter->first << ">" << endl;
@@ -240,13 +255,16 @@ string Device::getXmlConfig(bool top, bool common, bool hidden) {
 
       // Device entries
       for ( devIter = dev->begin(); devIter != dev->end(); devIter++ ) {
-         tmp << (*devIter)->getXmlConfig(false,common,hidden);
+         tmp << (*devIter)->getXmlConfig(false,common,hidden,locLevel);
       }
    }
 
    // End device tag
    loc << tmp.str();
-   if ( !top ) loc << "</" << name_ << ">" << endl;
+   if ( !top ) {
+      if ( level != 0 ) for (uint l=0; l < (level*3); l++) loc << " ";
+      loc << "</" << name_ << ">" << endl;
+   }
 
    // Return empty string if there where no local variables
    if ( tmp.str() != "" ) return(loc.str());
@@ -254,25 +272,33 @@ string Device::getXmlConfig(bool top, bool common, bool hidden) {
 }
 
 // Method to return status in xml string
-string Device::getXmlStatus(bool top, bool hidden) {
+string Device::getXmlStatus(bool top, bool hidden, uint level) {
    DeviceMap::iterator    devMapIter;
    DeviceVector           *dev;
    DeviceVector::iterator devIter;
    stringstream           tmp;
    stringstream           loc;
    VariableMap::iterator  varIter;
+   uint                   locLevel = level;
 
    loc.str("");
    tmp.str("");
 
    // Start device tag if not top level
-   if (!top ) loc << "<" << name_ << " index=\"" << dec << index_ << "\">" << endl;
+   if (!top ) {
+      if ( level != 0 ) {
+         for (uint l=0; l < (level*3); l++) loc << " ";
+         locLevel++;
+      }
+      loc << "<" << name_ << " index=\"" << dec << index_ << "\">" << endl;
+   }
 
    // Each local variable
    for (varIter=variables_.begin(); varIter != variables_.end(); ++varIter) {
 
       // Return all status variables at the top, other levels depends on hidden flag
       if ( varIter->second->type() == Variable::Status && (!varIter->second->hidden() || top || hidden )) {
+         if ( locLevel != 0 ) for (uint l=0; l < (locLevel*3); l++) tmp << " ";
          tmp << "<" << varIter->first << ">";
          tmp << varIter->second->get();
          tmp << "</" << varIter->first << ">" << endl;
@@ -285,13 +311,16 @@ string Device::getXmlStatus(bool top, bool hidden) {
 
       // Device entries
       for ( devIter = dev->begin(); devIter != dev->end(); devIter++ ) {
-         tmp << (*devIter)->getXmlStatus(false,hidden);
+         tmp << (*devIter)->getXmlStatus(false,hidden,locLevel);
       }
    }
 
    // End device tag
    loc << tmp.str();
-   if (!top ) loc << "</" << name_ << ">" << endl;
+   if (!top ) {
+      if ( level != 0 ) for (uint l=0; l < (level*3); l++) loc << " ";
+      loc << "</" << name_ << ">" << endl;
+   }
 
    // Return empty string if there where no local entries
    if ( tmp.str() != "" ) return(loc.str());
@@ -352,7 +381,7 @@ void Device::execXmlCommand ( xmlNode *node ) {
 }
 
 // Method to get device structure in xml form.
-string Device::getXmlStructure (bool top, bool common, bool hidden) {
+string Device::getXmlStructure (bool top, bool common, bool hidden, uint level) {
    DeviceMap::iterator    devMapIter;
    DeviceVector           *dev;
    DeviceVector::iterator devIter;
@@ -360,6 +389,7 @@ string Device::getXmlStructure (bool top, bool common, bool hidden) {
    stringstream           loc;
    VariableMap::iterator  varIter;
    CommandMap::iterator   cmdIter;
+   uint                   locLevel = level;
 
    tmp.str("");
    loc.str("");
@@ -369,14 +399,25 @@ string Device::getXmlStructure (bool top, bool common, bool hidden) {
 
    // Start device tag, don't include for the top level device
    if ( !top ) {
+      if ( level != 0 ) {
+         for (uint l=0; l < (level*3); l++) loc << " ";
+         locLevel++;
+      }
       loc << "<device>" << endl;
-      if ( ! common ) loc << "<index>" << index_ << "</index>" << endl;
+      if ( ! common ) {
+         if ( level != 0 ) for (uint l=0; l < (level*3); l++) loc << " ";
+         loc << "<index>" << index_ << "</index>" << endl;
+      }
    }
 
    // Return name and description for top level only when in common mode
    if ( common || !top ) {
+      if ( locLevel != 0 ) for (uint l=0; l < (locLevel*3); l++) tmp << " ";
       tmp << "<name>" << name_ << "</name>" << endl;
-      if ( desc_ != "" ) tmp << "<description>" << desc_ << "</description>" << endl;
+      if ( desc_ != "" ) {
+         if ( locLevel != 0 ) for (uint l=0; l < (locLevel*3); l++) tmp << " ";
+         tmp << "<description>" << desc_ << "</description>" << endl;
+      }
    }
 
    // Variables, common or specific
@@ -385,7 +426,7 @@ string Device::getXmlStructure (bool top, bool common, bool hidden) {
 
       // Each local variable
       for (varIter=variables_.begin(); varIter != variables_.end(); ++varIter) 
-         if ( common != varIter->second->perInstance() ) tmp << varIter->second->getXmlStructure(hidden||top);
+         if ( common != varIter->second->perInstance() ) tmp << varIter->second->getXmlStructure(hidden||top,locLevel);
 
    }
 
@@ -395,8 +436,7 @@ string Device::getXmlStructure (bool top, bool common, bool hidden) {
 
       // Each local command
       for (cmdIter=commands_.begin(); cmdIter != commands_.end(); ++cmdIter) 
-         tmp << cmdIter->second->getXmlStructure(hidden||top);
-
+         tmp << cmdIter->second->getXmlStructure(hidden||top,locLevel);
    }
 
    // Sub devices
@@ -408,14 +448,17 @@ string Device::getXmlStructure (bool top, bool common, bool hidden) {
 
          // Device entries
          for ( devIter = dev->begin(); devIter != dev->end(); devIter++ ) {
-            tmp << (*devIter)->getXmlStructure(false,common,hidden);
+            tmp << (*devIter)->getXmlStructure(false,common,hidden,locLevel);
          }
       }
    }
 
    // End device tag
    loc << tmp.str();
-   if (!top) loc << "</device>" << endl;
+   if (!top) {
+      if ( level != 0 ) for (uint l=0; l < (level*3); l++) loc << " ";
+      loc << "</device>" << endl;
+   }
 
    // Return empty string if there where not local entries
    if ( tmp.str() != "" ) return(loc.str());
@@ -439,11 +482,11 @@ Device::Device ( uint destination, uint baseAddress, string name, uint index, De
    commands_.clear();
 
    // Add variable for enable, enable by default
-   addVariable(new Variable("enabled",Variable::Configuration));
-   variables_["enabled"]->setPerInstance(true);
-   variables_["enabled"]->setDescription("Set to true to enable device for physical access");
-   variables_["enabled"]->setTrueFalse();
-   variables_["enabled"]->set("True");
+   addVariable(new Variable("Enabled",Variable::Configuration));
+   getVariable("Enabled")->setPerInstance(true);
+   getVariable("Enabled")->setDescription("Set to true to enable device for physical access");
+   getVariable("Enabled")->setTrueFalse();
+   getVariable("Enabled")->set("True");
 
    // Parent and top level
    parent_ = parent;
@@ -529,6 +572,63 @@ void Device::addCommand(Command *cmd) {
    commands_.insert(pair<string,Command*>(cmd->name(),cmd));
 }
 
+// Return register, throws exception when not found
+Register *Device::getRegister(string name) {
+   RegisterMap::iterator regMapIter;
+   stringstream          err;
+
+   // Look for register
+   regMapIter = registers_.find(name);
+
+   // Register was not found
+   if ( regMapIter == registers_.end() ) {
+      err.str("");
+      err << "Device::getRegister -> Name: " << name_ << " Index: " << dec << index_;
+      err << ", Invalid Register: " << name << endl;
+      if ( debug_ ) cout << err.str();
+      throw(err.str());
+   }
+   return(regMapIter->second);
+}
+
+// Return variable, throw exception when not found
+Variable *Device::getVariable(string name) {
+   VariableMap::iterator varMapIter;
+   stringstream          err;
+
+   // Look for variable
+   varMapIter = variables_.find(name);
+
+   // Variable was not found
+   if ( varMapIter == variables_.end() ) {
+      err.str("");
+      err << "Device::getVariable -> Name: " << name_ << " Index: " << dec << index_;
+      err << ", Invalid Variable: " << name << endl;
+      if ( debug_ ) cout << err.str();
+      throw(err.str());
+   }
+   return(varMapIter->second);
+}
+
+// Return command, throw exception when not found
+Command *Device::getCommand(string name) {
+   CommandMap::iterator cmdMapIter;
+   stringstream         err;
+
+   // Look for command
+   cmdMapIter = commands_.find(name);
+
+   // Command was not found
+   if ( cmdMapIter == commands_.end() ) {
+      err.str("");
+      err << "Device::getCommand -> Name: " << name_ << " Index: " << dec << index_;
+      err << ", Invalid Command: " << name << endl;
+      if ( debug_ ) cout << err.str();
+      throw(err.str());
+   }
+   return(cmdMapIter->second);
+}
+
 // Get name
 string Device::name() { return(name_); }
 
@@ -575,25 +675,13 @@ Device * Device::device ( string name, uint index ) {
 
 // Method to process a command
 void Device::command ( string name, string arg ) {
-   CommandMap::iterator cmdMapIter;
    Command       *cmd;
    stringstream  tmp;
 
    // Device is not enabled
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
-   // Find command
-   cmdMapIter = commands_.find(name);
-
-   // Command was not found
-   if ( cmdMapIter == commands_.end() ) {
-      tmp.str("");
-      tmp << "Device::command -> Name: " << name_ << " Index: " << dec << index_;
-      tmp << ", Invalid Command: " << name << endl;
-      if ( debug_ ) cout << tmp.str();
-      throw(tmp.str());
-   }
-   else cmd = cmdMapIter->second;
+   cmd = getCommand(name);
 
    // Command is not internal
    if ( !cmd->internal() ) {
@@ -610,25 +698,13 @@ void Device::command ( string name, string arg ) {
 
 // Method to set run command
 void Device::setRunCommand ( string name ) {
-   CommandMap::iterator cmdMapIter;
    Command       *cmd;
    stringstream  tmp;
 
    // Device is not enabled
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
-   // Find command
-   cmdMapIter = commands_.find(name);
-
-   // Command was not found
-   if ( cmdMapIter == commands_.end() ) {
-      tmp.str("");
-      tmp << "Device::setRuncommand -> Name: " << name_ << " Index: " << dec << index_;
-      tmp << ", Invalid Command: " << name << endl;
-      if ( debug_ ) cout << tmp.str();
-      throw(tmp.str());
-   }
-   else cmd = cmdMapIter->second;
+   cmd = getCommand(name);
 
    if ( debug_ ) {
       cout << "Device::setRuncommand -> Name: " << name_ << " Index: " << dec << index_
@@ -641,23 +717,11 @@ void Device::setRunCommand ( string name ) {
 
 // Method to set variable
 void Device::set ( string variable, string value ) {
-   VariableMap::iterator varMapIter;
    Variable              *var;
-   stringstream          err;
 
-   // Look for variable
-   varMapIter = variables_.find(variable);
-
-   // Variable was not found
-   if ( varMapIter == variables_.end() ) {
-      err.str("");
-      err << "Device::set -> Name: " << name_ << " Index: " << dec << index_;
-      err << ", Invalid Variable: " << variable << endl;
-      if ( debug_ ) cout << err.str();
-      //throw(err.str());
-      return;
-   }
-   else var = varMapIter->second;
+   try {
+      var = getVariable(variable);
+   } catch ( string error ) { return; } 
 
    if ( var->type() != Variable::Configuration ) return;
 
@@ -670,46 +734,22 @@ void Device::set ( string variable, string value ) {
 
 // Method to get variable
 string Device::get ( string variable ) {
-   VariableMap::iterator varMapIter;
    Variable              *var;
-   stringstream          err;
 
-   // Look for variable
-   varMapIter = variables_.find(variable);
-
-   // Variable was not found
-   if ( varMapIter == variables_.end() ) {
-      err.str("");
-      err << "Device::get -> Name: " << name_ << " Index: " << dec << index_
-          << ", Invalid Variable: " << variable << endl;
-      if ( debug_ ) cout << err.str();
-      //throw(err.str());
-      return("");
-   }
-   var = varMapIter->second;
+   try {
+      var = getVariable(variable);
+   } catch ( string error ) { return ""; } 
 
    return(var->get());
 }
 
 // Method to set variable
 void Device::setInt ( string variable, uint value ) {
-   VariableMap::iterator varMapIter;
    Variable              *var;
-   stringstream          err;
 
-   // Look for variable
-   varMapIter = variables_.find(variable);
-
-   // Variable was not found
-   if ( varMapIter == variables_.end() ) {
-      err.str("");
-      err << "Device::setInt -> Name: " << name_ << " Index: " << dec << index_;
-      err << ", Invalid Variable: " << variable << endl;
-      if ( debug_ ) cout << err.str();
-      //throw(err.str());
-      return;
-   }
-   var = varMapIter->second;
+   try {
+      var = getVariable(variable);
+   } catch ( string error ) { return; } 
 
    if ( var->type() != Variable::Configuration ) return;
 
@@ -722,23 +762,11 @@ void Device::setInt ( string variable, uint value ) {
 
 // Method to get variable
 uint Device::getInt ( string variable ) {
-   VariableMap::iterator varMapIter;
    Variable              *var;
-   stringstream          err;
 
-   // Look for variable
-   varMapIter = variables_.find(variable);
-
-   // Variable was not found
-   if ( varMapIter == variables_.end() ) {
-      err.str("");
-      err << "Device::getInt -> Name: " << name_ << " Index: " << dec << index_;
-      err << ", Invalid Variable: " << variable << endl;
-      if ( debug_ ) cout << err.str();
-      //throw(err.str());
-      return(0xFFFFFFFF);
-   }
-   var = varMapIter->second;
+   try {
+      var = getVariable(variable);
+   } catch ( string error ) { return 0; } 
 
    return(var->getInt());
 }
@@ -747,6 +775,8 @@ uint Device::getInt ( string variable ) {
 uint Device::readSingle ( string name ) {
    RegisterMap::iterator regMapIter;
    stringstream          err;
+
+   REGISTER_LOCK
 
    // Find command
    regMapIter = registers_.find(name);
@@ -759,8 +789,6 @@ uint Device::readSingle ( string name ) {
       if ( debug_ ) cout << err.str() << endl;
       throw(err.str());
    }
-
-   REGISTER_LOCK
 
    // Read register
    readRegister(regMapIter->second);
@@ -775,6 +803,8 @@ void Device::writeSingle ( string name, uint value ) {
    RegisterMap::iterator regMapIter;
    stringstream          err;
 
+   REGISTER_LOCK
+
    // Find register
    regMapIter = registers_.find(name);
 
@@ -786,8 +816,6 @@ void Device::writeSingle ( string name, uint value ) {
       if ( debug_ ) cout << err << endl;
       throw(err.str());
    }
-
-   REGISTER_LOCK
 
    // Set value
    regMapIter->second->set(value);
@@ -806,7 +834,7 @@ void Device::readStatus( ) {
    RegisterMap::iterator  regMapIter;
 
    // Device is not enabled
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
    // Debug
    if ( debug_ && devices_.size() > 0 ) {
@@ -832,7 +860,7 @@ void Device::readConfig ( ) {
    RegisterMap::iterator  regMapIter;
 
    // Device is not enabled
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
    // Debug
    if ( debug_ && devices_.size() > 0 ) {
@@ -858,7 +886,7 @@ void Device::writeConfig ( bool force ) {
    RegisterMap::iterator  regMapIter;
 
    // Device is not enabled
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
    // Debug
    if ( debug_ && devices_.size() > 0 ) {
@@ -884,7 +912,7 @@ void Device::verifyConfig( ) {
    RegisterMap::iterator  regMapIter;
 
    // Device is not enabled
-   if ( getInt("enabled") == 0 ) return;
+   if ( getInt("Enabled") == 0 ) return;
 
    // Get each sub device
    for ( devMapIter = devices_.begin(); devMapIter != devices_.end(); devMapIter++ ) {

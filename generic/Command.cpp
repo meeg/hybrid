@@ -53,17 +53,34 @@ string Command::name () { return(name_); }
 uint Command::opCode () { return(opCode_); }
 
 // Method to get variable information in xml form.
-string Command::getXmlStructure (bool hidden) {
+string Command::getXmlStructure (bool hidden, uint level) {
    stringstream           tmp;
 
    if ( isHidden_ && !hidden ) return(string(""));
 
    tmp.str("");
+   if ( level != 0 ) for (uint l=0; l < (level*3); l++) tmp << " ";
    tmp << "<command>" << endl;
+
+   if ( level != 0 ) for (uint l=0; l < ((level*3)+3); l++) tmp << " ";
    tmp << "<name>" << name_ << "</name>" << endl;
-   if ( desc_ != "" ) tmp << "<description>" << desc_ << "</description>" << endl;
-   if ( isHidden_ ) tmp << "<hidden/>" << endl;
-   if ( hasArg_ ) tmp << "<hasArg/>" << endl;
+
+   if ( desc_ != "" ) {
+      if ( level != 0 ) for (uint l=0; l < ((level*3)+3); l++) tmp << " ";
+      tmp << "<description>" << desc_ << "</description>" << endl;
+   }
+
+   if ( isHidden_ ) {
+      if ( level != 0 ) for (uint l=0; l < ((level*3)+3); l++) tmp << " ";
+      tmp << "<hidden/>" << endl;
+   }
+
+   if ( hasArg_ ) {
+      if ( level != 0 ) for (uint l=0; l < ((level*3)+3); l++) tmp << " ";
+      tmp << "<hasArg/>" << endl;
+   }
+
+   if ( level != 0 ) for (uint l=0; l < (level*3); l++) tmp << " ";
    tmp << "</command>" << endl;
    return(tmp.str());
 }

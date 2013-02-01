@@ -20,50 +20,82 @@
 #include <fcntl.h>   
 #include <string.h>   
 #include <unistd.h>
+#include <stdio.h>
 
-#define CONTROL_CMD_SIZE   10240
-#define CONTROL_CMD_FILE   "/control_cmd.shared"
+#define CONTROL_CMD_SIZE      10240
+#define CONTROL_CMD_XML_SIZE  1048576
+#define CONTROL_CMD_NAME_SIZE 200
 
 typedef struct {
 
    // Command control
-   unsigned int cmdRdyCount;
-   unsigned int cmdAckCount;
+   char         cmdRdyCount;
+   char         cmdAckCount;
    char         cmdBuffer[CONTROL_CMD_SIZE];
+   char         errorBuffer[CONTROL_CMD_SIZE];
    char         statBuffer[CONTROL_CMD_SIZE];
    char         userBuffer[CONTROL_CMD_SIZE];
+   char         xmlStatusBuffer[CONTROL_CMD_XML_SIZE];
+   char         xmlConfigBuffer[CONTROL_CMD_XML_SIZE];
+   char         sharedName[CONTROL_CMD_NAME_SIZE];
 
 } ControlCmdMemory;
 
 // Open and map shared memory
-inline int controlCmdOpenAndMap ( ControlCmdMemory **ptr ) {
-   int smemFd;
+inline int controlCmdOpenAndMap ( ControlCmdMemory **ptr, const char *system, unsigned int id ) {
+   int           smemFd;
+   char          shmName[200];
 
-   // Open shared memory
-   smemFd = shm_open(CONTROL_CMD_FILE, (O_CREAT | O_RDWR), (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+   // Generate shared memory
+   sprintf(shmName,"control_cmd.%i.%s.%i",getuid(),system,id);
 
-   // Failed to open shred memory
-   if ( smemFd < 0 ) return(-1);
-  
-   // Force permissions regardless of umask
-   fchmod(smemFd, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
- 
-   // Set the size of the shared memory segment
-   ftruncate(smemFd, sizeof(ControlCmdMemory));
+   // Attempt to open existing shared memory
+   if ( (smemFd = shm_open(shmName, O_RDWR, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) ) < 0 ) {
+
+      // Otherwise open and create shared memory
+      if ( (smemFd = shm_open(shmName, (O_CREAT | O_RDWR), (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) ) < 0 ) return(-1);
+
+      // Force permissions regardless of umask
+      fchmod(smemFd, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
+    
+      // Set the size of the shared memory segment
+      ftruncate(smemFd, sizeof(ControlCmdMemory));
+   }
 
    // Map the shared memory
    if((*ptr = (ControlCmdMemory *)mmap(0, sizeof(ControlCmdMemory),
               (PROT_READ | PROT_WRITE), MAP_SHARED, smemFd, 0)) == MAP_FAILED) return(-2);
 
+   // Store name
+   strcpy((*ptr)->sharedName,shmName);
+
    return(smemFd);
+}
+
+// Close shared memory
+inline void controlCmdClose ( ControlCmdMemory *ptr ) {
+   char shmName[200];
+
+   // Get shared name
+   strcpy(shmName,ptr->sharedName);
+
+   // Unlink
+   shm_unlink(shmName);
 }
 
 // Init data structure, called by ControlServer
 inline void controlCmdInit ( ControlCmdMemory *ptr ) {
    memset(ptr->cmdBuffer, 0, CONTROL_CMD_SIZE);
+   memset(ptr->cmdBuffer, 0, CONTROL_CMD_SIZE);
+   memset(ptr->errorBuffer, 0, CONTROL_CMD_SIZE);
+   memset(ptr->statBuffer, 0, CONTROL_CMD_SIZE);
+   memset(ptr->userBuffer, 0, CONTROL_CMD_SIZE);
+   memset(ptr->xmlStatusBuffer, 0, CONTROL_CMD_XML_SIZE);
+   memset(ptr->xmlConfigBuffer, 0, CONTROL_CMD_XML_SIZE);
 
    ptr->cmdRdyCount = 0;
    ptr->cmdAckCount = 0;
+
 }
 
 // Return pointer to command buffer
@@ -73,6 +105,7 @@ inline char * controlCmdBuffer ( ControlCmdMemory *ptr ) {
 
 // Send cmd, called by client
 inline void controlCmdSend ( ControlCmdMemory *ptr, const char *cmd ) {
+   strcpy(ptr->errorBuffer,"");
    strcpy(ptr->cmdBuffer,cmd);
    ptr->cmdRdyCount++;
 }
@@ -96,6 +129,21 @@ inline char * controlStatBuffer ( ControlCmdMemory *ptr ) {
 // Return pointer to user buffer
 inline char * controlUserBuffer ( ControlCmdMemory *ptr ) {
    return(ptr->userBuffer);
+}
+
+// Return pointer to xml configuration
+inline char * controlXmlConfigBuffer ( ControlCmdMemory *ptr ) {
+   return(ptr->xmlConfigBuffer);
+}
+
+// Return pointer to xml status
+inline char * controlXmlStatusBuffer ( ControlCmdMemory *ptr ) {
+   return(ptr->xmlStatusBuffer);
+}
+
+// Return pointer to error buffer
+inline char * controlErrorBuffer ( ControlCmdMemory *ptr ) {
+   return(ptr->errorBuffer);
 }
 
 #endif

@@ -85,45 +85,44 @@ void CommLink::dataHandler() {
    int     slen = sizeof(net_addr_);
    time_t  ltime;
    time_t  ctime;
-   uint    cfgCount;
-   uint    cfgSize;
+   uint    xmlCount;
+   uint    xmlSize;
    uint    wrSize;
 
    // Store time
    time(&ltime);
    ctime        = ltime;
    dataRxCount_ = 0;
-   cfgCount     = cfgReqCnt_;
+   xmlCount     = xmlReqCnt_;
 
    // Running
    while ( runEnable_ ) {
 
-      // Config/status update
-      if ( cfgCount != cfgReqCnt_ ) {
+      // Config/status/start/stop update
+      if ( xmlCount != xmlReqCnt_ ) {
 
          // Storing is enabled
-         if ( cfgStoreEn_ ) {
-            wrSize = (cfgReqEntry_.length() & 0x0FFFFFFF);
-            if ( cfgIsConfig_ ) cfgSize = wrSize | 0x10000000;
-            else cfgSize = wrSize | 0x20000000;
+         if ( xmlStoreEn_ ) {
+            wrSize = (xmlReqEntry_.length() & 0x0FFFFFFF);
+            xmlSize = ((xmlType_ << 28) & 0xF0000000) | wrSize;
 
             // Callback function is set
-            if ( dataCb_ != NULL ) dataCb_((void *)cfgReqEntry_.c_str(), cfgSize);
+            if ( dataCb_ != NULL ) dataCb_((void *)xmlReqEntry_.c_str(), xmlSize);
 
             // Network is open
             if ( dataNetFd_ >= 0 ) {
-               sendto(dataNetFd_,&cfgSize,4,0,(const sockaddr*)&net_addr_,slen);
-               sendto(dataNetFd_,cfgReqEntry_.c_str(),wrSize,0,(const sockaddr*)&net_addr_,slen);
+               sendto(dataNetFd_,&xmlSize,4,0,(const sockaddr*)&net_addr_,slen);
+               sendto(dataNetFd_,xmlReqEntry_.c_str(),wrSize,0,(const sockaddr*)&net_addr_,slen);
             }
 
             // Data file is open
             if ( dataFileFd_ >= 0 ) {
-               write(dataFileFd_,&cfgSize,4);
-               write(dataFileFd_,cfgReqEntry_.c_str(),wrSize);
+               write(dataFileFd_,&xmlSize,4);
+               write(dataFileFd_,xmlReqEntry_.c_str(),wrSize);
             }
          }
-         cfgCount = cfgReqCnt_;
-         cfgRespCnt_++;
+         xmlCount = xmlReqCnt_;
+         xmlRespCnt_++;
       }
 
       // Data is ready
@@ -196,11 +195,12 @@ CommLink::CommLink ( ) {
    maxRxTx_        = 4;
    dataCb_         = NULL;
    unexpCount_     = 0;
-   cfgReqEntry_    = "";
-   cfgIsConfig_    = false;
-   cfgReqCnt_      = 0;
-   cfgRespCnt_     = 0;
-   cfgStoreEn_     = true;
+   xmlReqEntry_    = "";
+   xmlType_        = 0;
+   xmlReqCnt_      = 0;
+   xmlRespCnt_     = 0;
+   xmlStoreEn_     = true;
+   toDisable_      = false;
 
    pthread_mutex_init(&mutex_,NULL);
 }
@@ -251,13 +251,10 @@ void CommLink::close () {
    // Stop the thread
    runEnable_ = false;
 
-   usleep(1000);
-
    // Wait for thread to stop
-   //pthread_join(ioThread_, NULL);
-
-   // Wait for thread to stop
-   //pthread_join(dataThread_, NULL);
+   pthread_join(ioThread_, NULL);
+   pthread_join(rxThread_, NULL);
+   pthread_join(dataThread_, NULL);
 }
 
 // Open data file
@@ -358,60 +355,89 @@ void CommLink::queueRegister ( uint destination, Register *reg, bool write, bool
    uint         timer;
    stringstream err;
    uint         tryCount;
+   bool         error = false;
+
+   pthread_mutex_lock(&mutex_);
 
    if ( (reg->size()+3) > maxRxTx_ ) {
       err.str("");
       err << "CommLink::queueRegister -> Register: " << reg->name();
       err << "Register size exceeds maxRxTx!";
       if ( debug_ ) cout << err.str() << endl;
-      throw(err.str());
+      error = true;
    }
+   else {
 
-   pthread_mutex_lock(&mutex_);
+      // Setup request
+      timer        = 0;
+      regReqEntry_ = reg;
+      regReqDest_  = destination;
+      regReqWrite_ = write;
+      currResp     = regRespCnt_;
+      tryCount     = 0;
 
-   // Setup request
-   timer        = 0;
-   regReqEntry_ = reg;
-   regReqDest_  = destination;
-   regReqWrite_ = write;
-   currResp     = regRespCnt_;
-   tryCount     = 0;
-   regReqCnt_++;
+      do {
+         regReqCnt_++;
+         tryCount++;
+         error = false;
 
-   // Wait for response
-   while ( wait && currResp == regRespCnt_ ) {
-      if ( timer > 1000 ) {
-         err.str("");
-         err << "CommLink::queueRegister -> Register: " << reg->name();
-         err << ", Write: " << dec << write;
-         err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
-         err << ", Address: 0x" << hex << setw(8) << setfill('0') << reg->address();
-         err << ", Attempt: " << dec << tryCount;
-         if ( tryCount == 3 ) err << ", Timeout!";
-         else err << ", Trying Again!";
-         cout << err.str() << endl;
-         timeoutCount_++;
-
-         // Fail after 4 attempts
-         if ( tryCount == 3 ) {
-            pthread_mutex_unlock(&mutex_);
-            throw(err.str());
+         // Wait for response
+         while ( wait && !error && currResp == regRespCnt_ ) {
+            if ( timer > 100 && (!toDisable_)) {
+               err.str("");
+               err << "CommLink::queueRegister -> Register: " << reg->name();
+               if ( write ) err << ", Write"; else err << ", Read";
+               err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
+               err << ", Address: 0x" << hex << setw(8) << setfill('0') << reg->address();
+               err << ", Attempt: " << dec << tryCount;
+               err << ", Timeout, Trying Again!";
+               cout << err.str() << endl;
+               timeoutCount_++;
+               timer = 0;
+               error = true;
+               usleep(100);
+            }
+            else {
+               timer++;
+               usleep(1);
+            }
          }
 
-         // Try again
-         usleep(100);
-         tryCount++;
-         regReqCnt_++;
+         if ( !error ) regRxCount_++;
+
+         // Check status value
+         if ( wait && !error && (reg->status() != 0) ) {
+            err.str("");
+            err << "CommLink::queueRegister -> Register: " << reg->name();
+            if ( write ) err << ", Write"; else err << ", Read";
+            err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
+            err << ", Address: 0x" << hex << setw(8) << setfill('0') << reg->address();
+            err << ", Status: 0x" << hex << setw(8) << setfill('0') << reg->status();
+            err << ", Attempt: " << dec << tryCount;
+            err << ", Status Error, Trying Again!";
+            cout << err.str() << endl;
+            error = true;
+            usleep(100);
+         }
+         regRxCount_++;
+
+      } while ( error && tryCount <= 5 );
+
+      // Error occured
+      if ( error ) {
+         err.str("");
+         err << "CommLink::queueRegister -> Register: " << reg->name();
+         if ( write ) err << ", Write"; else err << ", Read";
+         err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
+         err << ", Address: 0x" << hex << setw(8) << setfill('0') << reg->address();
+         err << ", Failed!!!!";
+         cout << err.str() << endl;
       }
-      timer++;
-      usleep(1);
+      else reg->clrStale();
    }
-   regRxCount_++;
-
-   // Clear stale flag
-   reg->clrStale();
-
    pthread_mutex_unlock(&mutex_);
+
+   if ( error ) throw(err.str());
 }
 
 // Queue command request
@@ -431,7 +457,7 @@ void CommLink::queueCommand ( uint destination, Command *cmd ) {
 
    // Wait for response
    while ( currResp == cmdRespCnt_ ) {
-      if ( timer > 1000 ) {
+      if ( timer > 1000 && (!toDisable_)) {
          err.str("");
          err << "CommLink::queueCommand -> Command: " << cmd->name();
          err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
@@ -534,13 +560,13 @@ void CommLink::addConfig ( string config ) {
 
    // Setup request
    timer        = 0;
-   cfgReqEntry_ = config;
-   cfgIsConfig_ = true;
-   currResp     = cfgRespCnt_;
-   cfgReqCnt_++;
+   xmlReqEntry_ = config;
+   xmlType_     = Data::XmlConfig;
+   currResp     = xmlRespCnt_;
+   xmlReqCnt_++;
 
    // Wait for response
-   while ( currResp == cfgRespCnt_ ) {
+   while ( currResp == xmlRespCnt_ ) {
       if ( timer > 1000 ) {
          err = "CommLink::addConfig -> Timeout!";
          if ( debug_ ) cout << err << endl;
@@ -563,13 +589,13 @@ void CommLink::addStatus ( string status ) {
 
    // Setup request
    timer        = 0;
-   cfgReqEntry_ = status;
-   cfgIsConfig_ = false;
-   currResp     = cfgRespCnt_;
-   cfgReqCnt_++;
+   xmlReqEntry_ = status;
+   xmlType_     = Data::XmlStatus;
+   currResp     = xmlRespCnt_;
+   xmlReqCnt_++;
 
    // Wait for response
-   while ( currResp == cfgRespCnt_ ) {
+   while ( currResp == xmlRespCnt_ ) {
       if ( timer > 1000 ) {
          err = "CommLink::addConfig -> Timeout!";
          if ( debug_ ) cout << err << endl;
@@ -582,8 +608,67 @@ void CommLink::addStatus ( string status ) {
    pthread_mutex_unlock(&mutex_);
 }
 
-// Enable store of config/status to data file & callback
-void CommLink::setConfigStore ( bool enable ) {
-   cfgStoreEn_ = enable;
+// Add run start to data file
+void CommLink::addRunStart ( string xml ) {
+   uint   currResp;
+   uint   timer;
+   string err;
+
+   pthread_mutex_lock(&mutex_);
+
+   // Setup request
+   timer        = 0;
+   xmlReqEntry_ = xml;
+   xmlType_     = Data::XmlRunStart;
+   currResp     = xmlRespCnt_;
+   xmlReqCnt_++;
+
+   // Wait for response
+   while ( currResp == xmlRespCnt_ ) {
+      if ( timer > 1000 ) {
+         err = "CommLink::addRunStart -> Timeout!";
+         if ( debug_ ) cout << err << endl;
+         pthread_mutex_unlock(&mutex_);
+         throw(err);
+      }
+      timer++;
+      usleep(1);
+   }
+   pthread_mutex_unlock(&mutex_);
+}
+
+// Add status to data file
+void CommLink::addRunStop ( string xml ) {
+   uint   currResp;
+   uint   timer;
+   string err;
+
+   pthread_mutex_lock(&mutex_);
+
+   // Setup request
+   timer        = 0;
+   xmlReqEntry_ = xml;
+   xmlType_     = Data::XmlRunStop;
+   currResp     = xmlRespCnt_;
+   xmlReqCnt_++;
+
+   // Wait for response
+   while ( currResp == xmlRespCnt_ ) {
+      if ( timer > 1000 ) {
+         err = "CommLink::addRunStop -> Timeout!";
+         if ( debug_ ) cout << err << endl;
+         pthread_mutex_unlock(&mutex_);
+         throw(err);
+      }
+      timer++;
+      usleep(1);
+   }
+   pthread_mutex_unlock(&mutex_);
+}
+
+
+// Enable store of config/status/start/stop to data file & callback
+void CommLink::setXmlStore ( bool enable ) {
+   xmlStoreEn_ = enable;
 }
 
