@@ -452,20 +452,22 @@ void CntrlFpga::readTemps ( ) {
    readRegister(registers_["TempData"]);
 
    for (hybrid=0; hybrid < 3; hybrid++) {
-      for (temp=0; temp < 4; temp++) {
-         name.str("");
-         name << "Temp_" << dec << hybrid;
-         name << "_" << dec << temp;
+      if ( device("hybrid",hybrid)->getInt("Enabled") ) {
+         for (temp=0; temp < 4; temp++) {
+            name.str("");
+            name << "Temp_" << dec << hybrid;
+            name << "_" << dec << temp;
 
-         tmp = registers_["TempData"]->getIndex(hybrid*2+(temp/2));
+            tmp = registers_["TempData"]->getIndex(hybrid*2+(temp/2));
 
-         if ( (temp % 2) == 0 ) val = (tmp & 0xFFF);
-         else val = ((tmp >> 16) & 0xFFF);
+            if ( (temp % 2) == 0 ) val = (tmp & 0xFFF);
+            else val = ((tmp >> 16) & 0xFFF);
 
-         txt.str("");
-         txt << tempTable_[val] << " C (";
-         txt << "0x" << hex << setw(3) << setfill('0') << val << ")";
-         variables_[name.str()]->set(txt.str());
+            txt.str("");
+            txt << tempTable_[val] << " C (";
+            txt << "0x" << hex << setw(3) << setfill('0') << val << ")";
+            variables_[name.str()]->set(txt.str());
+         }
       }
    }
 
@@ -800,24 +802,28 @@ void CntrlFpga::writeConfig ( bool force ) {
 
    // debug_ = true;
 
-   // Filter data when force = true
-   if ( filt_ != NULL && force ) {
-      for ( hyb=0; hyb < 3; hyb++) {
-         for ( apv=0; apv<5; apv++) {
-         
-            // Start reload 
-            regName.str("");
-            regName << "FilterLd" << dec << hyb << apv;
-            writeRegister(registers_[regName.str()],true);
 
-            // Each coef, scale factor = 2, total bits = 16, fractional bits = 14, signed
-            for ( coef = 0; coef < 10; coef++ ) {
-               coefVal = (unsigned int)(((filt_->filterData[index_][hyb][apv][coefOrder(coef)]) / 2.0) * (double)pow(2,15));
+   if ( variables_["NewRegisters"]->getInt() ) {
 
+      // Filter data when force = true
+      if ( filt_ != NULL && force ) {
+         for ( hyb=0; hyb < 3; hyb++) {
+            for ( apv=0; apv<5; apv++) {
+            
+               // Start reload 
                regName.str("");
-               regName << "FilterWr" << dec << hyb << apv;
-               registers_[regName.str()]->set(coefVal);
+               regName << "FilterLd" << dec << hyb << apv;
                writeRegister(registers_[regName.str()],true);
+
+               // Each coef, scale factor = 2, total bits = 16, fractional bits = 14, signed
+               for ( coef = 0; coef < 10; coef++ ) {
+                  coefVal = (unsigned int)(((filt_->filterData[index_][hyb][apv][coefOrder(coef)]) / 2.0) * (double)pow(2,15));
+
+                  regName.str("");
+                  regName << "FilterWr" << dec << hyb << apv;
+                  registers_[regName.str()]->set(coefVal);
+                  writeRegister(registers_[regName.str()],true);
+               }
             }
          }
       }
