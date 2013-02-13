@@ -259,6 +259,7 @@ int main ( int argc, char **argv ) {
 			for (x=0; x < event.count(); x++) {
 				// Get sample
 				sample  = event.sample(x);
+				//printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
 				int hybrid = sample->hybrid();
 				if (use_hybrid!=-1 && hybrid!=use_hybrid) continue;
 

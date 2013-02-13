@@ -27,7 +27,7 @@ using namespace std;
 // Constructor
 DataReadEvio::DataReadEvio ( ) {
 	debug_=false;
-	//  debug_=true;
+	//debug_=true;
 	fd_ = -1;
 	maxbuf=MAXEVIOBUF;
 	fragment_offset[0] = 2;//BANK
@@ -99,21 +99,24 @@ bool DataReadEvio::next(Data *data) {
 				parse_event(buf);
 				//fpga_it = fpga_banks.begin();
 				nodata=false;  
+				free(buf);
 			}else{
 				if(evtTag==20)return(false); //this is the end of data
 				//otherwise, just skip it. 
 				cout<<"Not a data event...skipping"<<endl;
+				free(buf);
 			}
 		} else if (status==EOF)
 		{
 			cout << "end of file" << endl;
+			free(buf);
 			return(false);
 		}else{
 			cout<<"oops...broke trying to evRead; error code "<<status<<endl;
 
+			free(buf);
 			return(false);
 		}
-		delete buf;
 	}  while(nodata);
 	if(debug_)cout<<"Found a data event"<<endl;
 	return(next(data));

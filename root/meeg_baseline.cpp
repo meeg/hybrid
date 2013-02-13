@@ -239,9 +239,10 @@ int main ( int argc, char **argv ) {
 	//dataRead.dumpStatus();
 
 	runCount = atoi(dataRead->getConfig("RunCount").c_str());
+	int max_count = runCount==0 ? 10000 : runCount;
 	double *apv_means[5];
-	for (int i=0;i<5;i++) apv_means[i] = new double[runCount];
-	double *moving_ti = new double[runCount];
+	for (int i=0;i<5;i++) apv_means[i] = new double[max_count];
+	double *moving_ti = new double[max_count];
 	/*
 	   double *moving_yi = new double[runCount];
 	   double *moving_yi2 = new double[runCount];
@@ -268,8 +269,10 @@ int main ( int argc, char **argv ) {
 				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
 				read_temp = false;
 			}
-		moving_ti[eventCount] = eventCount;
-		for (int i=0;i<5;i++) apv_means[i][eventCount] = 0.0;
+		if (eventCount<max_count) {
+			moving_ti[eventCount] = eventCount;
+			for (int i=0;i<5;i++) apv_means[i][eventCount] = 0.0;
+		}
 		for (int i=0;i<640;i++)
 		{
 			channelActive[i] = false;
@@ -277,6 +280,7 @@ int main ( int argc, char **argv ) {
 		for (x=0; x < event.count(); x++) {
 			// Get sample
 			sample  = event.sample(x);
+			//printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
 			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
 			//printf("hybrid %d\n",sample->hybrid());
 
@@ -327,7 +331,9 @@ int main ( int argc, char **argv ) {
 			double mean = 0;
 			for (y=0;y<6;y++) mean+=sample->value(y);
 			mean/=6.0;
-			apv_means[sample->apv()][eventCount] += mean;
+			if (eventCount<max_count) {
+				apv_means[sample->apv()][eventCount] += mean;
+			}
 			/*
 			   if (channel==corr1)
 			   {
@@ -339,7 +345,9 @@ int main ( int argc, char **argv ) {
 			   }
 			   */
 		}
+		if (eventCount<max_count) {
 		for (int i=0;i<5;i++) apv_means[i][eventCount] /= 128;
+		}
 		if (!skip_corr)
 			for (int i=0;i<640;i++) if (channelActive[i])
 			{
@@ -393,7 +401,7 @@ int main ( int argc, char **argv ) {
 	mg = new TMultiGraph();
 	for (int i=0;i<5;i++)
 	{
-		graph[i] = new TGraph(eventCount,moving_ti,apv_means[i]);
+		graph[i] = new TGraph(min(eventCount,max_count),moving_ti,apv_means[i]);
 		graph[i]->SetMarkerColor(i+1);
 		if (i==4) graph[i]->SetMarkerColor(6);
 		graph[i]->SetMarkerStyle(20);
@@ -407,6 +415,8 @@ int main ( int argc, char **argv ) {
 	c1->Clear();
 	//for (int i=0;i<5;i++) delete graph[i];
 	delete mg;
+	for (int i=0;i<5;i++) delete[] apv_means[i];
+	delete[] moving_ti;
 
 	/*
 	   c1->Clear();

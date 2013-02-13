@@ -92,7 +92,7 @@ void doStats(int n, int nmin, int nmax, short int *y, int &count, double &center
 	int *newy = new int[n];
 	for (int i=nmin; i<=nmax; i++) newy[i] = y[i];
 	doStats(n, nmin, nmax, newy, count, center, spread);
-	delete newy;
+	delete[] newy;
 }
 
 void doStats_mean(int n, int nmin, int nmax, int *y, int &count, double &center, double &spread)
