@@ -45,6 +45,7 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
+        bool debug = false;
 	bool flip_channels = false;
 	bool mux_channels = false;
 	bool skip_corr = false;
@@ -108,11 +109,12 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmctH:F:e:E")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmctH:F:e:Ed")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
+				printf("-d: turn on debug\n");
 				printf("-o: use specified output filename\n");
 				printf("-n: physical channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
@@ -155,6 +157,9 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'E':
 				evio_format = true;
+				break;
+			case 'd':
+				debug = true;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -248,19 +253,24 @@ int main ( int argc, char **argv ) {
 	   double *moving_yi2 = new double[runCount];
 	   */
 
+	if(debug) printf("%d events expected from config\n",runCount);
+
 
 	// Process each event
 	eventCount = 0;
 
 	do {
-		//printf("fpga %d\n",event.fpgaAddress());
+	        if(debug) printf("Event %d\n",eventCount);
+
+	        if(debug) printf("fpga %d\n",event.fpgaAddress());
 		if (event.fpgaAddress()==7) 
 		{
-			//printf("not a data event\n");
+			printf("not a data event\n");
 			continue;
 		}
-		if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
-		//cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
+		if (fpga!=-1 && ((int)event.fpgaAddress())!=fpga) continue;
+		if(debug) cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count() << " is" <<endl;
+		if(debug) cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
 		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
@@ -277,11 +287,12 @@ int main ( int argc, char **argv ) {
 		{
 			channelActive[i] = false;
 		}
+
 		for (x=0; x < event.count(); x++) {
 			// Get sample
 			sample  = event.sample(x);
-			//printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
-			if (hybrid!=-1 && sample->hybrid()!=hybrid) continue;
+			if(debug) printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
+			if (hybrid!=-1 && ((int)sample->hybrid())!=hybrid) continue;
 			//printf("hybrid %d\n",sample->hybrid());
 
 			if (mux_channels) channel = chanMap[sample->channel()];
