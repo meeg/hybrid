@@ -104,6 +104,7 @@ int main ( int argc, char **argv ) {
 
 	TH1F *histT0[640];
 	TH1F *histA[640];
+	TH1F *histA_all;
 	TH2F *histT0_2d;
 	TH2F *histA_2d;
 	TH2I *T0_A;
@@ -410,6 +411,8 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
+	sprintf(name,"A");
+	histA_all = new TH1F(name,name,1000,0,500.0);
 	for (int n=0;n<640;n++) {
 		histMin[n] = 16384;
 		histMax[n] = 0;
@@ -555,11 +558,12 @@ int main ( int argc, char **argv ) {
 						samples[y] -= calMean[channel][y];
 						//samples[y] -= sample->value(0);
 						sum+=samples[y];
-						if (value>2.0*TMath::Mean(6,calSigma[channel])) {
+						if (samples[y]>2.0*TMath::Mean(6,calSigma[channel])) {
 							nAboveThreshold++;
 						}
 					}
-					if (nAboveThreshold>3)
+					//if ((samples[1]> samples[0] || samples[2]>samples[1]) && nAboveThreshold>2)
+					if (nAboveThreshold>2)
 					{
 						//int sgn = sum>0?0:1;
 						mySamples->readEvent(samples,0.0);
@@ -591,6 +595,7 @@ int main ( int argc, char **argv ) {
 
 						chiprob = TMath::Prob(chisq,dof);
 						if (chiprob > 0.01) {
+							histA_all->Fill(fit_par[1]);
 							histT0[n]->Fill(fit_par[0]);
 							histA[n]->Fill(fit_par[1]);
 							histT0_2d->Fill(channel,fit_par[0]);
@@ -751,6 +756,10 @@ int main ( int argc, char **argv ) {
 	histA_2d->GetYaxis()->SetRangeUser(minA,maxA);
 	histA_2d->Draw("colz");
 	sprintf(name,"%s_t0_A_hist_%s.png",inname.Data(),sgn?"neg":"pos");
+	c1->SaveAs(name);
+
+	histA_all->Draw();
+	sprintf(name,"%s_t0_A.png",inname.Data());
 	c1->SaveAs(name);
 
 	/*
