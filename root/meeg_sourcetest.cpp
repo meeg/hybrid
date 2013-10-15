@@ -51,8 +51,6 @@ int main ( int argc, char **argv ) {
 	int c;
 	bool subtract_T0 = false;
 	bool print_fit_status = false;
-	bool force_cal_grp = false;
-	bool ignore_cal_grp = false;
 	bool flip_channels = false;
 	bool use_shape = false;
 	bool shift_t0 = false;
@@ -66,8 +64,6 @@ int main ( int argc, char **argv ) {
 	int single_channel = -1;
 	TString inname = "";
 	TString outdir = "";
-	int cal_grp = -1;
-	int cal_delay = 0;
 	double delay_step = SAMPLE_INTERVAL/8;
 	TCanvas         *c1;
 	//TH2F            *histAll;
@@ -76,11 +72,12 @@ int main ( int argc, char **argv ) {
 	//TGraph          *mean;
 	//TGraph          *sigma;
 	int nChan = 0;
-	//double          grChan[640];
-	//double grT0[640], grT0_sigma[640], grT0_err[640];
-	//double grA[640], grA_sigma[640], grA_err[640];
+	double          grChan[640];
+	double grT0[640], grT0_sigma[640], grT0_err[640];
+	double grA[640], grA_sigma[640], grA_err[640];
 	double          calMean[640][7] = {{0.0}};
 	double          calSigma[640][7] = {{1.0}};
+	double          calSigma_mean[640] = {0.0};
 	double calTp[640] = {0.0};
 	double calA[640] = {0.0};
 	double calT0[640] = {0.0};
@@ -105,6 +102,9 @@ int main ( int argc, char **argv ) {
 	TH1F *histT0[640];
 	TH1F *histA[640];
 	TH1F *histA_all;
+	TH1F *histA_norm;
+	TH1F *histA_clusters;
+	TH1F *histA_total;
 	TH2F *histT0_2d;
 	TH2F *histA_2d;
 	TH2I *T0_A;
@@ -122,15 +122,13 @@ int main ( int argc, char **argv ) {
 	double T0_dist_b,T0_dist_m;
 
 
-	while ((c = getopt(argc,argv,"hfsg:o:auc:d:tbnH:F:e:E")) !=-1)
+	while ((c = getopt(argc,argv,"hfso:uc:d:tbnH:F:e:E")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-f: print fit status to .fits\n");
-				printf("-g: force use of specified cal group\n");
 				printf("-c: use only specified channel\n");
-				printf("-a: use all cal groups\n");
 				printf("-o: use specified output filename\n");
 				printf("-s: shift T0 by value from Tp cal file\n");
 				printf("-u: use .shape cal instead of .tp\n");
@@ -153,9 +151,6 @@ int main ( int argc, char **argv ) {
 			case 'n':
 				flip_channels = true;
 				break;
-			case 'a':
-				ignore_cal_grp = true;
-				break;
 			case 's':
 				shift_t0 = true;
 				break;
@@ -164,10 +159,6 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'c':
 				single_channel = atoi(optarg);
-				break;
-			case 'g':
-				cal_grp = atoi(optarg);
-				force_cal_grp=true;
 				break;
 			case 'o':
 				inname = optarg;
@@ -237,6 +228,7 @@ int main ( int argc, char **argv ) {
 			calfile >> calMean[channel][i];
 			calfile >> calSigma[channel][i];
 		}
+		calSigma_mean[channel] = TMath::Mean(6,calSigma[channel]);
 	}
 	calfile.close();
 
@@ -304,7 +296,7 @@ int main ( int argc, char **argv ) {
 				} while (ti[ni-1]<300.0);
 
 				myShape[channel] = new SmoothShapingCurve(ni,ti,yi);
-				myFitter[channel] = new LinFitter(myShape[channel],6,1,TMath::Mean(6,calSigma[channel]));
+				myFitter[channel] = new LinFitter(myShape[channel],6,1,calSigma_mean[channel]);
 
 
 				if (single_channel!=-1 && channel==single_channel)
@@ -327,7 +319,7 @@ int main ( int argc, char **argv ) {
 				//myShape[channel] = new SmoothShapingCurve(calTp[channel]);
 				//myFitter[channel] = new LinFitter(myShape[channel],6,1,calSigma[channel]);
 				myShape[channel] = new ShapingCurve(calTp[channel]);
-				myFitter[channel] = new AnalyticFitter(myShape[channel],6,1,TMath::Mean(6,calSigma[channel]));
+				myFitter[channel] = new AnalyticFitter(myShape[channel],6,1,calSigma_mean[channel]);
 			}
 		}
 
@@ -375,7 +367,6 @@ int main ( int argc, char **argv ) {
 
 	// 2d histogram
 	{
-		int sgn = 1;
 		/*
 		sprintf(name,"Pulse_shape_%s",sgn?"Neg":"Pos");
 		sprintf(title,"Normalized pulse shape, %s pulses;Time [ns];Amplitude [normalized]",sgn?"negative":"positive");
@@ -385,34 +376,28 @@ int main ( int argc, char **argv ) {
 		sprintf(title,"Amplitude vs. T0;Time [ns];Amplitude [ADC counts]");
 		T0_A = new TH2I(name,title,500,-4*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL,500,0.0,2000.0);
 		//T0_A = new TH2I(name,name,500,0,2*SAMPLE_INTERVAL,500,800.0,1400.0);
-		if (force_cal_grp)
-		{
-			//sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
-			//sprintf(title,"Chisq probability of fit, %s pulses;Channel;Probability",sgn?"negative":"positive");
-			//histChiProb = new TH2F(name,title,80,0,640,100,0,1.0);
-			sprintf(name,"T0_%s",sgn?"Neg":"Pos");
-			sprintf(title,"Fitted values of T0 relative to channel average, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
-			histT0_2d = new TH2F(name,title,80,0,640,1000,-1*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
-			sprintf(name,"A_%s",sgn?"Neg":"Pos");
-			sprintf(title,"Fitted values of amplitude, %s pulses;Channel;Amplitude [ADC counts]",sgn?"negative":"positive");
-			histA_2d = new TH2F(name,title,80,0,640,1000,0,2000.0);
-		}
-		else
-		{
 			//sprintf(name,"Chisq_Prob_%s",sgn?"Neg":"Pos");
 			//sprintf(title,"Chisq probability of fit, %s pulses;Channel;Probability",sgn?"negative":"positive");
 			//histChiProb = new TH2F(name,title,640,0,640,100,0,1.0);
-			sprintf(name,"T0_%s",sgn?"Neg":"Pos");
-			sprintf(title,"Fitted values of T0 relative to channel average, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
+			sprintf(name,"T0_2d");
+			sprintf(title,"Fitted values of T0 relative to channel average;Channel;T0 [ns]");
 			histT0_2d = new TH2F(name,title,640,0,640,1000,-1*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
-			sprintf(name,"A_%s",sgn?"Neg":"Pos");
-			sprintf(title,"Fitted values of amplitude, %s pulses;Channel;Amplitude [ADC counts]",sgn?"negative":"positive");
+			sprintf(name,"A_2d");
+			sprintf(title,"Fitted values of amplitude;Channel;Amplitude [ADC counts]");
 			histA_2d = new TH2F(name,title,640,0,640,1000,0,2000.0);
-		}
 	}
 
 	sprintf(name,"A");
-	histA_all = new TH1F(name,name,1000,0,500.0);
+	histA_all = new TH1F(name,name,1000,0,2000.0);
+
+	sprintf(name,"A/internal cal response");
+	histA_norm = new TH1F(name,name,1000,0,2.0);
+
+	sprintf(name,"clustered A");
+	histA_clusters = new TH1F(name,name,1000,0,2000.0);
+
+	sprintf(name,"total A in event");
+	histA_total = new TH1F(name,name,1000,0,2000.0);
 	for (int n=0;n<640;n++) {
 		histMin[n] = 16384;
 		histMax[n] = 0;
@@ -496,20 +481,6 @@ int main ( int argc, char **argv ) {
 		//dataRead.dumpStatus();
 		
 		runCount = atoi(dataRead->getConfig("RunCount").c_str());
-		if (!force_cal_grp)
-		{
-			cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
-			cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
-		}
-
-		cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
-		cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
-		if (cal_delay==0)
-		{
-			cal_delay=8;
-			cout<<"Force cal_delay=8 to keep sample time in range"<<endl;
-		}
-
 
 		// Process each event
 		eventCount = 0;
@@ -518,6 +489,10 @@ int main ( int argc, char **argv ) {
 			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
 			if (num_events > 0 && eventCount > num_events) break;
+
+			double hits[640];
+			for (int i=0;i<640;i++) hits[i] = 0.0;
+
 			for (x=0; x < event.count(); x++) {
 				// Get sample
 				sample  = event.sample(x);
@@ -537,10 +512,9 @@ int main ( int argc, char **argv ) {
 					cout << "Chan = " << dec << sample->channel() << endl;
 				}
 
-				//if (!ignore_cal_grp && cal_grp!=-1 && ((int)sample->channel()-cal_grp)%8!=0) continue;
 				int n = channel;
 				// Filter APVs
-				if ( eventCount >= 20 ) {
+				if ( eventCount >= 20 && n>5 && n<620 ) {
 
 					sum = 0;
 					int nAboveThreshold = 0;
@@ -558,7 +532,7 @@ int main ( int argc, char **argv ) {
 						samples[y] -= calMean[channel][y];
 						//samples[y] -= sample->value(0);
 						sum+=samples[y];
-						if (samples[y]>2.0*TMath::Mean(6,calSigma[channel])) {
+						if (samples[y]>2.0*calSigma_mean[channel]) {
 							nAboveThreshold++;
 						}
 					}
@@ -594,14 +568,19 @@ int main ( int argc, char **argv ) {
 
 
 						chiprob = TMath::Prob(chisq,dof);
-						if (chiprob > 0.01) {
+						//if (chiprob > 0.01 /*&& fit_par[0] > -25.0 && fit_par[0] < 50.0*/) {
+						if (chiprob > 0.01 && fit_par[1] > 2.0*calSigma_mean[channel] && fit_par[0] > -50.0 && fit_par[0] < 75.0) {
 							histA_all->Fill(fit_par[1]);
+							//histA_norm->Fill(fit_par[1]/calA[channel]);
+							histA_norm->Fill(fit_par[1]/calSigma_mean[channel]/31.0);
 							histT0[n]->Fill(fit_par[0]);
 							histA[n]->Fill(fit_par[1]);
 							histT0_2d->Fill(channel,fit_par[0]);
 							histA_2d->Fill(channel,fit_par[1]);
 							T0_A->Fill(fit_par[0],fit_par[1]);
+							hits[channel] = fit_par[1];
 						}
+						//}
 						/*
 						   histT0_err[n]->Fill(fit_err[0]);
 						   histA_err[n]->Fill(fit_err[1]);
@@ -622,6 +601,42 @@ int main ( int argc, char **argv ) {
 					}
 				}
 			}
+
+			double totalSum = 0.0;
+			for (int i=0;i<640;i++) {
+				if (hits[i] > 4.0*calSigma_mean[i]) {
+					totalSum += hits[i];
+					double clusterSum = hits[i];
+					hits[i] = 0.0;
+					int j = i-1;
+					while (hits[j] > 3.0*calSigma_mean[i]) {
+						clusterSum += hits[j];
+						hits[j] = 0.0;
+						j--;
+					}
+					j = i+1;
+					while (hits[j] > 3.0*calSigma_mean[i]) {
+						clusterSum += hits[j];
+						hits[j] = 0.0;
+						j++;
+					}
+					histA_clusters->Fill(clusterSum);
+				}
+			}
+			if (totalSum>0)
+				histA_total->Fill(totalSum);
+
+			/*
+			if (nhits>1) {
+				for (int i=0;i<640;i++) {
+					if (hits[i] != 0.0) {
+						printf("%d:\t%f\n",i,hits[i]);
+					}
+				}
+				printf("\n");
+			}
+			*/
+
 			eventCount++;
 
 		} while ( dataRead->next(&event) );
@@ -634,22 +649,25 @@ int main ( int argc, char **argv ) {
 	}
 
 	/*
-	   for (int n=0;n<640;n++) for (int sgn=0;sgn<2;sgn++) if (histT0[n]->GetEntries()>0) {
-	   grChan[nChan]=n;
+	for (int n=0;n<640;n++) if (histA[n]->GetEntries()>0) {
+		grChan[nChan]=n;
 
-	   grT0[nChan] = histT0[n]->GetMean();
-	   if (shift_t0) grT0[nChan] -= cal_delay*delay_step + calT0[n];
-	   grT0_sigma[nChan] = histT0[n]->GetRMS();
-	   grT0_err[nChan] = histT0_err[n]->GetMean();
-	   grA[nChan] = histA[n]->GetMean();
-	   grA_sigma[nChan] = histA[n]->GetRMS();
-	   grA_err[nChan] = histA_err[n]->GetMean();
+		histA[n]->Fit("gaus","Q" ,"C" ,200.0,230.0);
+		grA[nChan] = histA[n]->GetFunction("gaus")->GetParameter(0);
+		//grT0[nChan] = histT0[n]->GetMean();
+		//if (shift_t0) grT0[nChan] -= cal_delay*delay_step + calT0[n];
+		//grT0_sigma[nChan] = histT0[n]->GetRMS();
+		//grT0_err[nChan] = histT0_err[n]->GetMean();
+		//grA[nChan] = histA[n]->GetMean();
+		//grA_sigma[nChan] = histA[n]->GetRMS();
+		//grA_err[nChan] = histA_err[n]->GetMean();
 
-	   outfile <<n<<"\t"<<grT0[nChan]<<"\t\t"<<grT0_sigma[nChan]<<"\t\t"<<grT0_err[nChan]<<"\t\t";
-	   outfile<<grA[nChan]<<"\t\t"<<grA_sigma[nChan]<<"\t\t"<<grA_err[nChan]<<endl;     
-	   nChan++;
-	   }
-	   */
+		//outfile <<n<<"\t"<<grT0[nChan]<<"\t\t"<<grT0_sigma[nChan]<<"\t\t"<<grT0_err[nChan]<<"\t\t";
+		//outfile<<grA[nChan]<<"\t\t"<<grA_sigma[nChan]<<"\t\t"<<grA_err[nChan]<<endl;     
+		printf("%d\t%f\t%f\t%f\n",n,histA[n]->GetFunction("gaus")->GetParameter(0),histA[n]->GetFunction("gaus")->GetParameter(1),histA[n]->GetFunction("gaus")->GetParameter(2));
+		nChan++;
+	}
+	*/
 
 	{
 		int sgn = 1;
@@ -748,7 +766,7 @@ int main ( int argc, char **argv ) {
 	c1->SaveAs(name);
 	*/
 
-		histT0_2d->GetYaxis()->SetRangeUser(minT0-5.0,maxT0+5.0);
+	histT0_2d->GetYaxis()->SetRangeUser(minT0-5.0,maxT0+5.0);
 	histT0_2d->Draw("colz");
 	sprintf(name,"%s_t0_T0_hist_%s.png",inname.Data(),sgn?"neg":"pos");
 	c1->SaveAs(name);
@@ -758,8 +776,28 @@ int main ( int argc, char **argv ) {
 	sprintf(name,"%s_t0_A_hist_%s.png",inname.Data(),sgn?"neg":"pos");
 	c1->SaveAs(name);
 
+	histA_all->Fit("gaus","Q" ,"C" ,180.0,240.0);
+	printf("%f %f %f\n",histA_all->GetFunction("gaus")->GetParameter(0),histA_all->GetFunction("gaus")->GetParameter(1),histA_all->GetFunction("gaus")->GetParameter(2));
 	histA_all->Draw();
+	//c1->SetLogy();
 	sprintf(name,"%s_t0_A.png",inname.Data());
+	c1->SaveAs(name);
+
+	histA_norm->Fit("gaus","Q" ,"C" ,0.17,0.23);
+	printf("%f %f %f\n",histA_norm->GetFunction("gaus")->GetParameter(0),histA_norm->GetFunction("gaus")->GetParameter(1),histA_norm->GetFunction("gaus")->GetParameter(2));
+	histA_norm->Draw();
+	//c1->SetLogy();
+	sprintf(name,"%s_t0_A_norm.png",inname.Data());
+	c1->SaveAs(name);
+
+	histA_clusters->Draw();
+	c1->SetLogy();
+	sprintf(name,"%s_t0_A_clusters.png",inname.Data());
+	c1->SaveAs(name);
+
+	histA_total->Draw();
+	c1->SetLogy();
+	sprintf(name,"%s_t0_A_total.png",inname.Data());
 	c1->SaveAs(name);
 
 	/*
