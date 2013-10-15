@@ -84,6 +84,7 @@ int main ( int argc, char **argv ) {
 		grChan[i] = i;
 	}
 	DataRead        *dataRead;
+	int svt_bank_num = 3;
 	TrackerEvent    event;
 	TrackerSample   *sample;
 	uint            x;
@@ -97,7 +98,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmctH:F:e:Es:")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmctH:F:e:Es:b:")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -112,6 +113,7 @@ int main ( int argc, char **argv ) {
 				printf("-e: stop after specified number of events\n");
 				printf("-E: use EVIO file format\n");
 				printf("-s: number of sigmas for threshold file (default 2)\n");
+				printf("-b: EVIO bank number for SVT (default 3)\n");
 				return(0);
 				break;
 			case 'o':
@@ -146,6 +148,9 @@ int main ( int argc, char **argv ) {
 			case 's':
 				threshold_sigma = atof(optarg);
 				break;
+			case 'b':
+				svt_bank_num = atoi(optarg);
+				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
 				return(1);
@@ -153,9 +158,11 @@ int main ( int argc, char **argv ) {
 				abort();
 		}
 
-	if (evio_format)
-		dataRead = new DataReadEvio();
-	else 
+	if (evio_format) {
+		DataReadEvio *tmpDataRead = new DataReadEvio();
+		tmpDataRead->set_bank_num(svt_bank_num);
+		dataRead = tmpDataRead;
+	} else 
 		dataRead = new DataRead();
 
 	gROOT->SetStyle("Plain");

@@ -35,10 +35,15 @@ DataReadEvio::DataReadEvio ( ) {
 	fragment_offset[2]=1;//TAGSEGMENT
 	fpga_count = 0;
 	fpga_it = 0;
+	svt_bank_num = 3;
 }
 
 // Deconstructor
 DataReadEvio::~DataReadEvio ( ) { }
+
+void DataReadEvio::set_bank_num(int bank_num) {
+	svt_bank_num = bank_num;
+}
 
 // Open file
 bool DataReadEvio::open ( string file) {
@@ -172,7 +177,11 @@ void DataReadEvio::parse_eventBank(unsigned int *buf, int bank_length) {
 		int fragType = getFragType(type);
 		if (fragType==BANK)
 		{
-			switch (tag) {
+			if (tag==svt_bank_num) {
+				if (debug_) printf("SVT bank\n");
+				parse_SVTBank(&buf[ptr+2],length-2);
+			}
+			else switch (tag) {
 				case 1:
 					if (debug_) printf("ECal top bank\n");
 					parse_ECalBank(&buf[ptr+2],length-2);
@@ -180,10 +189,6 @@ void DataReadEvio::parse_eventBank(unsigned int *buf, int bank_length) {
 				case 2:
 					if (debug_) printf("ECal bottom bank\n");
 					parse_ECalBank(&buf[ptr+2],length-2);
-					break;
-				case 3:
-					if (debug_) printf("SVT bank\n");
-					parse_SVTBank(&buf[ptr+2],length-2);
 					break;
 				default:
 					printf("Unexpected bank tag %d\n",tag);
