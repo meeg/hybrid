@@ -104,6 +104,10 @@ int main ( int argc, char **argv ) {
 	TH1F *histA_all;
 	TH1F *histA_norm;
 	TH1F *histA_clusters;
+	TH1F *histA_clusters_1;
+	TH1F *histA_clusters_2;
+	TH1F *histA_clusters_3;
+	TH2F *histT0_clustering;
 	TH1F *histA_total;
 	TH2F *histT0_2d;
 	TH2F *histA_2d;
@@ -364,6 +368,18 @@ int main ( int argc, char **argv ) {
 	//}
 	optind++;
 
+	if (inname=="")
+	{
+		inname=argv[optind];
+
+		inname.ReplaceAll(".bin","");
+		if (inname.Contains('/')) {
+			inname.Remove(0,inname.Last('/')+1);
+		}
+	}
+	sprintf(name,"%s.root",inname.Data());
+	TFile *myFile = new TFile(name,"RECREATE");
+
 
 	// 2d histogram
 	{
@@ -388,16 +404,29 @@ int main ( int argc, char **argv ) {
 	}
 
 	sprintf(name,"A");
-	histA_all = new TH1F(name,name,1000,0,2000.0);
+	histA_all = new TH1F(name,name,100,0,2000.0);
 
 	sprintf(name,"A/internal cal response");
-	histA_norm = new TH1F(name,name,1000,0,2.0);
+	histA_norm = new TH1F(name,name,100,0,2.0);
 
 	sprintf(name,"clustered A");
-	histA_clusters = new TH1F(name,name,1000,0,2000.0);
+	histA_clusters = new TH1F(name,name,100,0,2000.0);
+
+	sprintf(name,"clustered A, 1 hit");
+	histA_clusters_1 = new TH1F(name,name,100,0,2000.0);
+
+	sprintf(name,"clustered A, 2 hits");
+	histA_clusters_2 = new TH1F(name,name,100,0,2000.0);
+
+	sprintf(name,"clustered A, 3 or more hits");
+	histA_clusters_3 = new TH1F(name,name,100,0,2000.0);
+
+	sprintf(name,"T0_clustering");
+	sprintf(title,"T0 of seed and added hits;seed hit [ns];added hit [ns]");
+	histT0_clustering = new TH2F(name,title,500,-2*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL,500,-2*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
 
 	sprintf(name,"total A in event");
-	histA_total = new TH1F(name,name,1000,0,2000.0);
+	histA_total = new TH1F(name,name,100,0,2000.0);
 	for (int n=0;n<640;n++) {
 		histMin[n] = 16384;
 		histMax[n] = 0;
@@ -411,16 +440,6 @@ int main ( int argc, char **argv ) {
 			//histA_err[n] = new TH1F(name,name,1000,0,100.0);
 	}
 
-
-	if (inname=="")
-	{
-		inname=argv[optind];
-
-		inname.ReplaceAll(".bin","");
-		if (inname.Contains('/')) {
-			inname.Remove(0,inname.Last('/')+1);
-		}
-	}
 
 
 
@@ -492,6 +511,7 @@ int main ( int argc, char **argv ) {
 
 			double hits[640];
 			for (int i=0;i<640;i++) hits[i] = 0.0;
+			double times[640];
 
 			for (x=0; x < event.count(); x++) {
 				// Get sample
@@ -579,6 +599,7 @@ int main ( int argc, char **argv ) {
 							histA_2d->Fill(channel,fit_par[1]);
 							T0_A->Fill(fit_par[0],fit_par[1]);
 							hits[channel] = fit_par[1];
+							times[channel] = fit_par[0];
 						}
 						//}
 						/*
@@ -603,24 +624,48 @@ int main ( int argc, char **argv ) {
 			}
 
 			double totalSum = 0.0;
-			for (int i=0;i<640;i++) {
-				if (hits[i] > 4.0*calSigma_mean[i]) {
-					totalSum += hits[i];
-					double clusterSum = hits[i];
-					hits[i] = 0.0;
-					int j = i-1;
-					while (hits[j] > 3.0*calSigma_mean[i]) {
-						clusterSum += hits[j];
-						hits[j] = 0.0;
-						j--;
+			while (true) {
+				double max_E = 0.0;
+				int seed;
+				bool hits_left = false;
+				for (int i=0;i<640;i++) {
+					if (hits[i] > 4.0*calSigma_mean[i] && hits[i] > max_E) {
+						hits_left = true;
+						max_E = hits[i];
+						seed = i;
 					}
-					j = i+1;
-					while (hits[j] > 3.0*calSigma_mean[i]) {
-						clusterSum += hits[j];
-						hits[j] = 0.0;
-						j++;
-					}
-					histA_clusters->Fill(clusterSum);
+				}
+				if (!hits_left) break;
+				double clusterSum = hits[seed];
+				int clusterSize = 1;
+				hits[seed] = 0.0;
+				int j = seed-1;
+				while (hits[j] > 3.0*calSigma_mean[j]) {
+					clusterSum += hits[j];
+					clusterSize++;
+					hits[j] = 0.0;
+					histT0_clustering->Fill(times[seed],times[j]);
+					j--;
+				}
+				j = seed+1;
+				while (hits[j] > 3.0*calSigma_mean[j]) {
+					clusterSum += hits[j];
+					clusterSize++;
+					hits[j] = 0.0;
+					histT0_clustering->Fill(times[seed],times[j]);
+					j++;
+				}
+				histA_clusters->Fill(clusterSum);
+				totalSum += clusterSum;
+				switch (clusterSize) {
+					case 1:
+						histA_clusters_1->Fill(clusterSum);
+						break;
+					case 2:
+						histA_clusters_2->Fill(clusterSum);
+						break;
+					default:
+						histA_clusters_3->Fill(clusterSum);
 				}
 			}
 			if (totalSum>0)
@@ -779,20 +824,42 @@ int main ( int argc, char **argv ) {
 	histA_all->Fit("gaus","Q" ,"C" ,180.0,240.0);
 	printf("%f %f %f\n",histA_all->GetFunction("gaus")->GetParameter(0),histA_all->GetFunction("gaus")->GetParameter(1),histA_all->GetFunction("gaus")->GetParameter(2));
 	histA_all->Draw();
-	//c1->SetLogy();
+	c1->SetLogy();
 	sprintf(name,"%s_t0_A.png",inname.Data());
 	c1->SaveAs(name);
 
 	histA_norm->Fit("gaus","Q" ,"C" ,0.17,0.23);
 	printf("%f %f %f\n",histA_norm->GetFunction("gaus")->GetParameter(0),histA_norm->GetFunction("gaus")->GetParameter(1),histA_norm->GetFunction("gaus")->GetParameter(2));
 	histA_norm->Draw();
-	//c1->SetLogy();
+	c1->SetLogy();
 	sprintf(name,"%s_t0_A_norm.png",inname.Data());
 	c1->SaveAs(name);
 
 	histA_clusters->Draw();
 	c1->SetLogy();
 	sprintf(name,"%s_t0_A_clusters.png",inname.Data());
+	c1->SaveAs(name);
+
+	histA_clusters_1->Draw();
+	c1->SetLogy();
+	sprintf(name,"%s_t0_A_clusters_1.png",inname.Data());
+	c1->SaveAs(name);
+
+	histA_clusters_2->Draw();
+	c1->SetLogy();
+	sprintf(name,"%s_t0_A_clusters_2.png",inname.Data());
+	c1->SaveAs(name);
+
+	histA_clusters_3->Draw();
+	c1->SetLogy();
+	sprintf(name,"%s_t0_A_clusters_3.png",inname.Data());
+	c1->SaveAs(name);
+
+	c1->SetLogy(0);
+	histT0_clustering->GetXaxis()->SetRangeUser(minT0-5.0,maxT0+5.0);
+	histT0_clustering->GetYaxis()->SetRangeUser(minT0-5.0,maxT0+5.0);
+	histT0_clustering->Draw("colz");
+	sprintf(name,"%s_t0_T0_clustering.png",inname.Data());
 	c1->SaveAs(name);
 
 	histA_total->Draw();
@@ -832,6 +899,9 @@ int main ( int argc, char **argv ) {
 	//if (print_fit_status) fitfile.close();
 	//outfile[0].close();
 	//outfile[1].close();
+	
+	myFile->Write();
+	myFile->Close();
 	return(0);
 }
 
