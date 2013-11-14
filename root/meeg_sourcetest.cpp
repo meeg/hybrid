@@ -600,21 +600,19 @@ int main ( int argc, char **argv ) {
 							T0_A->Fill(fit_par[0],fit_par[1]);
 							hits[channel] = fit_par[1];
 							times[channel] = fit_par[0];
-						}
-						//}
-						/*
-						   histT0_err[n]->Fill(fit_err[0]);
-						   histA_err[n]->Fill(fit_err[1]);
-						   if (print_fit_status) fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
+						   //histT0_err[n]->Fill(fit_err[0]);
+						   //histA_err[n]->Fill(fit_err[1]);
+						   //if (print_fit_status) fitfile<<"Channel "<<channel << ", T0 " << fit_par[0] <<", A " << fit_par[1] << ", Fit chisq " << chisq << ", DOF " << dof << ", prob " << chiprob << endl;
 						   if (fit_par[0]>maxT0) maxT0 = fit_par[0];
 						   if (fit_par[0]<minT0) minT0 = fit_par[0];
 						   if (fit_par[1]>maxA) maxA = fit_par[1];
 						   if (fit_par[1]<minA) minA = fit_par[1];
-						   histChiProb->Fill(channel,chiprob);
-						   for ( y=0; y < 6; y++ ) {
-						   pulse2D->Fill(y*SAMPLE_INTERVAL-fit_par[0],samples[y]/fit_par[1]);
-						   }
-						   */
+						   //histChiProb->Fill(channel,chiprob);
+						   //for ( y=0; y < 6; y++ ) {
+						   //pulse2D->Fill(y*SAMPLE_INTERVAL-fit_par[0],samples[y]/fit_par[1]);
+						   //}
+						}
+						//}
 					}
 					else
 					{
