@@ -644,6 +644,7 @@ int main ( int argc, char **argv ) {
 					clusterSum += hits[j];
 					clusterSize++;
 					hits[j] = 0.0;
+					if (max_E > 10.0*calSigma_mean[seed])
 					histT0_clustering->Fill(times[seed],times[j]);
 					j--;
 				}
@@ -652,6 +653,7 @@ int main ( int argc, char **argv ) {
 					clusterSum += hits[j];
 					clusterSize++;
 					hits[j] = 0.0;
+					if (max_E > 10.0*calSigma_mean[seed])
 					histT0_clustering->Fill(times[seed],times[j]);
 					j++;
 				}
