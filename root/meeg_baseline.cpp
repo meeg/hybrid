@@ -46,7 +46,7 @@ using namespace std;
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
         bool debug = false;
-	bool flip_channels = false;
+	bool flip_channels = true;
 	bool mux_channels = false;
 	bool skip_corr = false;
 	bool read_temp = false;
@@ -116,7 +116,7 @@ int main ( int argc, char **argv ) {
 				printf("-h: print this help\n");
 				printf("-d: turn on debug\n");
 				printf("-o: use specified output filename\n");
-				printf("-n: physical channel numbering\n");
+				printf("-n: DAQ (Ryan's) channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
 				printf("-t: print temperature\n");
@@ -135,7 +135,7 @@ int main ( int argc, char **argv ) {
 				else outdir="";
 				break;
 			case 'n':
-				flip_channels = true;
+				flip_channels = false;
 				break;
 			case 'c':
 				skip_corr = true;

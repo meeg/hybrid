@@ -47,7 +47,7 @@ int main ( int argc, char **argv ) {
 	bool plot_tp_fits = false;
 	bool plot_fit_results = false;
 	bool force_cal_grp = false;
-	bool flip_channels = false;
+	bool flip_channels = true;
 	bool move_fitstart = false;
 	bool read_temp = false;
 	bool evio_format = false;
@@ -100,7 +100,7 @@ int main ( int argc, char **argv ) {
 				printf("-g: force use of specified cal group\n");
 				printf("-r: plot fit results\n");
 				printf("-o: use specified output filename\n");
-				printf("-n: don't use physical channel numbering\n");
+				printf("-n: DAQ (Ryan's) channel numbering\n");
 				printf("-s: start fit at given delay after a first guess at T0\n");
 				printf("-t: print temperature\n");
 				printf("-F: use only specified FPGA\n");
@@ -116,7 +116,7 @@ int main ( int argc, char **argv ) {
 				plot_fit_results = true;
 				break;
 			case 'n':
-				flip_channels = true;
+				flip_channels = false;
 				break;
 			case 'g':
 				force_cal_grp = true;
@@ -264,7 +264,7 @@ int main ( int argc, char **argv ) {
 				if (use_hybrid!=-1 && hybrid!=use_hybrid) continue;
 
 				int channel = sample->channel();
-				if (!flip_channels)
+				if (flip_channels)
 					channel += (4-sample->apv())*128;
 				else
 					channel += sample->apv()*128;

@@ -45,7 +45,7 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-	bool flip_channels = false;
+	bool flip_channels = true;
 	bool mux_channels = false;
 	bool read_temp = false;
 	bool evio_format = false;
@@ -104,7 +104,7 @@ int main ( int argc, char **argv ) {
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
-				printf("-n: don't use physical channel numbering\n");
+				printf("-n: DAQ (Ryan's) channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
 				printf("-t: print temperature\n");
@@ -125,7 +125,7 @@ int main ( int argc, char **argv ) {
 				else outdir="";
 				break;
 			case 'n':
-				flip_channels = true;
+				flip_channels = false;
 				break;
 			case 'm':
 				mux_channels = true;
@@ -256,7 +256,7 @@ int main ( int argc, char **argv ) {
 			if (mux_channels) channel = chanMap[sample->channel()];
 			else channel = sample->channel();
 
-			if (!flip_channels)
+			if (flip_channels)
 				channel += (4-sample->apv())*128;
 			else
 				channel += sample->apv()*128;
@@ -400,7 +400,7 @@ int main ( int argc, char **argv ) {
 			{
 				int apv = i/128;
 				int channel = i%128;
-				if (!flip_channels) apv = 4-apv;
+				if (flip_channels) apv = 4-apv;
 				if (channel == 0)
 					threshfile << fpga << "," << hyb << "," << apv << endl;
 				threshfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + threshold_sigma*channelVariance[6][fpga][hyb][i] << endl;
