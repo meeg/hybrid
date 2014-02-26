@@ -51,7 +51,7 @@ int main ( int argc, char **argv ) {
 	int c;
 	bool subtract_T0 = false;
 	bool print_fit_status = false;
-	bool flip_channels = false;
+	bool flip_channels = true;
 	bool use_shape = false;
 	bool shift_t0 = false;
 	bool use_dist = false;
@@ -139,7 +139,7 @@ int main ( int argc, char **argv ) {
 				printf("-b: subtract value of T0 in .tp cal\n");
 				printf("-t: make new .shape cal based on T0-A distribution\n");
 				printf("-d: read and use .dist file, starting T0 window at specified value\n");
-				printf("-n: physical channel numbering\n");
+				printf("-n: DAQ (Ryan's) channel numbering\n");
 				printf("-F: use only specified FPGA\n");
 				printf("-H: use only specified hybrid\n");
 				printf("-e: stop after specified number of events\n");
@@ -153,7 +153,7 @@ int main ( int argc, char **argv ) {
 				use_shape = true;
 				break;
 			case 'n':
-				flip_channels = true;
+				flip_channels = false;
 				break;
 			case 's':
 				shift_t0 = true;
