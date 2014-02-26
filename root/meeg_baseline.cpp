@@ -183,7 +183,7 @@ int main ( int argc, char **argv ) {
 	c1 = new TCanvas("c1","c1",1200,900);
 
 	// Start X11 view
-	//   TApplication theApp("App",NULL,NULL);
+	// TApplication theApp("App",NULL,NULL);
 
 	// Root file is the first and only arg
 	if ( argc-optind != 1 ) {
@@ -314,6 +314,12 @@ int main ( int argc, char **argv ) {
 
 			// Filter APVs
 			if ( eventCount >= 20 ) {
+				bool bad_event = false;
+				for ( y=0; y < 6; y++ ) if (sample->value(y)==0) {
+					printf("sample is zero: event %d, channel %d, sample %d\n",x,channel,y);
+					bad_event = true;
+				}
+				if (bad_event) continue;
 				channelAvg[channel] = 0;
 				for ( y=0; y < 6; y++ ) {
 					value = sample->value(y);
@@ -598,6 +604,16 @@ int main ( int argc, char **argv ) {
 		graph[i] = new TGraph(ni,grChan,grSigma[i]);
 		graph[i]->SetMarkerColor(i+2);
 		mg->Add(graph[i]);
+
+		if(i==0) {
+		  for (int ch=0;ch<graph[i]->GetN();ch++) {
+		    double x,y;
+		    graph[i]->GetPoint(ch,x,y);
+		    if (y > 50) printf("ch %f: noise %f above 50\n",x,y);
+		    if (y < 20) printf("ch %f: noise %f below 20\n",x,y);
+		  }
+		}
+
 	}
 	graph[6]->SetMarkerColor(1);
 	mg->SetTitle("Noise;Channel;ADC counts");

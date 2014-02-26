@@ -351,6 +351,12 @@ int main ( int argc, char **argv ) {
 
 				// Filter APVs
 				if ( eventCount >= 20 ) {
+					bool bad_event = false;
+					for ( y=0; y < 6; y++ ) if (sample->value(y)==0) {
+						printf("sample is zero: event %d, channel %d, sample %d\n",x,channel,y);
+						bad_event = true;
+					}
+					if (bad_event) continue;
 
 					sum = 0;
 					for ( y=0; y < 6; y++ ) {

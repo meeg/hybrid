@@ -403,30 +403,33 @@ int main ( int argc, char **argv ) {
 			histA_2d = new TH2F(name,title,640,0,640,1000,0,2000.0);
 	}
 
+	int a_bins = 400;
+	double max_a = 8000.0;
+
 	sprintf(name,"A");
-	histA_all = new TH1F(name,name,100,0,2000.0);
+	histA_all = new TH1F(name,name,a_bins,0,max_a);
 
 	sprintf(name,"A/internal cal response");
-	histA_norm = new TH1F(name,name,100,0,2.0);
+	histA_norm = new TH1F(name,name,a_bins,0,max_a/1000.0);
 
 	sprintf(name,"clustered A");
-	histA_clusters = new TH1F(name,name,100,0,2000.0);
+	histA_clusters = new TH1F(name,name,a_bins,0,max_a);
 
 	sprintf(name,"clustered A, 1 hit");
-	histA_clusters_1 = new TH1F(name,name,100,0,2000.0);
+	histA_clusters_1 = new TH1F(name,name,a_bins,0,max_a);
 
 	sprintf(name,"clustered A, 2 hits");
-	histA_clusters_2 = new TH1F(name,name,100,0,2000.0);
+	histA_clusters_2 = new TH1F(name,name,a_bins,0,max_a);
 
 	sprintf(name,"clustered A, 3 or more hits");
-	histA_clusters_3 = new TH1F(name,name,100,0,2000.0);
+	histA_clusters_3 = new TH1F(name,name,a_bins,0,max_a);
 
 	sprintf(name,"T0_clustering");
 	sprintf(title,"T0 of seed and added hits;seed hit [ns];added hit [ns]");
 	histT0_clustering = new TH2F(name,title,500,-2*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL,500,-2*SAMPLE_INTERVAL,6*SAMPLE_INTERVAL);
 
 	sprintf(name,"total A in event");
-	histA_total = new TH1F(name,name,100,0,2000.0);
+	histA_total = new TH1F(name,name,a_bins,0,max_a);
 	for (int n=0;n<640;n++) {
 		histMin[n] = 16384;
 		histMax[n] = 0;
@@ -627,7 +630,7 @@ int main ( int argc, char **argv ) {
 				int seed;
 				bool hits_left = false;
 				for (int i=0;i<640;i++) {
-					if (hits[i] > 4.0*calSigma_mean[i] && hits[i] > max_E) {
+					if (hits[i] > 10.0*calSigma_mean[i] && hits[i] > max_E) {
 						hits_left = true;
 						max_E = hits[i];
 						seed = i;

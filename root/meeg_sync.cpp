@@ -341,7 +341,6 @@ int main ( int argc, char **argv ) {
 						pedValue -= pedestal[fpga][hyb][apv];
 
 						//printf("fpga: %d, x: %d, val: %x, adcValid: %d\n",event.fpgaAddress(),x, adcValue, adcValid);
-						//printf("fpga: %d, x: %d, val: %x, adcValid: %d\n",event.fpgaAddress(),x, adcValue, adcValid);
 
 						//if ( idx==10000 && adcValue > 0x2000 ) idx = 0;
 						if ( pedValue > 0x2000 ) {
