@@ -69,6 +69,7 @@ class Device {
 
       // Map of variables
       VariableMap variables_;
+      VariableMap hiddenVariables_;
 
       // Map of registers
       RegisterMap registers_;
@@ -99,7 +100,7 @@ class Device {
 
       // Verify register
       // Throws string on verify fail
-      void verifyRegister ( Register *reg, bool warnOnly = false );
+      void verifyRegister ( Register *reg, bool warnOnly = false, uint mask = 0xFFFFFFFF );
 
       // Method to set variable values from xml tree
       bool setXmlConfig ( xmlNode *node );
@@ -278,6 +279,12 @@ class Device {
 
       //! Verify hardware state of configuration
       virtual void verifyConfig ( );
+
+      
+      void hideAllCommands();
+
+      void hideAllVariables();
+      void unhideVariables();
 
 };
 #endif

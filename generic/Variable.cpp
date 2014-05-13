@@ -12,6 +12,7 @@
 //-----------------------------------------------------------------------------
 // Modification history :
 // 04/12/2011: created
+// 02/07/2011: Added map option
 //-----------------------------------------------------------------------------
 
 #include <Variable.h>
@@ -20,6 +21,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <pthread.h>
+#include <stdexcept>
 using namespace std;
 
 // Constructor
@@ -43,18 +45,30 @@ Variable::Variable ( string name, VariableType type ) {
 
 // Set enum list      
 void Variable::setEnums ( EnumVector enums ) {
-   values_ = enums;
-   value_  = values_[0];
+   uint x;
+
+   values_.clear();
+
+   for ( x=0; x < enums.size(); x++ ) 
+      values_.insert(pair<uint,string>(x,enums[x]));
+
+   value_ = values_[0];
+}
+
+// Set map 
+void Variable::setMap ( EnumMap map ) {
+   values_ = map;
+
+   value_ = values_.begin()->first;
 }
 
 // Set as true/false
 void Variable::setTrueFalse ( ) {
-   vector<string> trueFalse;
-   trueFalse.resize(2);
-   trueFalse[0] = "False";
-   trueFalse[1] = "True";
-   values_ = trueFalse;
-   value_  = values_[0];
+   values_.clear();
+   values_[0] = "False";
+   values_[1] = "True";
+
+   value_ = values_[0];
 }
 
 // Set computation constants
@@ -129,7 +143,6 @@ string Variable::get ( ) {
 void Variable::setInt ( uint value ) {
    string       newValue;
    stringstream tmp;
-   uint         x;
 
    tmp.str("");
    newValue = "";
@@ -137,16 +150,12 @@ void Variable::setInt ( uint value ) {
    // Variable is an enum
    if ( values_.size() != 0 ) {
 
-      // Valid value
-      if ( value < values_.size() ) newValue = values_.at(value);
-
-      // Invalid
-      else {
+      try {
+         newValue = values_.at(value);
+      }
+      catch (const out_of_range& oor) {
          tmp << "Variable::setInt -> Name: " << name_ << endl;
          tmp << "   Invalid enum value: 0x" << hex << setw(0) << value << endl;
-         tmp << "   Valid Enums: " << endl;
-         for ( x=0; x < values_.size(); x++ ) 
-            tmp << "      0x" << hex << setw(0) << x << " - " << values_.at(x) << endl;
          throw(tmp.str());
       }
    } 
@@ -161,14 +170,46 @@ void Variable::setInt ( uint value ) {
    pthread_mutex_unlock(&mutex_);
 }
 
+// Method to set variable register value (displayed in decimal)
+void Variable::setIntDec ( uint value ) {
+   string       newValue;
+   stringstream tmp;
+
+   tmp.str("");
+   newValue = "";
+
+   // Variable is an enum
+   if ( values_.size() != 0 ) {
+
+      try {
+         newValue = values_.at(value);
+      }
+      catch (const std::out_of_range& oor) {
+         tmp << "Variable::setInt -> Name: " << name_ << endl;
+         tmp << "   Invalid enum value: 0x" << hex << setw(0) << value << endl;
+         throw(tmp.str());
+      }
+   } 
+   else {
+      tmp.str("");
+      tmp << dec  << setw(0) << value;
+      newValue = tmp.str();
+   }
+
+   pthread_mutex_lock(&mutex_);
+   value_ = newValue;
+   pthread_mutex_unlock(&mutex_);
+}
+
+
 // Method to get variable register value
 uint Variable::getInt ( ) {
-   stringstream tmp;
-   uint         ret;
-   const char   *sptr;
-   char         *eptr;
-   uint         x;
-   string       lvalue;
+   stringstream      tmp;
+   uint              ret;
+   const char        *sptr;
+   char              *eptr;
+   string            lvalue;
+   EnumMap::iterator enumIter;
 
    pthread_mutex_lock(&mutex_);
    lvalue = value_;
@@ -177,16 +218,18 @@ uint Variable::getInt ( ) {
    // Value can't be converted to integer
    if ( lvalue == "" ) return(0);
 
+   // Enum
    if ( values_.size() != 0 ) {
-      for (x=0; x < values_.size(); x++) {
-         if (lvalue == values_.at(x)) return(x);
+
+      // Find the value
+      for (enumIter = values_.begin(); enumIter != values_.end(); enumIter++) {
+         if ( enumIter->second == lvalue ) return(enumIter->first);
       }
+
+      // Value was not found
       tmp.str("");
       tmp << "Variable::setInt -> Name: " << name_ << endl;
       tmp << "   Invalid enum string: " << lvalue << endl;
-      tmp << "   Valid Enums: " << endl;
-      for ( x=0; x < values_.size(); x++ ) 
-         tmp << "      0x" << hex << setw(0) << x << " - " << values_.at(x) << endl;
       throw(tmp.str());
    }
    else {
@@ -207,8 +250,8 @@ uint Variable::getInt ( ) {
 
 //! Method to get variable information in xml form.
 string Variable::getXmlStructure (bool hidden, uint level) {
-   EnumVector::iterator   enumIter;
-   stringstream           tmp;
+   EnumMap::iterator enumIter;
+   stringstream      tmp;
 
    if ( isHidden_ && !hidden ) return(string(""));
 
@@ -232,7 +275,7 @@ string Variable::getXmlStructure (bool hidden, uint level) {
    if ( values_.size() != 0 ) {
       for ( enumIter = values_.begin(); enumIter != values_.end(); enumIter++ ) {
          if ( level != 0 ) for (uint l=0; l < ((level*3)+3); l++) tmp << " ";
-         tmp << "<enum>" << (*enumIter) << "</enum>" << endl;
+         tmp << "<enum>" << enumIter->second << "</enum>" << endl;
       }
    }
 

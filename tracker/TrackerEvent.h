@@ -67,24 +67,26 @@ using namespace std;
 class TrackerEvent : public Data {
 
       // Temperature Constants
-      static const double coeffA_  = -1.4141963e1;
-      static const double coeffB_  =  4.4307830e3;
-      static const double coeffC_  = -3.4078983e4;
-      static const double coeffD_  = -8.8941929e6;
-      static const double beta_    = 3750;
-      static const double constA_  = 0.03448533;
-      static const double t25_     = 10000.0;
-      static const double k0_      = 273.15;
-      static const double vmax_    = 2.5;
-      static const double vref_    = 2.5;
-      static const double rdiv_    = 10000;
-      static const double minTemp_ = -50;
-      static const double maxTemp_ = 150;
-      static const double incTemp_ = 0.01;
-      static const uint   adcCnt_  = 4096;
+      static const double coeffA_     = -1.4141963e1;
+      static const double coeffB_     =  4.4307830e3;
+      static const double coeffC_     = -3.4078983e4;
+      static const double coeffD_     = -8.8941929e6;
+      static const double beta_       = 3750;
+      static const double constA_     = 0.03448533;
+      static const double t25_        = 10000.0;
+      static const double k0_         = 273.15;
+      static const double vmax_       = 2.5;
+      static const double vref_       = 2.5;
+      static const double vrefNew_    = 2.048;
+      static const double rdiv_       = 10000;
+      static const double minTemp_    = -50;
+      static const double maxTemp_    = 150;
+      static const double incTemp_    = 0.01;
+      static const uint   adcCnt_     = 4096;
 
       // Temperature lookup table
       double tempTable_[adcCnt_];
+      double tempTableNew_[adcCnt_];
 
       // Frame Constants
       static const unsigned int headSize_   = 8;

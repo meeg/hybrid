@@ -74,7 +74,7 @@ class DataReadEvio : public DataRead {
 
 	void set_bank_num(int bank_num);
 
-	bool open ( string file);
+	bool open ( string file, bool compressed = false );
 
 	void close();
 

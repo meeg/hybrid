@@ -42,12 +42,17 @@ typedef struct {
 } ControlCmdMemory;
 
 // Open and map shared memory
-inline int controlCmdOpenAndMap ( ControlCmdMemory **ptr, const char *system, unsigned int id ) {
+inline int controlCmdOpenAndMap ( ControlCmdMemory **ptr, const char *system, unsigned int id, int uid=-1 ) {
    int           smemFd;
    char          shmName[200];
+   int           lid;
+
+   // ID to use?
+   if ( uid == -1 ) lid = getuid();
+   else lid = uid;
 
    // Generate shared memory
-   sprintf(shmName,"control_cmd.%i.%s.%i",getuid(),system,id);
+   sprintf(shmName,"control_cmd.%i.%s.%i",lid,system,id);
 
    // Attempt to open existing shared memory
    if ( (smemFd = shm_open(shmName, O_RDWR, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) ) < 0 ) {

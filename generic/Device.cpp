@@ -31,7 +31,10 @@ void Device::writeRegister ( Register *reg, bool force, bool wait ) {
    stringstream msg;
    msg.str("");
 
-   if ( getInt("Enabled") == 0 || ( (!reg->stale()) && (!force) )) return;
+   // Set register stale if force is set, that way if not enabled it will be written eventually
+   if ( force ) reg->setStale();
+
+   if ( getInt("Enabled") == 0 || !reg->stale() ) return;
 
    // Call function to set register value
    system_->commLink()->queueRegister(destination_,reg,true,wait);
@@ -81,7 +84,7 @@ void Device::readRegister ( Register *reg ) {
 }
 
 // Verify register
-void Device::verifyRegister ( Register *reg, bool warnOnly ) {
+void Device::verifyRegister ( Register *reg, bool warnOnly, uint mask ) {
    stringstream msg;
    Register     *temp;
    bool         match;
@@ -94,9 +97,19 @@ void Device::verifyRegister ( Register *reg, bool warnOnly ) {
    temp = new Register(reg);
    system_->commLink()->queueRegister(destination_,temp,false,true);
 
-   // Verify register
-   if ( memcmp(temp->data(),reg->data(),reg->size()*4) == 0 ) match = true;
-   else match = false;
+   // Single register
+   if ( reg->size() == 1 ) {
+      if ( reg->get(0,mask) != temp->get(0,mask) ) match = false;
+      else match = true;
+   }
+
+   // Block register
+   else {
+
+      // Verify register
+      if ( memcmp(temp->data(),reg->data(),reg->size()*4) == 0 ) match = true;
+      else match = false;
+   }
 
    // Check for status error
    if ( temp->status() != 0 ) err = true;
@@ -469,6 +482,8 @@ string Device::getXmlStructure (bool top, bool common, bool hidden, uint level) 
 Device::Device ( uint destination, uint baseAddress, string name, uint index, Device *parent ) {
    Device *nxt;
 
+
+
    destination_     = destination;
    baseAddress_     = baseAddress;
    name_            = name;
@@ -487,6 +502,17 @@ Device::Device ( uint destination, uint baseAddress, string name, uint index, De
    getVariable("Enabled")->setDescription("Set to true to enable device for physical access");
    getVariable("Enabled")->setTrueFalse();
    getVariable("Enabled")->set("True");
+
+   // Hidden variable for register read result
+   addVariable(new Variable("ReadRegisterResult",Variable::Status));
+   getVariable("ReadRegisterResult")->setHidden(true);
+
+   // Read and write commands
+   addCommand(new Command("WriteRegister"));
+   getCommand("WriteRegister")->setHidden(true);
+
+   addCommand(new Command("ReadRegister"));
+   getCommand("ReadRegister")->setHidden(true);
 
    // Parent and top level
    parent_ = parent;
@@ -675,11 +701,40 @@ Device * Device::device ( string name, uint index ) {
 
 // Method to process a command
 void Device::command ( string name, string arg ) {
-   Command       *cmd;
-   stringstream  tmp;
+   Command        *cmd;
+   stringstream   tmp;
+   const char     *sptr;
+   char           *eptr;
+   uint           ret;
+   string         tname;
+   string         tvalue;
 
    // Device is not enabled
    if ( getInt("Enabled") == 0 ) return;
+
+   // Register read
+   if ( name == "ReadRegister" ) {
+      readRegister(getRegister(arg));
+      ret = getRegister(arg)->get();
+      getVariable("ReadRegisterResult")->setInt(ret);
+      cout << "Device::command -> Name: " << name_ << " Read register " << arg << " Value=" << get("ReadRegisterResult") << endl;
+      return;
+   }
+   
+   // Register write
+   if ( name == "WriteRegister" ) {
+      istringstream iss(arg,istringstream::in);
+      iss >> tname;
+      iss >> tvalue;
+
+      sptr = tvalue.c_str();
+      ret = (uint)strtoul(sptr,&eptr,0);
+      getRegister(tname)->set(ret);
+
+      cout << "Device::command -> Name: " << name_ << " Write register " << tname << " Value=0x" << hex << setw(8) << setfill('0') << ret << endl;
+      writeRegister(getRegister(tname),true,true);
+      return;
+   }
 
    cmd = getCommand(name);
 
@@ -723,7 +778,7 @@ void Device::set ( string variable, string value ) {
       var = getVariable(variable);
    } catch ( string error ) { return; } 
 
-   if ( var->type() != Variable::Configuration ) return;
+   //if ( var->type() != Variable::Configuration ) return;
 
    if ( debug_ ) {
       cout << "Device::set -> Name: " << name_ << " Index: " << dec << index_
@@ -751,7 +806,7 @@ void Device::setInt ( string variable, uint value ) {
       var = getVariable(variable);
    } catch ( string error ) { return; } 
 
-   if ( var->type() != Variable::Configuration ) return;
+   //if ( var->type() != Variable::Configuration ) return;
 
    if ( debug_ ) {
       cout << "Device::setInt -> Name: " << name_ << " Index: " << dec << index_
@@ -923,3 +978,37 @@ void Device::verifyConfig( ) {
    }
 }
 
+void Device::hideAllCommands() {
+   CommandMap::iterator cmdMapIter;
+   
+   for (cmdMapIter=commands_.begin(); cmdMapIter!=commands_.end(); cmdMapIter++) {
+      ((Command*)(cmdMapIter->second))->setHidden(true);
+   }
+}
+
+void Device::hideAllVariables() {
+   VariableMap::iterator i;
+   Variable* v;
+   //   string s;
+   hiddenVariables_.clear();
+   
+   for (i=variables_.begin(); i!=variables_.end(); i++) {
+      //      s = (string)(i->first);
+      v = (Variable*)(i->second);
+      if (v->hidden()) {
+         // Save list of variables that are already hidden so that they can remain hidden when
+         // unhideDevice is called
+         hiddenVariables_[(i->first)] = v;
+      }
+      v->setHidden(true);
+   }
+}
+
+void Device::unhideVariables() {
+    VariableMap::iterator i;
+    for (i=variables_.begin(); i!=variables_.end(); i++) {
+       if (hiddenVariables_.count(i->first) == 0) {
+          ((Variable*)(i->second))->setHidden(false);
+       }
+    }
+}

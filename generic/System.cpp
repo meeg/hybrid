@@ -30,6 +30,7 @@ using namespace std;
 System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    swRunEnable_    = false;
    swRunning_      = false;
+   hwRunning_      = false;
    allStatusReq_   = false;
    topStatusReq_   = false;
    defaults_       = "defaults.xml";
@@ -73,7 +74,7 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    getCommand("WriteStructureXml")->setHasArg(true);
 
    addCommand(new Command("OpenDataFile"));
-   getCommand("OpenDataFile")->setDescription("Open data file. Pass filename as arg.");
+   getCommand("OpenDataFile")->setDescription("Open data file.");
    getCommand("OpenDataFile")->setHidden(true);
 
    addCommand(new Command("CloseDataFile"));
@@ -120,6 +121,11 @@ System::System ( string name, CommLink *commLink ) : Device(0,0,name,0,NULL) {
    addVariable(new Variable("DataFile",Variable::Configuration));
    getVariable("DataFile")->setDescription("Data File For Write");
    getVariable("DataFile")->setHidden(true);
+
+   addVariable(new Variable("DataCompress",Variable::Configuration));
+   getVariable("DataCompress")->setDescription("Compress Data Files");
+   getVariable("DataCompress")->setTrueFalse();
+   getVariable("DataCompress")->setHidden(true);   
 
    addVariable(new Variable("DataRxCount",Variable::Status));
    getVariable("DataRxCount")->setDescription("Number of events received");
@@ -233,8 +239,6 @@ void System::swRunThread() {
    ulong           ctime;
    ulong           ltime;
    uint            runTotal;
-   stringstream    xml;
-   uint            runNumber;
 
    swRunning_ = true;
    swRunError_  = "";
@@ -250,19 +254,6 @@ void System::swRunThread() {
            << ", RunCount=" << dec << swRunCount_
            << ", RunPeriod=" << dec << swRunPeriod_ << endl;
    }
-
-   // Increment run number
-   runNumber = getVariable("RunNumber")->getInt() + 1;
-   getVariable("RunNumber")->setInt(runNumber);
-
-   // Add record to data file
-   xml.str("");
-   xml << "<runStart>" << endl;
-   xml << "<runNumber>" << runNumber << "</runNumber>" << endl;
-   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
-   xml << "<user>" << getlogin() << "</user>" << endl;
-   xml << "</runStart>" << endl;
-   commLink_->addRunStart(xml.str());
 
    // Run
    while ( swRunEnable_ && (runTotal < swRunCount_ || swRunCount_ == 0 )) {
@@ -289,15 +280,6 @@ void System::swRunThread() {
 
    sleep(1);
 
-   // Add record to data file
-   xml.str("");
-   xml << "<runStop>" << endl;
-   xml << "<runNumber>" << runNumber << "</runNumber>" << endl;
-   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
-   xml << "<user>" << getlogin() << "</user>" << endl;
-   xml << "</runStop>" << endl;
-   commLink_->addRunStop(xml.str());
-
    // Set run
    if ( swRunCount_ == 0 ) getVariable("RunProgress")->setInt(100);
    else getVariable("RunProgress")->setInt((uint)(((double)runTotal/(double)swRunCount_)*100.0));
@@ -310,12 +292,31 @@ void System::setRunState(string state) {
    stringstream err;
    stringstream tmp;
    uint         toCount;
+   uint         runNumber;
 
    // Stopped state is requested
-   if ( state == "Stopped" ) swRunEnable_ = false;
+   if ( state == "Stopped" ) {
+
+      if ( swRunEnable_ ) {
+         swRunEnable_ = false;
+         pthread_join(swRunThread_,NULL);
+      }
+
+      allStatusReq_ = true;
+      addRunStop();
+   }
 
    // Running state is requested
    else if ( state == "Running" && !swRunning_ ) {
+
+      // Set run command here when re-implemented
+      //device->setRuncommand("command");
+
+      // Increment run number
+      runNumber = getVariable("RunNumber")->getInt() + 1;
+      getVariable("RunNumber")->setInt(runNumber);
+      addRunStart();
+
       swRunRetState_ = get("RunState");
       swRunEnable_   = true;
       getVariable("RunState")->set("Running");
@@ -329,9 +330,6 @@ void System::setRunState(string state) {
       else if ( get("RunRate") ==  "10Hz") swRunPeriod_ =  100000;
       else if ( get("RunRate") ==   "1Hz") swRunPeriod_ = 1000000;
       else swRunPeriod_ = 1000000;
-
-      // Set run command here when re-implemented
-      //device->setRuncommand("command");
 
       // Start thread
       if ( swRunCount_ == 0 || pthread_create(&swRunThread_,NULL,swRunStatic,this) ) {
@@ -423,7 +421,7 @@ void System::command ( string name, string arg ) {
    // Open data file
    else if ( name == "OpenDataFile" ) {
       command("CloseDataFile","");
-      commLink_->openDataFile(getVariable("DataFile")->get());
+      commLink_->openDataFile(getVariable("DataFile")->get(),getVariable("DataCompress")->getInt());
       commLink_->addConfig(configString(true,false));
       readStatus();
       commLink_->addStatus(statusString(true,false));
@@ -626,6 +624,7 @@ string System::poll (ControlCmdMemory *cmem) {
    if ( swRunEnable_ && !swRunning_ ) {
       swRunEnable_ = false;
       pthread_join(swRunThread_,NULL);
+      addRunStop();
       allStatusReq_ = true;
       if ( swRunError_ != "" ) {
          errorBuffer_.append("<error>");
@@ -664,6 +663,9 @@ string System::poll (ControlCmdMemory *cmem) {
    // Once a second updates
    if ( currTime != lastTime_ ) {
       lastTime_ = currTime;
+
+      // Add timestamp to data file if running
+      if ( swRunning_ || hwRunning_ ) addRunTime();
 
       // File counters
       getVariable("RegRxCount")->setInt(commLink_->regRxCount());
@@ -794,5 +796,44 @@ string System::genTime( time_t tme ) {
    strftime(tstr,200,"%Y_%m_%d_%H_%M_%S",timeinfo);
    ret = tstr;
    return(ret); 
+}
+
+void System::addRunStart() {
+   stringstream    xml;
+
+   xml.str("");
+   xml << "<runStart>" << endl;
+   xml << "<runNumber>" << getVariable("RunNumber")->getInt() << "</runNumber>" << endl;
+   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
+   xml << "<unixtime>" << dec << time(0) << "</unixtime>" << endl;
+   xml << "<user>" << getlogin() << "</user>" << endl;
+   xml << "</runStart>" << endl;
+   commLink_->addRunStart(xml.str());
+}
+
+void System::addRunStop() {
+   stringstream    xml;
+
+   xml.str("");
+   xml << "<runStop>" << endl;
+   xml << "<runNumber>" << getVariable("RunNumber")->getInt() << "</runNumber>" << endl;
+   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
+   xml << "<unixtime>" << dec << time(0) << "</unixtime>" << endl;
+   xml << "<user>" << getlogin() << "</user>" << endl;
+   xml << "</runStop>" << endl;
+   commLink_->addRunStop(xml.str());
+}
+
+void System::addRunTime() {
+   stringstream    xml;
+
+   xml.str("");
+   xml << "<runTime>" << endl;
+   xml << "<runNumber>" << getVariable("RunNumber")->getInt() << "</runNumber>" << endl;
+   xml << "<timestamp>" << genTime(time(0)) << "</timestamp>" << endl;
+   xml << "<unixtime>" << dec << time(0) << "</unixtime>" << endl;
+   xml << "<user>" << getlogin() << "</user>" << endl;
+   xml << "</runTime>" << endl;
+   commLink_->addRunTime(xml.str());
 }
 

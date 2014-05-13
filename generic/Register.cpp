@@ -17,6 +17,10 @@
 #include <Register.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sstream>
+#include <iostream>
+#include <string>
+#include <iomanip>
 using namespace std;
 
 //! Constructor
@@ -40,6 +44,7 @@ Register::Register ( string name, uint address ) {
    stale_       = false;
    status_      = 0;
    size_        = 1;
+
 }
 
 // Constructor
@@ -65,6 +70,8 @@ string Register::name () { return(name_); }
 // Method to get register address
 uint Register::address () { return(address_); }
 
+void Register::setAddress(uint address) { address_ = address;}
+
 // Method to get register size
 uint Register::size () {
    return(size_);
@@ -88,6 +95,9 @@ uint Register::status () {
 //! Clear register stale
 void Register::clrStale() { stale_ = false; }
 
+//! Set register stale
+void Register::setStale() { stale_ = true; }
+
 //! Get register stale
 bool Register::stale() {
    return(stale_);
@@ -95,34 +105,31 @@ bool Register::stale() {
 
 // Method to set register value
 void Register::set ( uint value, uint bit, uint mask ) {
-   uint newVal = value_[0];
-
-   newVal &= (0xFFFFFFFF ^ (mask << bit));
-   newVal |= ((value & mask) << bit);
-
-   if ( newVal != value_[0] ) {
-      value_[0] = newVal;
-      stale_    = true;
-   }
+   setIndex(0, value, bit, mask);
 }
 
 // Method to get register value
 uint Register::get ( uint bit, uint mask ) {
-   return((value_[0]>>bit) & mask);
+   return(getIndex(0, bit, mask));
 }
 
-// Method to set register value
-void Register::setIndex ( uint index, uint value ) {
-
+void Register::setIndex ( uint index, uint value, uint bit, uint mask ) {
    if ( index >= size_ ) return;
 
-   if ( value != value_[index] ) stale_ = true;
-   value_[index] = value;
+   uint newVal = value_[index];
+   
+   newVal &= (0xFFFFFFFF ^ (mask << bit));
+   newVal |= ((value & mask) << bit);
+
+   if ( newVal != value_[index] ) {
+      value_[index] = newVal;
+      stale_ = true;
+   }
+
 }
 
-// Method to get register value
-uint Register::getIndex ( uint index ) {
+uint Register::getIndex ( uint index, uint bit, uint mask ) {
    if ( index >= size_ ) return(0xFFFFFFFF);
-   return(value_[index]);
+   return((value_[index]>>bit) & mask);
 }
 

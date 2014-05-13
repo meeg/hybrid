@@ -64,6 +64,25 @@ bool Data::read ( int fd, uint size ) {
    return(true);
 }
 
+// Read data from compressed file
+bool Data::read ( BZFILE *bzFile, uint size ) {
+   int bzerror;
+
+   if ( size > alloc_ ) {
+      free(data_);
+      alloc_ = size;
+      data_ = (uint *)malloc(alloc_ * sizeof(uint));
+   }
+   size_ = size;
+   if ( BZ2_bzRead ( &bzerror,bzFile,data_,size_*(sizeof(uint))) != (int)(size_*sizeof(uint))) {
+      size_ = 0;
+      update();
+      return(false);
+   }
+   update();
+   return(true);
+}
+
 // Copy data from buffer
 void Data::copy ( uint *data, uint size ) {
    if ( size > alloc_ ) {

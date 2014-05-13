@@ -35,6 +35,7 @@ class CntrlFpga : public Device {
       static const double k0_      = 273.15;
       static const double vmax_    = 2.5;
       static const double vref_    = 2.5;
+      static const double vrefNew_ = 2.048;
       static const double rdiv_    = 10000;
       static const double minTemp_ = -50;
       static const double maxTemp_ = 150;
@@ -43,6 +44,7 @@ class CntrlFpga : public Device {
 
       // Temperature lookup table
       double tempTable_[adcCnt_];
+      double tempTableNew_[adcCnt_];
 
       // Threshold data
       Threshold *thold_;

@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <DataSharedMem.h>
 using namespace std;
 
 // IO Thread
@@ -88,6 +89,7 @@ void CommLink::dataHandler() {
    uint    xmlCount;
    uint    xmlSize;
    uint    wrSize;
+   int     bzerror;
 
    // Store time
    time(&ltime);
@@ -115,8 +117,18 @@ void CommLink::dataHandler() {
                sendto(dataNetFd_,xmlReqEntry_.c_str(),wrSize,0,(const sockaddr*)&net_addr_,slen);
             }
 
+            // Shared memory
+            if ( smem_ != NULL ) 
+               dataSharedWrite ((DataSharedMemory *)smem_, xmlSize, xmlReqEntry_.c_str(), wrSize );
+
+            // Data file in compressed mode
+            if ( bzEnable_ ) {
+               BZ2_bzWrite(&bzerror,bzFile_,&xmlSize,4);
+               BZ2_bzWrite(&bzerror,bzFile_,(void *)xmlReqEntry_.c_str(),wrSize);
+            }
+
             // Data file is open
-            if ( dataFileFd_ >= 0 ) {
+            else if ( dataFileFd_ >= 0 ) {
                write(dataFileFd_,&xmlSize,4);
                write(dataFileFd_,xmlReqEntry_.c_str(),wrSize);
             }
@@ -142,8 +154,19 @@ void CommLink::dataHandler() {
             sendto(dataNetFd_,buff,size*4,0,(const sockaddr*)&net_addr_,slen);
          }
 
+         // Shared memory
+         if ( smem_ != NULL ) 
+            dataSharedWrite ((DataSharedMemory *)smem_, size, (char *)buff, size*4 );
+
+         // Data file in compressed mode
+         if ( bzEnable_ ) {
+            BZ2_bzWrite(&bzerror,bzFile_,&size,4);
+            BZ2_bzWrite(&bzerror,bzFile_,buff,size*4);
+            dataFileCount_++;
+         }
+
          // File is open
-         if ( dataFileFd_ >= 0 ) {
+         else if ( dataFileFd_ >= 0 ) {
             write(dataFileFd_,&size,4);
             write(dataFileFd_,buff,size*4);
             dataFileCount_++;
@@ -157,7 +180,8 @@ void CommLink::dataHandler() {
             if ( ltime != ctime ) {
                cout << "CommLink::dataHandler -> Received data. Size = " << dec << size
                     << ", TotCount = " << dec << dataRxCount_
-                    << ", FileCount = " << dec << dataFileCount_ << endl;
+                    << ", FileCount = " << dec << dataFileCount_ 
+                    << ", Buffer Depth = " << dec << dataQueue_.entryCnt() << endl;
                ltime = ctime;
             }
          }
@@ -201,6 +225,8 @@ CommLink::CommLink ( ) {
    xmlRespCnt_     = 0;
    xmlStoreEn_     = true;
    toDisable_      = false;
+   smem_           = NULL;
+   bzEnable_       = false;
 
    pthread_mutex_init(&mutex_,NULL);
 }
@@ -208,6 +234,7 @@ CommLink::CommLink ( ) {
 // Deconstructor
 CommLink::~CommLink ( ) { 
    close();
+   if ( smem_ != NULL ) dataSharedClose((DataSharedMemory*)smem_);
 }
 
 // Open link and start threads
@@ -258,32 +285,79 @@ void CommLink::close () {
 }
 
 // Open data file
-void CommLink::openDataFile (string file) {
+void CommLink::openDataFile (string file, bool compress) {
    stringstream tmp;
+   int          bzerror;
+   FILE         *f;
+
    dataFile_ = file;
+   bzEnable_ = compress;
 
-   // Attempt to open data file
-   dataFileFd_ = ::open(file.c_str(),O_RDWR|O_CREAT|O_APPEND,S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
-   tmp.str("");
+   // Compress mode
+   if ( bzEnable_ ) {
+      dataFileFd_ = -1;
 
-   // Status
-   tmp << "CommLink::openDataFile -> ";
-   if ( dataFileFd_ < 0 ) tmp << "Error opening data file ";
-   else tmp << "Opened data file ";
-   tmp << file << endl;
+      // Open file
+      umask(002);
+      f = fopen ( file.c_str(), "a" );
 
-   // Debug result
-   if ( debug_ ) cout << tmp.str();
-   dataFileCount_ = 0;
+      // Attempt to compress file
+      if ( f ) {
+         bzFile_ = BZ2_bzWriteOpen(&bzerror,f,9,0,30);
+         if ( bzerror != BZ_OK ) bzEnable_ = false;
+      }
+      else bzEnable_ = false;
 
-   // Status
-   if ( dataFileFd_ < 0 ) throw(tmp.str());
+      // Status
+      tmp.str("");
+      tmp << "CommLink::openDataFile -> ";
+      if ( dataFileFd_ < 0 ) tmp << "Error opening compressed data file ";
+      else tmp << "Opened compressed data file ";
+      tmp << file << endl;
+
+      // Debug result
+      if ( debug_ ) cout << tmp.str();
+      dataFileCount_ = 0;
+
+      // Status
+      if ( ! bzEnable_ ) throw(tmp.str());
+   }
+
+   // Non compress mode
+   else {
+
+      // Open the file
+      dataFileFd_ = ::open(file.c_str(),O_RDWR|O_CREAT|O_APPEND,S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+
+      // Status
+      tmp.str("");
+      tmp << "CommLink::openDataFile -> ";
+      if ( dataFileFd_ < 0 ) tmp << "Error opening data file ";
+      else tmp << "Opened data file ";
+      tmp << file << endl;
+
+      // Debug result
+      if ( debug_ ) cout << tmp.str();
+      dataFileCount_ = 0;
+
+      // Status
+      if ( dataFileFd_ < 0 ) throw(tmp.str());
+   }
 }
 
 // Close data file
 void CommLink::closeDataFile () {
-   ::close(dataFileFd_);
-   dataFileFd_  = -1;
+   int  bzerror;
+
+   // Close compression
+   if ( bzEnable_ ) {
+      bzEnable_ = false;
+      BZ2_bzWriteClose(&bzerror,bzFile_,0,NULL,NULL);
+   }
+   else {
+      ::close(dataFileFd_);
+      dataFileFd_  = -1;
+   }
 
    if ( debug_ ) {
       cout << "CommLink::closeDataFile -> "
@@ -383,7 +457,7 @@ void CommLink::queueRegister ( uint destination, Register *reg, bool write, bool
 
          // Wait for response
          while ( wait && !error && currResp == regRespCnt_ ) {
-            if ( timer > 100 && (!toDisable_)) {
+            if ( timer > 1000 && (!toDisable_)) {
                err.str("");
                err << "CommLink::queueRegister -> Register: " << reg->name();
                if ( write ) err << ", Write"; else err << ", Read";
@@ -473,6 +547,57 @@ void CommLink::queueCommand ( uint destination, Command *cmd ) {
    }
    pthread_mutex_unlock(&mutex_);
 }
+
+// Queue data transmission
+void CommLink::queueDataTx ( uint destination, uint address, uint *txBuffer, uint txLength ) {
+   uint         timer;
+   stringstream err;
+
+   pthread_mutex_lock(&mutex_);
+
+   // Setup request
+   timer          = 0;
+   dataReqEntry_  = txBuffer;
+   dataReqLength_ = txLength;
+   dataReqDest_   = destination;
+   dataReqAddr_   = address;
+   dataReqCnt_++;
+
+   //Check that exactly one lane and VC are selected
+   uint lane    = (dataReqAddr_ >> 4) & 0xF;
+   uint vc      = (dataReqAddr_     ) & 0xF;
+   uint laneSum = 0;
+   uint vcSum   = 0;
+   for ( uint i = 0; i < 4; ++i ) {
+      laneSum += (lane >> i) & 0x1;
+      vcSum   += (vc   >> i) & 0x1;
+   }
+
+   if ( vcSum != 1 || laneSum != 1 ) {
+         err.str("");
+         err << "CommLink::queueDataTx -> ";
+         err << " bad VC/lane selection: ";
+         err << ", Lane: 0x" << hex << setw(8) << setfill('0') << lane;
+         err << ", Vc: 0x" << hex << setw(8) << setfill('0') << vc;
+         pthread_mutex_unlock(&mutex_);
+         throw(err.str());
+
+   }
+   else if ( txLength > maxRxTx_ ) {
+         err.str("");
+         err << "CommLink::queueDataTx -> ";
+         err << ", Destination: 0x" << hex << setw(8) << setfill('0') << destination;
+         err << ", Size: " << dec << txLength;
+         err << ", First word: " << hex << setw(8) << setfill('0') << txBuffer[0];
+         err << ", Exceeded maxRxTx_: " << dec << maxRxTx_;
+         pthread_mutex_unlock(&mutex_);
+         throw(err.str());
+
+   } 
+
+   pthread_mutex_unlock(&mutex_);
+}
+
 
 // Queue run command request
 void CommLink::queueRunCommand ( ) {
@@ -567,11 +692,9 @@ void CommLink::addConfig ( string config ) {
 
    // Wait for response
    while ( currResp == xmlRespCnt_ ) {
-      if ( timer > 1000 ) {
-         err = "CommLink::addConfig -> Timeout!";
-         if ( debug_ ) cout << err << endl;
-         pthread_mutex_unlock(&mutex_);
-         throw(err);
+      if ( timer > 1000000 ) {
+         cout << "CommLink::addConfig -> Waiting for main thread!" << endl;
+         timer = 0;
       }
       timer++;
       usleep(1);
@@ -596,11 +719,9 @@ void CommLink::addStatus ( string status ) {
 
    // Wait for response
    while ( currResp == xmlRespCnt_ ) {
-      if ( timer > 1000 ) {
-         err = "CommLink::addConfig -> Timeout!";
-         if ( debug_ ) cout << err << endl;
-         pthread_mutex_unlock(&mutex_);
-         throw(err);
+      if ( timer > 1000000 ) {
+         cout << "CommLink::addStatus -> Waiting for main thread!" << endl;
+         timer = 0;
       }
       timer++;
       usleep(1);
@@ -625,11 +746,9 @@ void CommLink::addRunStart ( string xml ) {
 
    // Wait for response
    while ( currResp == xmlRespCnt_ ) {
-      if ( timer > 1000 ) {
-         err = "CommLink::addRunStart -> Timeout!";
-         if ( debug_ ) cout << err << endl;
-         pthread_mutex_unlock(&mutex_);
-         throw(err);
+      if ( timer > 1000000 ) {
+         cout << "CommLink::addRunStart -> Waiting for main thread!" << endl;
+         timer = 0;
       }
       timer++;
       usleep(1);
@@ -654,11 +773,36 @@ void CommLink::addRunStop ( string xml ) {
 
    // Wait for response
    while ( currResp == xmlRespCnt_ ) {
-      if ( timer > 1000 ) {
-         err = "CommLink::addRunStop -> Timeout!";
-         if ( debug_ ) cout << err << endl;
-         pthread_mutex_unlock(&mutex_);
-         throw(err);
+      if ( timer > 1000000 ) {
+         cout << "CommLink::addRunStop -> Waiting for main thread!" << endl;
+         timer = 0;
+      }
+      timer++;
+      usleep(1);
+   }
+   pthread_mutex_unlock(&mutex_);
+}
+
+// Add timestamp to data file
+void CommLink::addRunTime ( string xml ) {
+   uint   currResp;
+   uint   timer;
+   string err;
+
+   pthread_mutex_lock(&mutex_);
+
+   // Setup request
+   timer        = 0;
+   xmlReqEntry_ = xml;
+   xmlType_     = Data::XmlRunTime;
+   currResp     = xmlRespCnt_;
+   xmlReqCnt_++;
+
+   // Wait for response
+   while ( currResp == xmlRespCnt_ ) {
+      if ( timer > 1000000 ) {
+         cout << "CommLink::addRunTime -> Waiting for main thread!" << endl;
+         timer = 0;
       }
       timer++;
       usleep(1);
@@ -670,5 +814,18 @@ void CommLink::addRunStop ( string xml ) {
 // Enable store of config/status/start/stop to data file & callback
 void CommLink::setXmlStore ( bool enable ) {
    xmlStoreEn_ = enable;
+}
+
+// Enable shared 
+void CommLink::enableSharedMemory ( string system, uint id ) {
+
+   // Attempt to open and init shared memory
+   if ( (smemFd_ = dataSharedOpenAndMap ( (DataSharedMemory **)(&smem_) , system.c_str(), id )) < 0 ) {
+      smem_ = NULL;
+      throw string("CommLink::enabledSharedMemory -> Failed to open shared memory");
+   }
+
+   // Init shared memory
+   dataSharedInit((DataSharedMemory*)smem_);
 }
 

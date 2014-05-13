@@ -26,6 +26,10 @@ class CommQueue {
       // Read and write pointer
       volatile unsigned int read;
       volatile unsigned int write;
+
+      // Read and write counts
+      volatile unsigned int readCnt;
+      volatile unsigned int writeCnt;
  
       // Circular Buffer
       void *data[size];
@@ -43,6 +47,9 @@ class CommQueue {
 
       // Queue has data
       bool ready ();      
+
+      // Queue depth
+      unsigned int entryCnt ();      
 
 };
 #endif

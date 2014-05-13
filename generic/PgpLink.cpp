@@ -143,17 +143,21 @@ void PgpLink::ioHandler() {
    uint           lastReqCnt;
    uint           lastCmdCnt;
    uint           lastRunCnt;
+   uint           lastDataCnt;
    uint           runVc;
    uint           runLane;
    uint           regVc;
    uint           regLane;
    uint           cmdVc;
    uint           cmdLane;
+   uint           dataVc;
+   uint           dataLane;
    
    // Setup
-   lastReqCnt = regReqCnt_;
-   lastCmdCnt = cmdReqCnt_;
-   lastRunCnt = runReqCnt_;
+   lastReqCnt  = regReqCnt_;
+   lastCmdCnt  = cmdReqCnt_;
+   lastRunCnt  = runReqCnt_;
+   lastDataCnt = dataReqCnt_;
 
    // Init register buffer
    regBuff_ = (uint *) malloc(sizeof(uint)*maxRxTx_);
@@ -232,6 +236,25 @@ void PgpLink::ioHandler() {
          lastCmdCnt = cmdReqCnt_;
          cmdRespCnt_++;
       }
+
+      // Data TX is pending
+      else if ( lastDataCnt != dataReqCnt_ ) {
+
+         // Setup transmit
+         uint dataLaneBits = (dataReqAddr_ >> 4) & 0xF;
+         uint dataVcBits   = (dataReqAddr_     ) & 0xF; 
+         dataLane = 0;
+         dataVc   = 0;
+         while(dataLaneBits >>= 1) dataLane++;
+         while(dataVcBits   >>= 1) dataVc++;
+
+         // Send data
+         pgpcard_send(fd_, dataReqEntry_, dataReqLength_, dataLane, dataVc);
+
+         // Match request cound
+         lastDataCnt = dataReqCnt_;
+      }
+
       else usleep(10);
    }
 
@@ -265,12 +288,11 @@ void PgpLink::open ( string device ) {
       if ( fd_ < 0 ) dbg << "Error opening file ";
       else dbg << "Opened device file ";
       dbg << device_ << endl;
-      cout << dbg;
+      cout << dbg.str();
       throw(dbg.str());
    }
 
    // Status
-   if ( fd_ < 0 ) throw(dbg.str());
    CommLink::open();
 }
 

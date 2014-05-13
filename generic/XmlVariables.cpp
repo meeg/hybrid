@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <libxml/tree.h>
 using namespace std;
@@ -58,14 +59,14 @@ string XmlVariables::removeWhite ( string str ) {
 }
 
 // Process xml
-void XmlVariables::parse ( string type, char *str ) {
+bool XmlVariables::parse ( string type, const char *str ) {
    xmlDocPtr    doc;
    xmlNodePtr   node;
    string       name;
 
    // Parse string
    doc = xmlReadMemory(str, strlen(str), "string.xml", NULL, 0);
-   if (doc == NULL) return;
+   if (doc == NULL) return (false);
 
    // get the root element node
    node = xmlDocGetRootElement(doc);
@@ -76,6 +77,23 @@ void XmlVariables::parse ( string type, char *str ) {
 
    // Cleanup
    xmlFreeDoc(doc);
+   return(true);
+}
+
+// Process xml file
+bool XmlVariables::parseFile ( string type, string file ) {
+   ifstream     is;
+   stringstream buffer;
+
+   // Open file
+   is.open(file.c_str());
+   if ( ! is.is_open() ) return(false);
+   buffer.str("");
+   buffer << is.rdbuf();
+   is.close();
+
+   // Parse string
+   return(parse(type,buffer.str().c_str()));
 }
 
 // Process level
@@ -154,6 +172,27 @@ uint XmlVariables::getInt ( string var ) {
    value = varMapIter->second;
    sptr = value.c_str();
    ret = (uint)strtoul(sptr,&eptr,0);
+   if ( *eptr != '\0' || eptr == sptr ) ret = 0;
+   return(ret);
+}
+
+// Get
+double XmlVariables::getDouble ( string var ) {
+   VariableHolder::iterator varMapIter;
+   double                   ret;
+   string                   value;
+   const char               *sptr;
+   char                     *eptr;
+
+   // Look for variable
+   varMapIter = vars_.find(var);
+
+   // Variable was not found
+   if ( varMapIter == vars_.end() ) return(0);
+
+   value = varMapIter->second;
+   sptr = value.c_str();
+   ret = strtod(sptr,&eptr);
    if ( *eptr != '\0' || eptr == sptr ) ret = 0;
    return(ret);
 }

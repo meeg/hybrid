@@ -46,6 +46,18 @@ TrackerEvent::TrackerEvent () : Data() {
       if ( idx < adcCnt_ ) tempTable_[idx] = temp; 
       temp += incTemp_;
    }
+
+   // Fill new temperature lookup table
+   temp = minTemp_;
+   while ( temp < maxTemp_ ) {
+      tk = k0_ + temp;
+      //res = t25_ * exp(coeffA_+(coeffB_/tk)+(coeffC_/(tk*tk))+(coeffD_/(tk*tk*tk)));      
+      res = constA_ * exp(beta_/tk);
+      volt = (res*vmax_)/(rdiv_+res);
+      idx = (uint)((volt / vrefNew_) * (double)adcCnt_);
+      if ( idx < adcCnt_ ) tempTableNew_[idx] = temp; 
+      temp += incTemp_;
+   }
 }
 
 // Deconstructor
@@ -72,24 +84,34 @@ uint * TrackerEvent::tiData ( ) {
    return(&(data_[2]));
 }
 
+
 // Get temperature values from header.
 double TrackerEvent::temperature ( uint index ) {
+   uint adcValue;
+   uint convValue;
+
    if ( isTiFrame () ) return(0.0);
-   else switch (index) {
-      case  0: return(tempTable_[(data_[2]&0xFFF)]);
-      case  1: return(tempTable_[((data_[2]>>16)&0xFFF)]);
-      case  2: return(tempTable_[(data_[3]&0xFFF)]);
-      case  3: return(tempTable_[((data_[3]>>16)&0xFFF)]);
-      case  4: return(tempTable_[(data_[4]&0xFFF)]);
-      case  5: return(tempTable_[((data_[4]>>16)&0xFFF)]);
-      case  6: return(tempTable_[(data_[5]&0xFFF)]);
-      case  7: return(tempTable_[((data_[5]>>16)&0xFFF)]);
-      case  8: return(tempTable_[(data_[6]&0xFFF)]);
-      case  9: return(tempTable_[((data_[6]>>16)&0xFFF)]);
-      case 10: return(tempTable_[(data_[7]&0xFFF)]);
-      case 11: return(tempTable_[((data_[7]>>16)&0xFFF)]);
+
+   switch (index) {
+      case  0: adcValue = (data_[2]&0xFFFF);
+      case  1: adcValue = ((data_[2]>>16)&0xFFFF);
+      case  2: adcValue = (data_[3]&0xFFFF);
+      case  3: adcValue = ((data_[3]>>16)&0xFFFF);
+      case  4: adcValue = (data_[4]&0xFFFF);
+      case  5: adcValue = ((data_[4]>>16)&0xFFFF);
+      case  6: adcValue = (data_[5]&0xFFFF);
+      case  7: adcValue = ((data_[5]>>16)&0xFFFF);
+      case  8: adcValue = (data_[6]&0xFFFF);
+      case  9: adcValue = ((data_[6]>>16)&0xFFFF);
+      case 10: adcValue = (data_[7]&0xFFFF);
+      case 11: adcValue = ((data_[7]>>16)&0xFFFF);
       default: return(0.0);
    }
+
+   if ( adcValue & 0x8000 ) convValue = ((adcValue >> 3) & 0xFFF);
+   else convValue = adcValue & 0xFFF;
+
+   return (tempTableNew_[convValue]);
 }
 
 // Get sample count

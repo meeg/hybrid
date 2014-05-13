@@ -52,6 +52,19 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
       temp += incTemp_;
    }
 
+   temp = minTemp_;
+   while ( temp < maxTemp_ ) {
+      tk = k0_ + temp;
+      //res = t25_ * exp(coeffA_+(coeffB_/tk)+(coeffC_/(tk*tk))+(coeffD_/(tk*tk*tk)));      
+      res = constA_ * exp(beta_/tk);
+      volt = (res*vmax_)/(rdiv_+res);
+      idx = (uint)((volt / vrefNew_) * (double)(adcCnt_-1));
+      if ( idx < adcCnt_ ) tempTableNew_[idx] = temp; 
+      //cout << "temp=" << temp << " adc=0x" << hex << idx << endl;
+      temp += incTemp_;
+   }
+
+
    // Description
    desc_ = "Control FPGA Object.";
 
@@ -85,6 +98,7 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    addRegister(new Register("AdcClkDelay",     0x01000032));
    addRegister(new Register("SyncData",        0x01000040, 15));
    addRegister(new Register("TrigEdgeNeg",     0x01000050));
+   addRegister(new Register("HybridType",      0x01000051));
    addRegister(new Register("ThresholdA",      0x01200000, 640)); // Hybrid 0
    addRegister(new Register("ThresholdB",      0x01200400, 640)); // Hybrid 1
    addRegister(new Register("ThresholdC",      0x01200800, 640)); // Hybrid 2
@@ -369,6 +383,15 @@ CntrlFpga::CntrlFpga ( uint destination, uint index, Device *parent ) :
    variables_["TrigEdgeNeg"]->setDescription("Trigger Edge Negative");
    variables_["TrigEdgeNeg"]->setTrueFalse();
 
+   addVariable(new Variable("HybridType", Variable::Configuration));
+   variables_["HybridType"]->setDescription("New or old Hybrid");
+   vector<string> hybridTypes;
+   hybridTypes.resize(2);
+   hybridTypes[0] = "Old";
+   hybridTypes[1] = "New";
+   variables_["HybridType"]->setEnums(hybridTypes);
+
+
    // Commands
    addCommand(new Command("ApvSWTrig",0x0));
    commands_["ApvSWTrig"]->setDescription("Generate APV software trigger + calibration.");
@@ -460,12 +483,20 @@ void CntrlFpga::readTemps ( ) {
 
             tmp = registers_["TempData"]->getIndex(hybrid*2+(temp/2));
 
-            if ( (temp % 2) == 0 ) val = (tmp & 0xFFF);
-            else val = ((tmp >> 16) & 0xFFF);
+            if ( (temp % 2) == 0 ) val = (tmp & 0xFFFF);
+            else val = ((tmp >> 16) & 0xFFFF);
 
             txt.str("");
-            txt << tempTable_[val] << " C (";
-            txt << "0x" << hex << setw(3) << setfill('0') << val << ")";
+            if ( val & 0x8000 ) {
+               val = (val >> 3) & 0xFFF;
+               txt << tempTableNew_[val] << " C e(";
+               txt << "0x" << hex << setw(4) << setfill('0') << val << ")";
+            }
+            else {
+                val = val & 0xFFF;
+                txt << tempTable_[val] << " C (";
+                txt << "0x" << hex << setw(4) << setfill('0') << (val&0xFFF) << ")";
+            }
             variables_[name.str()]->set(txt.str());
          }
       }
@@ -667,6 +698,9 @@ void CntrlFpga::readConfig ( ) {
    readRegister(registers_["TholdEnable"]);
    variables_["TholdEnable"]->setInt(registers_["TholdEnable"]->get(0,0x1));
 
+   readRegister(registers_["HybridType"]);
+   variables_["HybridType"]->setInt(registers_["HybridType"]->get(0, 0x1));
+   
    // Sub devices
    Device::readConfig();
    REGISTER_UNLOCK
@@ -755,7 +789,8 @@ void CntrlFpga::writeConfig ( bool force ) {
    writeRegister(registers_["TrigEdgeNeg"],force);
 
 
-
+   registers_["HybridType"]->set(variables_["HybridType"]->getInt(), 0, 0x1);
+   writeRegister(registers_["HybridType"], force);
 
 
 
@@ -855,7 +890,7 @@ void CntrlFpga::verifyConfig ( ) {
    verifyRegister(registers_["ThresholdB"]);
    verifyRegister(registers_["ThresholdC"]);
    verifyRegister(registers_["TrigEdgeNeg"]);
-
+   verifyRegister(registers_["HybridType"]);
    Device::verifyConfig();
    REGISTER_UNLOCK
 }

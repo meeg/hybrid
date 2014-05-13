@@ -38,13 +38,13 @@ class XmlVariables {
       // Process level
       void xmlLevel( xmlNode *node, string curr );
 
-      // Generate XML for a given level knowing the previous and next values
-      string genXmlString ( string prevName, string currName, string currValue, string nextName );
-
       // Variable list
       VariableHolder vars_;
 
    public:
+
+      // Generate XML for a given level knowing the previous and next values
+      static string genXmlString ( string prevName, string currName, string currValue, string nextName );
 
       //! Constructor
       XmlVariables ( );
@@ -60,7 +60,14 @@ class XmlVariables {
        * \param type Type of variable to parse, config or status
        * \param xml XML String
       */
-      void parse ( string type, char *xml );
+      bool parse ( string type, const char *xml );
+
+      //! Parse XML file
+      /*! 
+       * \param type Type of variable to parse, config or status
+       * \param file XML file
+      */
+      bool parseFile ( string type, string file );
 
       //! Get a variable value
       /*! 
@@ -73,6 +80,12 @@ class XmlVariables {
        * \param var Variable name
       */
       uint getInt ( string var );
+
+      //! Get a variable value as double
+      /*! 
+       * \param var Variable name
+      */
+      double getDouble ( string var );
 
       //! Return variable list
       /*! 

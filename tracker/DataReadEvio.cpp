@@ -46,7 +46,7 @@ void DataReadEvio::set_bank_num(int bank_num) {
 }
 
 // Open file
-bool DataReadEvio::open ( string file) {
+bool DataReadEvio::open ( string file, bool compressed ) {
 	int status;
 	char * filename = (char *) malloc((file.size()+1)*sizeof(char));
 	strcpy(filename,file.c_str());

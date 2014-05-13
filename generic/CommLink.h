@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <bzlib.h>
 
 using namespace std;
 
@@ -35,6 +36,9 @@ class Command;
 
 //! Class to contain generic communications link
 class CommLink {
+
+      // Max UDP transfer size
+      static const uint MaxUdpSize = 16000;
 
       // Mutux variable for thread locking
       pthread_mutex_t mutex_;
@@ -54,11 +58,19 @@ class CommLink {
       int    dataFileFd_;
       string dataFile_;
 
+      // Compression options
+      bool     bzEnable_;
+      BZFILE * bzFile_;
+
       // Data network status
       struct sockaddr_in net_addr_;
       int                dataNetFd_;
       string             dataNetAddress_;
       int                dataNetPort_;
+
+      // Shared memory
+      uint smemFd_;
+      void *smem_;
 
       // Data rx callback function
       void (*dataCb_)(void *, uint);
@@ -80,6 +92,13 @@ class CommLink {
       Command  *runReqEntry_;
       uint      runReqDest_;
       uint      runReqCnt_;
+
+      // Data transmit request queue
+      uint     *dataReqEntry_;
+      uint      dataReqLength_;
+      uint      dataReqDest_;
+      uint      dataReqAddr_;
+      uint      dataReqCnt_;
 
       // Config/Status request queue
       string    xmlReqEntry_;
@@ -150,8 +169,9 @@ class CommLink {
        * Return true on success.
        * Throws string on error.
        * \param file filename to open
+       * \param compress flag
       */
-      void openDataFile (string file);
+      void openDataFile (string file, bool compress = false);
 
       //! Close data file
       void closeDataFile ();
@@ -202,6 +222,9 @@ class CommLink {
 
       //! Queue run command request
       void queueRunCommand ( );
+
+      //! Queue data transmission request
+      void queueDataTx ( uint destination, uint address, uint *txBuffer, uint txLength );
 
       //! Set run command
       /*! 
@@ -268,12 +291,24 @@ class CommLink {
       */
       void addRunStop ( string xml );
 
+      //! Add run time to data file
+      /*! 
+       * \param xml Run time data
+      */
+      void addRunTime ( string xml );
+
       //! Enable store of config/status/start/stop to data file & callback
       /*! 
        * \param enable Enable of config/status/start/stop
       */
       void setXmlStore ( bool enable );
 
+      //! Enable shared memory for control
+      /*! 
+       * \param system System name
+       * \param id ID to identify your process
+      */
+      void enableSharedMemory ( string system, uint id );
 };
 
 #endif

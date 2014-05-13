@@ -18,6 +18,7 @@
 
 #include <string>
 #include <sys/types.h>
+#include <bzlib.h>
 using namespace std;
 
 #ifdef __CINT__
@@ -50,7 +51,8 @@ class Data {
          XmlConfig   = 1,
          XmlStatus   = 2,
          XmlRunStart = 3,
-         XmlRunStop  = 4
+         XmlRunStop  = 4,
+         XmlRunTime  = 5
       };
 
       //! Constructor
@@ -72,6 +74,13 @@ class Data {
        * \param size Data size
       */
       bool read ( int fd, uint size );
+
+      //! Read data from compressed file
+      /*! 
+       * \param bzFile Compressed file 
+       * \param size Data size
+      */
+      bool read ( BZFILE *bzFile, uint size );
 
       //! Copy data from buffer
       /*! 

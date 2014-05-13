@@ -70,6 +70,8 @@ class Register {
       //! Method to get register address
       uint address ();
 
+      void setAddress(uint address);
+
       //! Method to get register size
       uint size ();
 
@@ -87,6 +89,9 @@ class Register {
 
       //! Clear register stale
       void clrStale();
+
+      //! Set register stale
+      void setStale();
 
       //! Get register stale
       bool stale();
@@ -119,7 +124,7 @@ class Register {
        * \param index register index
        * \param value register value
       */
-      void setIndex ( uint index, uint value );
+      void setIndex ( uint index, uint value, uint bit=0, uint mask=0xFFFFFFFF );
 
       //! Method to get register value
       /*!
@@ -127,7 +132,8 @@ class Register {
        * the register. 
        * \param index register index
       */
-      uint getIndex ( uint index );
+      uint getIndex ( uint index, uint bit=0, uint mask=0xFFFFFFFF );
+
 
 };
 #endif

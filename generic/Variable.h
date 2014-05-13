@@ -12,18 +12,21 @@
 //-----------------------------------------------------------------------------
 // Modification history :
 // 04/12/2011: created
+// 02/07/2014: Added map option
 //-----------------------------------------------------------------------------
 #ifndef __VARIABLE_H__
 #define __VARIABLE_H__
 
 #include <string>
 #include <vector>
+#include <map>
 #include <pthread.h>
 #include <sys/types.h>
 using namespace std;
 
 // Local types
-typedef vector<string> EnumVector;
+typedef vector<string>   EnumVector;
+typedef map<uint,string> EnumMap;
 
 //! Class to contain generic variable data.
 class Variable {
@@ -48,8 +51,8 @@ class Variable {
       // Current variable value
       string value_;
 
-      // Enum vector
-      EnumVector values_;
+      // Enum map
+      EnumMap values_;
 
       // Variable Type
       VariableType type_;
@@ -81,13 +84,19 @@ class Variable {
        * \param name    name of variable
        * \param type    VariableType value
       */
-      Variable ( string name, VariableType type );
+      Variable ( string name, VariableType type);
 
       //! Set enum list      
       /*! 
        * \param enums Vector of enum values
       */
       void setEnums ( EnumVector enums );
+
+      //! Set enum list      
+      /*! 
+       * \param enums Vector of enum values
+      */
+      void setMap ( EnumMap map );
       
       //! Set variable as true/false
       void setTrueFalse ( );
@@ -161,6 +170,14 @@ class Variable {
        * \param value integer value
       */
       void setInt ( uint value );
+
+      //! Method to set variable integer value
+      /*!
+       * Displays in decimal
+       * Throws string on error
+       * \param value integer value
+      */
+      void setIntDec ( uint value );
 
       //! Method to get variable integer value
       /*!

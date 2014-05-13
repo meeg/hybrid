@@ -47,6 +47,10 @@ class Command {
       /*! 
        * \param name        Command name
        * \param opCode      Command opCode
+       *
+       * Note: OpCode[07:00] = OP Code Value
+       *       OpCode[15:08] = Virtual Channel Number
+       *       OpCode[23:16] = Lane Number
       */
       Command ( string name, uint opCode );
 

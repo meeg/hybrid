@@ -19,8 +19,10 @@ using namespace std;
 
 // Constructor
 CommQueue::CommQueue() {
-   read  = 0;
-   write = 0;
+   read     = 0;
+   write    = 0;
+   readCnt  = 0;
+   writeCnt = 0;
 }
 
 
@@ -32,6 +34,7 @@ bool CommQueue::push ( void *ptr ) {
    if ( next != read ) {
       data[write] = ptr;
       write = next;
+      writeCnt++;
       return true;
    } else return false;
 }
@@ -46,6 +49,7 @@ void *CommQueue::pop ( ) {
    next = (read + 1) % size;
    ptr = data[read];
    read = next;
+   readCnt++;
    return ptr;
 }
 
@@ -55,3 +59,7 @@ bool CommQueue::ready () {
    return( read != write );
 }
 
+// Size
+unsigned int CommQueue::entryCnt () {
+   return(writeCnt - readCnt);
+}

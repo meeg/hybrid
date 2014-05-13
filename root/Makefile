@@ -1,6 +1,6 @@
 # Variables
 CFLAGS  := -g -Wall `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I$(PWD)/../evio -I.
-LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lgsl -lgslcblas
+LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lbz2 -lrt -lgsl -lgslcblas
 CC      := g++
 GCC      := gcc
 BIN     := $(PWD)/../bin
@@ -34,7 +34,7 @@ EVIO_OBJ := $(patsubst $(EVIO_DIR)/%.c,$(OBJ)/%.o,$(EVIO_SRC))
 ROOT_DIR := $(PWD)
 ROOT_SRC := $(wildcard $(ROOT_DIR)/*.cpp)
 ROOT_BIN := $(patsubst $(ROOT_DIR)/%.cpp,$(BIN)/%,$(ROOT_SRC))
-ROOT_OBJ := $(OBJ)/meeg_utils.o
+ROOT_OBJ := $(OBJ)/meeg_utils.o $(OBJ)/cosmic_utils.o
 
 # Default
 all: dir $(GEN_OBJ) $(OFF_OBJ) $(TRK_OBJ) $(FIT_OBJ) $(EVIO_OBJ) $(ROOT_OBJ) $(ROOT_BIN)
@@ -69,5 +69,5 @@ $(OBJ)/%.o: $(ROOT_DIR)/%.cc $(ROOT_DIR)/%.hh
 
 # Compile root
 $(BIN)/%: $(ROOT_DIR)/%.cpp $(OFF_OBJ) $(GEN_OBJ) $(TRK_OBJ) $(FIT_OBJ) $(ROOT_OBJ)
-	$(CC) $(CFLAGS) $(LFLAGS) $(DEF) $(OBJ)/* -o $@ $<
+	$(CC) $(CFLAGS) $(DEF) $(OBJ)/* -o $@ $< $(LFLAGS)
 

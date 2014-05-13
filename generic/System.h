@@ -53,6 +53,7 @@ class System : public Device {
       uint   swRunProgress_;
       string swRunRetState_;
       string swRunError_;
+      bool   hwRunning_;
 
       // Current state for polling
       bool allStatusReq_;
@@ -71,8 +72,20 @@ class System : public Device {
       uint   lastDataCount_;
       time_t lastTime_;
 
+      // Run time tracker
+      time_t lastRunTime_;
+
       // Parse XML
       bool parseXml ( string input, bool force );
+
+      // Add start xml to file
+      void addRunStart();
+
+      // Add stop xml to file
+      void addRunStop();
+
+      // Add timestamp to file
+      void addRunTime();
 
    public:
 
