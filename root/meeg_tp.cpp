@@ -50,7 +50,8 @@ int main ( int argc, char **argv ) {
 	bool use_baseline_cal = false;
 	bool flip_channels = true;
 	bool move_fitstart = false;
-	bool read_temp = false;
+	bool read_temp = true;
+	int hybrid_type = 0;
 	bool evio_format = false;
 	int fpga = -1;
 	int hybrid = -1;
@@ -101,7 +102,7 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
-	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:ntH:F:e:E")) !=-1)
+	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:nt:H:F:e:E")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -114,7 +115,7 @@ int main ( int argc, char **argv ) {
 				printf("-d: use specified dtrig baseline cal file\n");
 				printf("-n: DAQ (Ryan's) channel numbering\n");
 				printf("-s: start fit at given delay after a first guess at T0\n");
-				printf("-t: print temperature\n");
+				printf("-t: hybrid type (1 for old test run hybrid, 2 for new 2014 hybrid)\n");
 				printf("-F: use only specified FPGA\n");
 				printf("-H: use only specified hybrid\n");
 				printf("-e: stop after specified number of events\n");
@@ -184,7 +185,7 @@ int main ( int argc, char **argv ) {
 				fit_shift = atof(optarg);
 				break;
 			case 't':
-				read_temp = true;
+				hybrid_type = atoi(optarg);
 				break;
 			case 'F':
 				fpga = atoi(optarg);
@@ -204,6 +205,12 @@ int main ( int argc, char **argv ) {
 			default:
 				abort();
 		}
+
+	if (hybrid_type==0) {
+		printf("WARNING: no hybrid type set; use -t to specify old or new hybrid\n");
+		printf("Configured for old (test run) hybrid\n");
+		hybrid_type = 1;
+	}
 
 	if (evio_format)
 		dataRead = new DataReadEvio();
@@ -322,12 +329,10 @@ int main ( int argc, char **argv ) {
 			if (fpga!=-1 && event.fpgaAddress()!=fpga) continue;
 			if (eventCount%1000==0) printf("Event %d\n",eventCount);
 			if (num_events!=-1 && eventCount >= num_events) break;
-			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
-				if (event.temperature(i)!=0.0)
-				{
-					printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
-					read_temp = false;
-				}
+			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
+				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
+				read_temp = false;
+			}
 			//if (goodEvent) 
 			for (x=0; x < event.count(); x++) {
 				// Get sample

@@ -86,32 +86,52 @@ uint * TrackerEvent::tiData ( ) {
 
 
 // Get temperature values from header.
-double TrackerEvent::temperature ( uint index ) {
+double TrackerEvent::temperature ( uint index, bool oldHybrid ) {
    uint adcValue;
    uint convValue;
+   uint bitmask;
 
    if ( isTiFrame () ) return(0.0);
 
+   if (oldHybrid) bitmask = 0xFFF;
+   else bitmask = 0xFFFF;
+
    switch (index) {
-      case  0: adcValue = (data_[2]&0xFFFF);
-      case  1: adcValue = ((data_[2]>>16)&0xFFFF);
-      case  2: adcValue = (data_[3]&0xFFFF);
-      case  3: adcValue = ((data_[3]>>16)&0xFFFF);
-      case  4: adcValue = (data_[4]&0xFFFF);
-      case  5: adcValue = ((data_[4]>>16)&0xFFFF);
-      case  6: adcValue = (data_[5]&0xFFFF);
-      case  7: adcValue = ((data_[5]>>16)&0xFFFF);
-      case  8: adcValue = (data_[6]&0xFFFF);
-      case  9: adcValue = ((data_[6]>>16)&0xFFFF);
-      case 10: adcValue = (data_[7]&0xFFFF);
-      case 11: adcValue = ((data_[7]>>16)&0xFFFF);
+      case  0: adcValue = (data_[2]&bitmask);
+	break;
+      case  1: adcValue = ((data_[2]>>16)&bitmask);
+	break;
+      case  2: adcValue = (data_[3]&bitmask);
+	break;
+      case  3: adcValue = ((data_[3]>>16)&bitmask);
+	break;
+      case  4: adcValue = (data_[4]&bitmask);
+	break;
+      case  5: adcValue = ((data_[4]>>16)&bitmask);
+	break;
+      case  6: adcValue = (data_[5]&bitmask);
+	break;
+      case  7: adcValue = ((data_[5]>>16)&bitmask);
+	break;
+      case  8: adcValue = (data_[6]&bitmask);
+	break;
+      case  9: adcValue = ((data_[6]>>16)&bitmask);
+	break;
+      case 10: adcValue = (data_[7]&bitmask);
+	break;
+      case 11: adcValue = ((data_[7]>>16)&bitmask);
+	break;
       default: return(0.0);
    }
 
-   if ( adcValue & 0x8000 ) convValue = ((adcValue >> 3) & 0xFFF);
-   else convValue = adcValue & 0xFFF;
+   if (oldHybrid) {
+      return (tempTable_[adcValue]);
+   } else {
+      if ( adcValue & 0x8000 ) convValue = ((adcValue >> 3) & 0xFFF);
+      else convValue = adcValue & 0xFFF;
 
-   return (tempTableNew_[convValue]);
+      return (tempTableNew_[convValue]);
+   }
 }
 
 // Get sample count

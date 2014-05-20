@@ -133,7 +133,7 @@ class TrackerEvent : public Data {
        * Returns temperature value.
        * \param index temperature index, 0-11.
       */
-      double temperature ( uint index );
+      double temperature ( uint index, bool oldHybrid = false );
 
       //! Get sample count
       /*!

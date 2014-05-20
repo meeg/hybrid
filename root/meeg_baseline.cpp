@@ -49,7 +49,8 @@ int main ( int argc, char **argv ) {
 	bool flip_channels = true;
 	bool mux_channels = false;
 	bool skip_corr = false;
-	bool read_temp = false;
+	bool read_temp = true;
+	int hybrid_type = 0;
 	bool evio_format = false;
 	int fpga = -1;
 	int hybrid = -1;
@@ -109,7 +110,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmctH:F:e:Ed")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmct:H:F:e:Ed")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -119,7 +120,7 @@ int main ( int argc, char **argv ) {
 				printf("-n: DAQ (Ryan's) channel numbering\n");
 				printf("-m: number channels in raw mux order\n");
 				printf("-c: don't compute correlations\n");
-				printf("-t: print temperature\n");
+				printf("-t: hybrid type (1 for old test run hybrid, 2 for new 2014 hybrid)\n");
 				printf("-F: use only specified FPGA\n");
 				printf("-H: use only specified hybrid\n");
 				printf("-e: stop after specified number of events\n");
@@ -144,7 +145,7 @@ int main ( int argc, char **argv ) {
 				mux_channels = true;
 				break;
 			case 't':
-				read_temp = true;
+				hybrid_type = atoi(optarg);
 				break;
 			case 'F':
 				fpga = atoi(optarg);
@@ -167,6 +168,12 @@ int main ( int argc, char **argv ) {
 			default:
 				abort();
 		}
+
+	if (hybrid_type==0) {
+		printf("WARNING: no hybrid type set; use -t to specify old or new hybrid\n");
+		printf("Configured for old (test run) hybrid\n");
+		hybrid_type = 1;
+	}
 
 	if (evio_format)
 		dataRead = new DataReadEvio();
@@ -273,12 +280,10 @@ int main ( int argc, char **argv ) {
 		if(debug) cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
-		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
-			if (event.temperature(i)!=0.0)
-			{
-				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
-				read_temp = false;
-			}
+		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
+			printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
+			read_temp = false;
+		}
 		if (eventCount<max_count) {
 			moving_ti[eventCount] = eventCount;
 			for (int i=0;i<5;i++) apv_means[i][eventCount] = 0.0;

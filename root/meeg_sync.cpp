@@ -55,7 +55,8 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-	bool read_temp = false;
+	bool read_temp = true;
+	int hybrid_type = 0;
 	bool evio_format = false;
 	bool no_gui = false;
 	bool print_data = false;
@@ -100,14 +101,14 @@ int main ( int argc, char **argv ) {
 	string          inValue;
 	stringstream    inValueStream;
 
-	while ((c = getopt(argc,argv,"ho:ntH:F:A:e:Egdf:")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nt:H:F:A:e:Egdf:")) !=-1)
 		switch (c)
 		{
 			case 'h':
 				printf("-h: print this help\n");
 				printf("-o: use specified output filename\n");
 				printf("-n: physical channel numbering\n");
-				printf("-t: print temperature\n");
+				printf("-t: hybrid type (1 for old test run hybrid, 2 for new 2014 hybrid)\n");
 				printf("-F: use only specified FPGA\n");
 				printf("-H: use only specified hybrid\n");
 				printf("-A: use only specified APV\n");
@@ -133,7 +134,7 @@ int main ( int argc, char **argv ) {
 				print_data = true;
 				break;
 			case 't':
-				read_temp = true;
+				hybrid_type = atoi(optarg);
 				break;
 			case 'F':
 				use_fpga = atoi(optarg);
@@ -195,6 +196,12 @@ int main ( int argc, char **argv ) {
 			default:
 				abort();
 		}
+
+	if (hybrid_type==0) {
+		printf("WARNING: no hybrid type set; use -t to specify old or new hybrid\n");
+		printf("Configured for old (test run) hybrid\n");
+		hybrid_type = 1;
+	}
 
 	if (evio_format)
 		dataRead = new DataReadEvio();
@@ -296,12 +303,10 @@ int main ( int argc, char **argv ) {
 		//if (print_data)
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
-		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++)
-			if (event.temperature(i)!=0.0)
-			{
-				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i));
-				read_temp = false;
-			}
+		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
+			printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
+			read_temp = false;
+		}
 		for ( y=0; y < 6; y++ ) {
 			for (int block=0; block < event.count()/128; block++) {
 				int idx = 10000;
