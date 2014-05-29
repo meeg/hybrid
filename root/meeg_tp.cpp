@@ -231,7 +231,7 @@ int main ( int argc, char **argv ) {
 
 	// Root file is the first and only arg
 	if ( argc-optind==0) {
-		cout << "Usage: meeg_baseline data_file\n";
+		cout << "Usage: meeg_tp data_file\n";
 		return(1);
 	}
 
@@ -245,6 +245,9 @@ int main ( int argc, char **argv ) {
 			inname.Remove(0,inname.Last('/')+1);
 		}
 	}
+
+	sprintf(name,"%s_tp.root",inname.Data());
+	TFile *myFile = new TFile(name,"RECREATE");
 
 	ofstream tpfile[2];
 	cout << "Writing Tp calibration to " << inname+".tp_pos" << endl;
@@ -583,7 +586,7 @@ int main ( int argc, char **argv ) {
 		sprintf(title,"Fitted Tp, %s pulses;Channel;Tp [ns]",sgn?"negative":"positive");
 		plotResults(title, name, name2, nChan[sgn], grChan[sgn], grTp[sgn], c1);
 
-		c1->SetLogy(1);
+		c1->SetLogy(0);
 		sprintf(name,"Chisq_%s",sgn?"neg":"pos");
 		sprintf(name2,"%s_tp_Chisq_%s.png",inname.Data(),sgn?"neg":"pos");
 		sprintf(title,"Fit chisq, %s pulses;Channel;Chisq",sgn?"negative":"positive");
@@ -607,6 +610,8 @@ int main ( int argc, char **argv ) {
 	shapefile[1].close();
 	noisefile[0].close();
 	noisefile[1].close();
+	myFile->Write();
+	myFile->Close();
 	return(0);
 }
 

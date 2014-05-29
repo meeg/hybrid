@@ -33,14 +33,18 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-   TCanvas         *c1, *c2, *c3, *c4, *c5;
+  TCanvas         *c1, *c2, *c3, *c4, *c5, *c6, *c7;
    TH2F            *histAll;
    TH2F            *histCos;
+   TH2F            *histCosHgh;
+   TH2F            *histCosPos;
    TH1F            *histSng[640];
    double          histMin[640];
    double          histMax[640];
    double          histCosMin;
    double          histCosMax;
+   double          histCosPosMin = 8192;
+   double          histCosPosMax = -8192;
    double          allMin;
    double          allMax;
    TGraph          *mean;
@@ -66,6 +70,12 @@ int main ( int argc, char **argv ) {
    uint            scnt;
    uint            ecnt;
    bool            posSig;
+   uint            verbose_level;
+   double          maxSample = -99.;
+   double          histCosHghMin = 8192;
+   double          histCosHghMax = -8192;
+   double          min_sng = 99999.;
+
 
    gStyle->SetOptStat(kFALSE);
 
@@ -74,16 +84,20 @@ int main ( int argc, char **argv ) {
 
    // Root file is the first and only arg
    if ( argc != 6 ) {
-      cout << "Usage: cosmic_summary fpga hybrid channel base_file data_file\n";
+      cout << "Usage: cosmic_summary fpga hybrid channel base_file data_file verbose_level\n";
       return(1);
    }
    tarFpga   = atoi(argv[1]);
    tarHybrid = atoi(argv[2]);
    tarChan   = atoi(argv[3]);
+   if (argc > 6) verbose_level = atoi(argv[6]);
+   else verbose_level = 0;
 
    // 2d histogram
    histAll = new TH2F("Value_Hist_All","Value_Hist_All",16384,0,16384,640,0,640);
    histCos = new TH2F("Value_Hist_Cos","Value_Hist_Cos",16384,-8192,8192,640,0,640);
+   histCosHgh = new TH2F("Value_Hist_Cos_Hgh","Value_Hist_Cos_Hgh",16384,-8192,8192,640,0,640);
+   histCosPos = new TH2F("Value_Hist_Cos_Pos","Value_Hist_Cos_Pos",16384,-8192,8192,640,0,640);
 
    for (channel=0; channel < 640; channel++) {
       sprintf(name,"%i",channel);
@@ -115,6 +129,8 @@ int main ( int argc, char **argv ) {
          }
       }
 
+      if ( eventCount % 1000 ==0 ) cout << "Processing event " << eventCount << endl;
+
       for (x=0; x < event.count(); x++) {
 
          // Check for matching FPGA
@@ -141,7 +157,9 @@ int main ( int argc, char **argv ) {
                         value = sample->value(y);
                         histAll->Fill(value,channel);
                         histSng[channel]->Fill(value);
-
+			if ( value < 1 ) {
+			  cout << "Sample " << y << " channel " << channel << " has " << value << endl; 
+		     }
                         if ( value < histMin[channel] ) histMin[channel] = value;
                         if ( value > histMax[channel] ) histMax[channel] = value;
                         if ( value < allMin           ) allMin = value;
@@ -210,6 +228,8 @@ int main ( int argc, char **argv ) {
          }
       }
 
+      if ( eventCount % 1000 == 0 ) cout << "Processing event " << eventCount << endl;
+
       for (x=0; x < event.count(); x++) {
 
          // Check for matching FPGA
@@ -232,33 +252,57 @@ int main ( int argc, char **argv ) {
 
                   // Filter APVs
                   scnt = 0;
+		  maxSample = -99.;  
+		  
                   for ( y=0; y < 6; y++ ) {
                      svalue[y] = (double)sample->value(y) - grMean[channel];
                      //if ( posSig && sample->apv() != 0 && svalue[y] > (5*grSigma[channel]) ) scnt++;
                      //if ( (!posSig) && sample->apv() != 0 && svalue[y] < (-5*grSigma[channel]) ) scnt++;
                      if ( sample->apv() != 0 && ((svalue[y] < (-5*grSigma[channel])) ||
                                                  (svalue[y] > (5*grSigma[channel])) ) ) scnt++;
+		     if ( svalue[y] < -5000. ) {
+		       cout << "Sample " << y << " channel " << channel << " has " << svalue[y] << " subtr signal from " << sample->value(y) << " mean " << grMean[channel] << endl; 
+		     }
+		     if ( svalue[y] > maxSample ) maxSample = svalue[y];
+
                   }
 
                   if ( scnt > 2 ) {
-                     cout << "Found hit."
-                          << " V0=" << svalue[0]
-                          << ", V1=" << svalue[1]
-                          << ", V2=" << svalue[2]
-                          << ", V3=" << svalue[3]
-                          << ", V4=" << svalue[4]
-                          << ", Event=" << dec << eventCount
-                          << ", Count=" << dec << ecnt
-                          << ", Channel=" << dec << channel
-                          << ", Apv=" << dec << sample->apv() << endl;
-
+		    if ( verbose_level > 0 ) {
+		      cout << "Found hit."
+			   << " V0=" << svalue[0]
+			   << ", V1=" << svalue[1]
+			   << ", V2=" << svalue[2]
+			   << ", V3=" << svalue[3]
+			   << ", V4=" << svalue[4]
+			   << ", Event=" << dec << eventCount
+			   << ", Count=" << dec << ecnt
+			   << ", Channel=" << dec << channel
+			   << ", Apv=" << dec << sample->apv() << endl;
+		    }
+		    
                      ecnt++;
+		     
+		     histCosHgh->Fill(maxSample,channel);
+		     if ( maxSample < histCosHghMin ) histCosHghMin = maxSample;
+		     if ( maxSample > histCosHghMax ) histCosHghMax = maxSample;
+
+		     min_sng = 99999.;
                      for ( y=0; y < 6; y++ ) {
                         histCos->Fill(svalue[y],channel);
-
                         if ( svalue[y] < histCosMin ) histCosMin = svalue[y];
                         if ( svalue[y] > histCosMax ) histCosMax = svalue[y];
+			if( svalue[y] < min_sng) min_sng = svalue[y];
                      }
+		     
+		     if ( min_sng > 0 ) {
+		       for ( y=0; y < 6; y++ ) {
+			 histCosPos->Fill(sample->value(y),channel);
+			 if ( sample->value(y) < histCosPosMin ) histCosPosMin = sample->value(y);
+			 if ( sample->value(y) > histCosPosMax ) histCosPosMax = sample->value(y);
+		       }
+                     }
+
                   }
                }
             }
@@ -271,6 +315,17 @@ int main ( int argc, char **argv ) {
    c5->cd();
    histCos->GetXaxis()->SetRangeUser(histCosMin,histCosMax);
    histCos->Draw("colz");
+
+   c6 = new TCanvas("c6","c6");
+   c6->cd();
+   histCosHgh->GetXaxis()->SetRangeUser(histCosHghMin,histCosHghMax);
+   histCosHgh->Draw("colz");
+
+   c7 = new TCanvas("c7","c7");
+   c7->cd();
+   histCosPos->GetXaxis()->SetRangeUser(histCosPosMin,histCosPosMax);
+   histCosPos->Draw("colz");
+
 
    // Start X-Windows
    theApp.Run();

@@ -199,17 +199,6 @@ int main ( int argc, char **argv ) {
 	}
 
 
-	// 2d histogram
-	for (int i=0;i<6;i++)
-	{
-		sprintf(name,"Value_Hist_s%d",i);
-		sprintf(title,"Baseline values, sample %d;ADC counts;Channel",i);
-		histAll[i] = new TH2F(name,title,16384,-0.5,16383.5,640,-0.5,639.5);
-	}
-	sprintf(title,"Baseline values, all samples;ADC counts;Channel");
-	histAll[6] = new TH2F("Value_Hist_All",title,16384,-0.5,16383.5,640,-0.5,639.5);
-
-
 	hybridMin = 16384;
 	hybridMax = 0;
 	for (channel=0; channel < 640; channel++) {
@@ -226,6 +215,21 @@ int main ( int argc, char **argv ) {
 			inname.Remove(0,inname.Last('/')+1);
 		}
 	}
+
+	sprintf(name,"%s_baseline.root",inname.Data());
+	TFile *myFile = new TFile(name,"RECREATE");
+
+	// 2d histogram
+	for (int i=0;i<6;i++)
+	{
+		sprintf(name,"Value_Hist_s%d",i);
+		sprintf(title,"Baseline values, sample %d;ADC counts;Channel",i);
+		histAll[i] = new TH2F(name,title,16384,-0.5,16383.5,640,-0.5,639.5);
+	}
+	sprintf(title,"Baseline values, all samples;ADC counts;Channel");
+	histAll[6] = new TH2F("Value_Hist_All",title,16384,-0.5,16383.5,640,-0.5,639.5);
+
+
 	ofstream outfile;
 	cout << "Writing calibration to " << inname+".base" << endl;
 	outfile.open(inname+".base");
@@ -660,6 +664,8 @@ int main ( int argc, char **argv ) {
 		delete[] allSamples[i][j];
 		//for (int k=0;k<16384;k++) allSamples[i][j][k]=0;
 	}
+	myFile->Write();
+	myFile->Close();
 	return(0);
 }
 

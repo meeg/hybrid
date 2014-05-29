@@ -377,7 +377,7 @@ int main ( int argc, char **argv ) {
 			inname.Remove(0,inname.Last('/')+1);
 		}
 	}
-	sprintf(name,"%s.root",inname.Data());
+	sprintf(name,"%s_sourcetest.root",inname.Data());
 	TFile *myFile = new TFile(name,"RECREATE");
 
 
