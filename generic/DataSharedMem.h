@@ -17,6 +17,7 @@
 #define __DATA_SHARED_MEM_H__
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>   
 #include <string.h>   
 #include <unistd.h>
@@ -112,7 +113,7 @@ inline void dataSharedWrite ( DataSharedMemory *ptr, unsigned int flag, const ch
 inline int dataSharedRead ( DataSharedMemory *ptr, unsigned int *rdAddr, unsigned int *rdCount, unsigned int *flag, char **data ) {
 
    // Detect if reader is ahead of writer or too far behind writer
-   if ( *rdCount == 0 || ( *rdCount > ptr->wrCount ) || ( (ptr->wrCount - *rdCount) >= (DATA_BUFF_CNT/2) ) ) {
+   if ( (*rdCount == 0 && ptr->wrCount != 0) || ( *rdCount > ptr->wrCount ) || ( (ptr->wrCount - *rdCount) >= (DATA_BUFF_CNT/2) ) ) {
       printf("Adjusting pointers. wrAddr=%i, wrCount=%i, wrAddrLast=%i, wrCountLast=%i, rdAddr=%i, rdCount=%i\n",ptr->wrAddr,ptr->wrCount,
          ptr->wrAddrLast,ptr->wrCountLast,*rdAddr,*rdCount);
       *rdAddr  = ptr->wrAddrLast;
