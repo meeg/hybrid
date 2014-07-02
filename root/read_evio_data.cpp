@@ -24,6 +24,7 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
+#include <DevboardEvent.h>
 #include <DevboardSample.h>
 #include <Data.h>
 #include <DataRead.h>

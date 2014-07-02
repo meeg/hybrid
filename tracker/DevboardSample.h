@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerSample.h
+// File          : DevboardSample.h
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -18,13 +18,13 @@
 // Modification history :
 // 08/26/2011: created
 //-----------------------------------------------------------------------------
-#ifndef __TRACKER_SAMPLE_H__
-#define __TRACKER_SAMPLE_H__
+#ifndef __DEVBOARD_SAMPLE_H__
+#define __DEVBOARD_SAMPLE_H__
 #include <sys/types.h>
 using namespace std;
 
-//! Tracker Event Container Class
-class TrackerSample {
+//! Devboard Event Container Class
+class DevboardSample {
 
       // Local data
       uint ldata_[4];
@@ -35,10 +35,10 @@ class TrackerSample {
    public:
 
       //! Constructor for static pointer
-      TrackerSample ();
+      DevboardSample ();
 
       //! Constructor with copy
-      TrackerSample ( uint *data );
+      DevboardSample ( uint *data );
 
       //! Set data pointer.
       /*!

@@ -68,7 +68,7 @@ bool DataReadEvio::next(Data *data) {
 	if (fpga_count>fpga_it)
 	{
 		if(debug_)printf("pulling a bank out of cache\n");
-		TrackerEvent *source_data = fpga_banks[fpga_it++];
+		Data *source_data = fpga_banks[fpga_it++];
 		data->copy(source_data->data(),source_data->size());
 		if (fpga_it==fpga_count)
 		{
@@ -223,16 +223,16 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
 
 		if (fragType==UINT32)
 		{
-			TrackerEvent* tb=new TrackerEvent();
+			Data* tb=new Data();
 			uint *data_  = (uint *)malloc((length-1) * sizeof(uint));
 			memcpy(data_+1,&buf[ptr+2],(length-2)*sizeof(uint));
 			data_[0] = tag;
 			if (tag==7) data_[0]+=0x80000000;
 			tb->copy(data_,length-1);
 			free(data_);
-			if(debug_){
-				cout<<"Made TrackerBank for FPGA = "<<tb->fpgaAddress()<<endl;    
-			}
+			//if(debug_){
+			//	cout<<"Made DevboardBank for FPGA = "<<tb->fpgaAddress()<<endl;    
+			//}
 			fpga_banks[fpga_count++] = tb;
 		}
 		else

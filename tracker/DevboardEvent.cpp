@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerEvent.cpp
+// File          : DevboardEvent.cpp
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -22,13 +22,13 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "TrackerEvent.h"
+#include "DevboardEvent.h"
 using namespace std;
 
-void TrackerEvent::update() { }
+void DevboardEvent::update() { }
 
 // Constructor
-TrackerEvent::TrackerEvent () : Data() {
+DevboardEvent::DevboardEvent () : Data() {
    double       temp;
    double       tk;
    double       res;
@@ -61,32 +61,32 @@ TrackerEvent::TrackerEvent () : Data() {
 }
 
 // Deconstructor
-TrackerEvent::~TrackerEvent () {
+DevboardEvent::~DevboardEvent () {
 }
 
 // Get TI flag from header
-bool TrackerEvent::isTiFrame ( ) {
+bool DevboardEvent::isTiFrame ( ) {
    return((data_[0] & 0x80000000) != 0);
 }
 
 // Get FpgaAddress value from header.
-uint TrackerEvent::fpgaAddress ( ) {
+uint DevboardEvent::fpgaAddress ( ) {
    return(data_[0] & 0xFFFF);
 }
 
 // Get sequence count from header.
-uint TrackerEvent::sequence ( ) {
+uint DevboardEvent::sequence ( ) {
    return(data_[1]);
 }
 
 // Get trigger block from header.
-uint * TrackerEvent::tiData ( ) {
+uint * DevboardEvent::tiData ( ) {
    return(&(data_[2]));
 }
 
 
 // Get temperature values from header.
-double TrackerEvent::temperature ( uint index, bool oldHybrid ) {
+double DevboardEvent::temperature ( uint index, bool oldHybrid ) {
    uint adcValue;
    uint convValue;
    uint bitmask;
@@ -135,13 +135,13 @@ double TrackerEvent::temperature ( uint index, bool oldHybrid ) {
 }
 
 // Get sample count
-uint TrackerEvent::count ( ) {
+uint DevboardEvent::count ( ) {
    if ( isTiFrame () ) return(0);
    else return((size_-(headSize_ + tailSize_))/sampleSize_);
 }
 
 // Get sample at index
-TrackerSample *TrackerEvent::sample (uint index) {
+DevboardSample *DevboardEvent::sample (uint index) {
    if ( isTiFrame () ) return(NULL);
    else if ( index >= count() ) return(NULL);
    else {
@@ -151,13 +151,13 @@ TrackerSample *TrackerEvent::sample (uint index) {
 }
 
 // Get sample at index
-TrackerSample *TrackerEvent::sampleCopy (uint index) {
-   TrackerSample *tmp;
+DevboardSample *DevboardEvent::sampleCopy (uint index) {
+   DevboardSample *tmp;
 
    if ( isTiFrame () ) return(NULL);
    else if ( index >= count() ) return(NULL);
    else {
-      tmp = new TrackerSample (&(data_[headSize_+(index*sampleSize_)]));
+      tmp = new DevboardSample (&(data_[headSize_+(index*sampleSize_)]));
       return(tmp);
    }
 }

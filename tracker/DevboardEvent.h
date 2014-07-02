@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerEvent.h
+// File          : DevboardEvent.h
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -31,7 +31,7 @@
 //       Header[6] = TempJ[15:0], TempI[15:0] -- Hybrid 2
 //       Header[7] = TempL[15:0], TempK[15:0] -- Hybrid 2
 //
-//       Samples... (See TrackerSample.h)
+//       Samples... (See DevboardSample.h)
 //
 //    For T = 1:
 //
@@ -51,20 +51,20 @@
 // Modification history :
 // 08/26/2011: created
 //-----------------------------------------------------------------------------
-#ifndef __TRACKER_EVENT_H__
-#define __TRACKER_EVENT_H__
+#ifndef __DEVBOARD_EVENT_H__
+#define __DEVBOARD_EVENT_H__
 
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <unistd.h>
 #include <sys/types.h>
-#include "TrackerSample.h"
+#include "DevboardSample.h"
 #include <Data.h>
 using namespace std;
 
-//! Tracker Event Container Class
-class TrackerEvent : public Data {
+//! Devboard Event Container Class
+class DevboardEvent : public Data {
 
       // Temperature Constants
       static const double coeffA_     = -1.4141963e1;
@@ -94,7 +94,7 @@ class TrackerEvent : public Data {
       static const unsigned int sampleSize_ = 4;
 
       // Internal sample contrainer
-      TrackerSample sample_;
+      DevboardSample sample_;
 
       // Update
       void update();
@@ -102,10 +102,10 @@ class TrackerEvent : public Data {
    public:
 
       //! Constructor
-      TrackerEvent ();
+      DevboardEvent ();
 
       //! Deconstructor
-      ~TrackerEvent ();
+      ~DevboardEvent ();
 
       //! Is frame TI frame?
       bool isTiFrame ( );
@@ -147,7 +147,7 @@ class TrackerEvent : public Data {
        * Contents of returned object will change next time sample() is called.
        * \param index Sample index. 0 - count()-1.
       */
-      TrackerSample *sample (uint index);
+      DevboardSample *sample (uint index);
 
       //! Get sample at index
       /*!
@@ -155,7 +155,7 @@ class TrackerEvent : public Data {
        * is created and must be deleted after use.
        * \param index Sample index. 0 - count()-1.
       */
-      TrackerSample *sampleCopy (uint index);
+      DevboardSample *sampleCopy (uint index);
 
 };
 

@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerSample.cpp
+// File          : DevboardSample.cpp
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -14,57 +14,57 @@
 // 08/26/2011: created
 //-----------------------------------------------------------------------------
 #include <string.h>
-#include "TrackerSample.h"
+#include "DevboardSample.h"
 using namespace std;
 
 // Constructor for static pointer
-TrackerSample::TrackerSample () {
+DevboardSample::DevboardSample () {
    data_ = ldata_;
 }
 
 // Constructor with copy
-TrackerSample::TrackerSample ( uint *data ) {
+DevboardSample::DevboardSample ( uint *data ) {
    data_ = ldata_;
    memcpy(ldata_,data,16);
 }
 
 // Set data pointer.
-void TrackerSample::setData ( uint *data ) {
+void DevboardSample::setData ( uint *data ) {
    data_ = data;
 }
 
 // Get error flag
-bool TrackerSample::error ( ) {
+bool DevboardSample::error ( ) {
    return((data_[0]>>30)&0x1);
 }
 
 // Get threshold drop flag
-bool TrackerSample::drop ( ) {
+bool DevboardSample::drop ( ) {
    return((data_[0]>>27)&0x1);
 }
 
 // Get hybrid index.
-uint TrackerSample::hybrid ( ) {
+uint DevboardSample::hybrid ( ) {
    return((data_[0]>>28)&0x3);
 }
 
 // Get apv index.
-uint TrackerSample::apv ( ) {
+uint DevboardSample::apv ( ) {
    return((data_[0]>>24)&0x7);
 }
 
 // Get channel index.
-uint TrackerSample::channel ( ) {
+uint DevboardSample::channel ( ) {
    return((data_[0]>>16)&0x7F);
 }
 
 // Get FpgaAddress value from header.
-uint TrackerSample::fpgaAddress ( ) {
+uint DevboardSample::fpgaAddress ( ) {
    return(data_[0]&0xFFFF);
 }
 
 // Get adc value at index.
-uint TrackerSample::value ( uint index ) {
+uint DevboardSample::value ( uint index ) {
    switch(index) {
       case 0: return(data_[1]&0xFFFF);
       case 1: return((data_[1]>>16)&0xFFFF);
