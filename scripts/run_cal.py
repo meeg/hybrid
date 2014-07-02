@@ -140,6 +140,8 @@ pythonDaq.daqSetConfig("cntrlFpga:hybrid:apv25:CalibInhibit","True")
 pythonDaq.daqSetConfig("cntrlFpga:ApvTrigType", "DoubleTrig" )
 pythonDaq.daqSetConfig("cntrlFpga:hybrid:apv25:CalGroup","0")
 file_path = data_path + '_baseline_dtrig.bin'
+print("Running baseline (DoubleTrig) - dummy run")
+doRun(file_path)
 print("Running baseline (DoubleTrig)")
 doRun(file_path)
 print "Baseline run complete"
