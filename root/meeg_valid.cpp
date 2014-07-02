@@ -20,8 +20,8 @@
 #include <cmath>
 #include <meeg_utils.hh>
 #include <stdarg.h>
-#include <TrackerEvent.h>
-#include <TrackerSample.h>
+#include <DevboardEvent.h>
+#include <DevboardSample.h>
 #include <Data.h>
 #include <DataRead.h>
 #include <DataReadEvio.h>
@@ -45,8 +45,8 @@ int main ( int argc, char **argv ) {
 	int c;
 
 	DataRead        *dataRead;
-	TrackerEvent    event;
-	TrackerSample   *sample;
+	DevboardEvent    event;
+	DevboardSample   *sample;
 	uint            x;
 	uint            y;
 	int            eventCount;

@@ -24,8 +24,8 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
-#include <TrackerEvent.h>
-#include <TrackerSample.h>
+#include <DevboardEvent.h>
+#include <DevboardSample.h>
 #include <Data.h>
 #include <DataRead.h>
 using namespace std;
@@ -38,8 +38,8 @@ int main ( int argc, char **argv ) {
    double          grX[128*6];
    TGraph          *plot;
    DataRead        dataRead;
-   TrackerEvent    event;
-   TrackerSample   *sample;
+   DevboardEvent    event;
+   DevboardSample   *sample;
    uint            idx;
    uint            x;
    uint            y;

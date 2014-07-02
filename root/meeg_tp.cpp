@@ -27,8 +27,8 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
-#include <TrackerEvent.h>
-#include <TrackerSample.h>
+#include <DevboardEvent.h>
+#include <DevboardSample.h>
 #include <Data.h>
 #include <DataRead.h>
 #include <DataReadEvio.h>
@@ -75,8 +75,8 @@ int main ( int argc, char **argv ) {
 	//TGraph          *mean;
 	//TGraph          *sigma;
 	DataRead        *dataRead;
-	TrackerEvent    event;
-	TrackerSample   *sample;
+	DevboardEvent    event;
+	DevboardSample   *sample;
 	uint            x;
 	uint            y;
 	int            value;

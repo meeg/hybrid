@@ -13,8 +13,6 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
-#include <TrackerEvent.h>
-#include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
 #include <TMath.h>
