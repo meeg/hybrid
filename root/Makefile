@@ -9,25 +9,25 @@ OBJ     := $(PWD)/.obj
 # Generic Sources
 GEN_DIR := $(PWD)/../generic
 GEN_SRC := $(GEN_DIR)/Data.cpp $(GEN_DIR)/DataRead.cpp $(GEN_DIR)/XmlVariables.cpp
-GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h $(GEN_DIR)/XmlVariables.h
+#GEN_HDR := $(GEN_DIR)/Data.h   $(GEN_DIR)/DataRead.h $(GEN_DIR)/XmlVariables.h
 GEN_OBJ := $(patsubst $(GEN_DIR)/%.cpp,$(OBJ)/%.o,$(GEN_SRC))
 
 # Tracker Sources
 TRK_DIR := $(PWD)/../tracker
-TRK_SRC := $(TRK_DIR)/DevboardEvent.cpp $(TRK_DIR)/DevboardSample.cpp $(TRK_DIR)/DataReadEvio.cpp
-TRK_HDR := $(TRK_DIR)/DevboardEvent.h   $(TRK_DIR)/DevboardSample.h $(TRK_DIR)/DataReadEvio.h
+TRK_SRC := $(TRK_DIR)/DevboardEvent.cpp $(TRK_DIR)/DevboardSample.cpp $(TRK_DIR)/DataReadEvio.cpp $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TriggerEvent.cpp $(TRK_DIR)/TriggerSample.cpp
+#TRK_HDR := $(TRK_DIR)/DevboardEvent.h   $(TRK_DIR)/DevboardSample.h $(TRK_DIR)/DataReadEvio.h
 TRK_OBJ := $(patsubst $(TRK_DIR)/%.cpp,$(OBJ)/%.o,$(TRK_SRC))
 
 # Fitter Sources
 FIT_DIR := $(PWD)/../t0fit
 FIT_SRC := $(FIT_DIR)/ShapingCurve.cc $(FIT_DIR)/Samples.cc $(FIT_DIR)/Event.cc $(FIT_DIR)/Fitter.cc $(FIT_DIR)/AnalyticFitter.cc $(FIT_DIR)/LinFitter.cc $(FIT_DIR)/SmoothShapingCurve.cc
-FIT_HDR := $(FIT_DIR)/ShapingCurve.hh $(FIT_DIR)/Samples.hh $(FIT_DIR)/Event.hh $(FIT_DIR)/Fitter.hh $(FIT_DIR)/AnalyticFitter.hh $(FIT_DIR)/LinFitter.hh $(FIT_DIR)/SmoothShapingCurve.hh
+#FIT_HDR := $(FIT_DIR)/ShapingCurve.hh $(FIT_DIR)/Samples.hh $(FIT_DIR)/Event.hh $(FIT_DIR)/Fitter.hh $(FIT_DIR)/AnalyticFitter.hh $(FIT_DIR)/LinFitter.hh $(FIT_DIR)/SmoothShapingCurve.hh
 FIT_OBJ := $(patsubst $(FIT_DIR)/%.cc,$(OBJ)/%.o,$(FIT_SRC))
 
 # EVIO Sources
 EVIO_DIR := $(PWD)/../evio
 EVIO_SRC := $(EVIO_DIR)/evio.c $(EVIO_DIR)/evioswap.c $(EVIO_DIR)/eviofmt.c $(EVIO_DIR)/eviofmtswap.c
-EVIO_HDR := $(EVIO_DIR)/evio.h $(EVIO_DIR)/evioswap.h
+#EVIO_HDR := $(EVIO_DIR)/evio.h $(EVIO_DIR)/evioswap.h
 EVIO_OBJ := $(patsubst $(EVIO_DIR)/%.c,$(OBJ)/%.o,$(EVIO_SRC))
 
 # Root Sources
