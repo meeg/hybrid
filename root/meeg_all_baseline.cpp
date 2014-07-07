@@ -32,11 +32,17 @@
 #include <stdarg.h>
 #include <DevboardEvent.h>
 #include <DevboardSample.h>
+#include <TriggerEvent.h>
+#include <TriggerSample.h>
 #include <Data.h>
 #include <DataRead.h>
 #include <DataReadEvio.h>
 #include <unistd.h>
 using namespace std;
+
+#define MAX_RCE 4
+#define MAX_FEB 4
+#define MAX_HYB 4
 
 //#define corr1 599
 //#define corr1 604
@@ -50,6 +56,7 @@ int main ( int argc, char **argv ) {
 	bool read_temp = true;
 	int hybrid_type = 0;
 	bool evio_format = false;
+	bool triggerevent_format = false;
 	int use_fpga = -1;
 	int use_hybrid = -1;
 	int num_events = -1;
@@ -61,23 +68,16 @@ int main ( int argc, char **argv ) {
 		chanMap[(32*(idx%4)) + (8*(idx/4)) - (31*(idx/16))] = idx;
 	}
 
-	int hybridCount[7][3];
-	int channelCount[7][3][640];
-	int channelAllCount[7][3][640];
-	double channelMean[7][7][3][640];
-	double channelVariance[7][7][3][640];
-	for (int fpga = 0;fpga<7;fpga++)
-		for (int hyb = 0;hyb<3;hyb++) {
-			hybridCount[fpga][hyb] = 0;
-			for (int i=0;i<640;i++) {
-				channelCount[fpga][hyb][i] = 0;
-				channelAllCount[fpga][hyb][i] = 0;
-				for (int j=0;j<7;j++) {
-					channelMean[j][fpga][hyb][i] = 0.0;
-					channelVariance[j][fpga][hyb][i] = 0.0;
-				}
+	int hybridCount[MAX_RCE][MAX_FEB][MAX_HYB];
+	int *channelCount[MAX_RCE][MAX_FEB][MAX_HYB];
+	int *channelAllCount[MAX_RCE][MAX_FEB][MAX_HYB];
+	double *channelMean[7][MAX_RCE][MAX_FEB][MAX_HYB];
+	double *channelVariance[7][MAX_RCE][MAX_FEB][MAX_HYB];
+	for (int rce = 0;rce<MAX_RCE;rce++)
+		for (int fpga = 0;fpga<MAX_FEB;fpga++)
+			for (int hyb = 0;hyb<MAX_HYB;hyb++) {
+				hybridCount[rce][fpga][hyb] = 0;
 			}
-		}
 
 	double          grChan[640];
 	for (int i=0;i<640;i++)
@@ -88,9 +88,9 @@ int main ( int argc, char **argv ) {
 	int svt_bank_num = 3;
 	DevboardEvent    event;
 	DevboardSample   *sample;
-	uint            x;
-	uint            y;
-	uint            channel;
+	TriggerEvent    triggerevent;
+	TriggerSample   *triggersample = new TriggerSample();
+	int		samples[6];
 	int            eventCount;
 	int runCount;
 	TString inname;
@@ -99,7 +99,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmct:H:F:e:Es:b:")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmct:H:F:e:Es:b:V")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -115,6 +115,7 @@ int main ( int argc, char **argv ) {
 				printf("-E: use EVIO file format\n");
 				printf("-s: number of sigmas for threshold file (default 2)\n");
 				printf("-b: EVIO bank number for SVT (default 3)\n");
+				printf("-V: use TriggerEvent event format\n");
 				return(0);
 				break;
 			case 'o':
@@ -151,6 +152,9 @@ int main ( int argc, char **argv ) {
 				break;
 			case 'b':
 				svt_bank_num = atoi(optarg);
+				break;
+			case 'V':
+				triggerevent_format = true;
 				break;
 			case '?':
 				printf("Invalid option or missing option argument; -h to list options\n");
@@ -224,7 +228,13 @@ int main ( int argc, char **argv ) {
 	cout << "Writing configuration to " <<outdir<<confname << endl;
 	outconfig.open(outdir+confname);
 
-	dataRead->next(&event);
+	bool readOK;
+
+	if (triggerevent_format) {
+		dataRead->next(&triggerevent);
+	} else {
+		dataRead->next(&event);
+	}
 	dataRead->dumpConfig(outconfig);
 	outconfig.close();
 	//dataRead.dumpStatus();
@@ -235,9 +245,23 @@ int main ( int argc, char **argv ) {
 	eventCount = 0;
 
 	do {
+		int rce = 0;
+		int fpga = 0;
+		int samplecount;
+
 		//printf("fpga %d\n",event.fpgaAddress());
-		int fpga = event.fpgaAddress();
-		if (fpga==7) 
+		if (triggerevent_format) {
+			samplecount = triggerevent.count();
+		} else {
+			fpga = event.fpgaAddress();
+			samplecount = event.count();
+			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
+				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
+				read_temp = false;
+			}
+		}
+
+		if (!triggerevent_format && fpga==7) 
 		{
 			//printf("not a data event\n");
 			continue;
@@ -246,68 +270,110 @@ int main ( int argc, char **argv ) {
 		//cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
-		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
-			printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
-			read_temp = false;
-		}
-		for (x=0; x < event.count(); x++) {
-			// Get sample
-			sample  = event.sample(x);
+		int x = 0;
+		while (x < samplecount) {
+			int hyb;
+			int apv;
+			int apvch;
+			int channel;
+
+			bool goodSample;
+
 			//printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
-			int hyb = sample->hybrid();
+			// Get sample
+			if (triggerevent_format) {
+				triggerevent.sample(x,triggersample);
+				rce = triggersample->rceAddress();
+				fpga = triggersample->febAddress();
+				hyb = triggersample->hybrid();
+				apv = triggersample->apv();
+				apvch = triggersample->channel();
+				goodSample = (!triggersample->head() && !triggersample->tail());
+				for ( int y=0; y < 6; y++ ) {
+					//printf("%x\n",sample->value(y));
+					samples[y] = triggersample->value(y);
+				}
+			} else {
+				sample  = event.sample(x);
+				hyb = sample->hybrid();
+				apv = sample->apv();
+				apvch = sample->channel();
+				for ( int y=0; y < 6; y++ ) {
+					//printf("%x\n",sample->value(y));
+					samples[y] = sample->value(y) & 0x3FFF;
+				}
+			}
 			if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
 			//printf("fpga %d, hybrid %d, apv %d, chan %d\n",event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel());
 
-			if (mux_channels) channel = chanMap[sample->channel()];
-			else channel = sample->channel();
+			if (mux_channels) channel = chanMap[apvch];
+			else channel = apvch;
 
 			if (flip_channels)
-				channel += (4-sample->apv())*128;
+				channel += (4-apv)*128;
 			else
-				channel += sample->apv()*128;
+				channel += apv*128;
 
 			//if (eventCount==0) printf("channel %d\n",channel);
 
 			if ( channel >= (5 * 128) ) {
 				cout << "Channel " << dec << channel << " out of range" << endl;
-				cout << "Apv = " << dec << sample->apv() << endl;
-				cout << "Chan = " << dec << sample->channel() << endl;
+				cout << "Apv = " << dec << apv << endl;
+				cout << "Chan = " << dec << apvch << endl;
 			}
 
 
 			// Filter APVs
 			if ( eventCount >= 20 ) {
-				hybridCount[fpga][hyb]++;
-				channelCount[fpga][hyb][channel]++;
-				for ( y=0; y < 6; y++ ) {
+				if (hybridCount[rce][fpga][hyb]==0) {
+					printf("found new hybrid: rce = %d, feb = %d, hyb = %d\n",rce,fpga,hyb);
+					channelCount[rce][fpga][hyb] = new int[640];
+					channelAllCount[rce][fpga][hyb] = new int[640];
+					for (int j=0;j<7;j++) {
+						channelMean[j][rce][fpga][hyb] = new double[640];
+						channelVariance[j][rce][fpga][hyb] = new double[640];
+					}
+					for (int i=0;i<640;i++) {
+						channelCount[rce][fpga][hyb][i] = 0;
+						channelAllCount[rce][fpga][hyb][i] = 0;
+						for (int j=0;j<7;j++) {
+							channelMean[j][rce][fpga][hyb][i] = 0.0;
+							channelVariance[j][rce][fpga][hyb][i] = 0.0;
+						}
+					}
+				}
+				hybridCount[rce][fpga][hyb]++;
+				channelCount[rce][fpga][hyb][channel]++;
+				for ( int y=0; y < 6; y++ ) {
 					//printf("%x\n",sample->value(y));
-					int value = sample->value(y) & 0x3FFF;
-					double delta = value-channelMean[y][fpga][hyb][channel];
-					if (channelCount[fpga][hyb][channel]==1)
+					int value = samples[y];
+					double delta = value-channelMean[y][rce][fpga][hyb][channel];
+					if (channelCount[rce][fpga][hyb][channel]==1)
 					{
-						channelMean[y][fpga][hyb][channel] = value;
+						channelMean[y][rce][fpga][hyb][channel] = value;
 					}
 					else
 					{
-						channelMean[y][fpga][hyb][channel] += delta/channelCount[fpga][hyb][channel];
+						channelMean[y][rce][fpga][hyb][channel] += delta/channelCount[rce][fpga][hyb][channel];
 					}
 					//printf("%d\n",value);
 					//printf("%f\n",channelMean[y][fpga][hyb][channel]);
-					channelVariance[y][fpga][hyb][channel] += delta*(value-channelMean[y][fpga][hyb][channel]);
+					channelVariance[y][rce][fpga][hyb][channel] += delta*(value-channelMean[y][rce][fpga][hyb][channel]);
 
-					channelAllCount[fpga][hyb][channel]++;
-					delta = value-channelMean[6][fpga][hyb][channel];
-					if (channelAllCount[fpga][hyb][channel]==1)
+					channelAllCount[rce][fpga][hyb][channel]++;
+					delta = value-channelMean[6][rce][fpga][hyb][channel];
+					if (channelAllCount[rce][fpga][hyb][channel]==1)
 					{
-						channelMean[6][fpga][hyb][channel] = value;
+						channelMean[6][rce][fpga][hyb][channel] = value;
 					}
 					else
 					{
-						channelMean[6][fpga][hyb][channel] += delta/channelAllCount[fpga][hyb][channel];
+						channelMean[6][rce][fpga][hyb][channel] += delta/channelAllCount[rce][fpga][hyb][channel];
 					}
-					channelVariance[6][fpga][hyb][channel] += delta*(value-channelMean[6][fpga][hyb][channel]);
+					channelVariance[6][rce][fpga][hyb][channel] += delta*(value-channelMean[6][rce][fpga][hyb][channel]);
 				}
 			}
+			x++;
 		}
 		eventCount++;
 		/*
@@ -316,7 +382,12 @@ int main ( int argc, char **argv ) {
 		   if (channelMean[6][i]<200) printf("event %d, channel %d, %f\n",eventCount,i,channelMean[6][i]);
 		   }*/
 
-	} while ( dataRead->next(&event));
+		if (triggerevent_format) {
+			readOK = dataRead->next(&triggerevent);
+		} else {
+			readOK = dataRead->next(&event);
+		}
+	} while (readOK);
 	dataRead->close();
 
 	if (!evio_format && eventCount != runCount)
@@ -324,101 +395,104 @@ int main ( int argc, char **argv ) {
 		printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
 	}
 
-	for (int fpga = 0;fpga<7;fpga++)
-		for (int hyb = 0;hyb<3;hyb++) if (hybridCount[fpga][hyb])
-		{
-			int deadAPV = -1;
-			for (int i=0;i<640;i++)
+	for (int rce = 0;rce<MAX_RCE;rce++)
+		for (int fpga = 0;fpga<MAX_FEB;fpga++)
+			for (int hyb = 0;hyb<MAX_HYB;hyb++) if (hybridCount[rce][fpga][hyb])
 			{
-				if (channelCount[fpga][hyb][i])
+				printf("processing hybrid: rce = %d, feb = %d, hyb = %d\n",rce,fpga,hyb);
+				int deadAPV = -1;
+				for (int i=0;i<640;i++)
 				{
-					if (i/128==deadAPV)
+					if (channelCount[rce][fpga][hyb][i])
 					{
-						printf("Counted %d events on channel %d, even though we thought APV %d was dead\n",channelCount[fpga][hyb][i],i,deadAPV);
+						if (i/128==deadAPV)
+						{
+							printf("Counted %d events on channel %d, even though we thought APV %d was dead\n",channelCount[rce][fpga][hyb][i],i,deadAPV);
+						}
+						if (!evio_format && channelCount[rce][fpga][hyb][i]!=(int)eventCount-20)
+						{
+							printf("Counted %d events for channel %d; expected %d\n",channelCount[rce][fpga][hyb][i],i,eventCount-20);
+						}
+						for (int j=0;j<6;j++)
+						{
+							channelVariance[j][rce][fpga][hyb][i]/=channelCount[rce][fpga][hyb][i];
+							channelVariance[j][rce][fpga][hyb][i]=sqrt(channelVariance[j][rce][fpga][hyb][i]);
+						}
+						channelVariance[6][rce][fpga][hyb][i]/=channelAllCount[rce][fpga][hyb][i];
+						channelVariance[6][rce][fpga][hyb][i]=sqrt(channelVariance[6][rce][fpga][hyb][i]);
 					}
-					if (!evio_format && channelCount[fpga][hyb][i]!=(int)eventCount-20)
+					else
 					{
-						printf("Counted %d events for channel %d; expected %d\n",channelCount[fpga][hyb][i],i,eventCount-20);
-					}
-					for (int j=0;j<6;j++)
-					{
-						channelVariance[j][fpga][hyb][i]/=channelCount[fpga][hyb][i];
-						channelVariance[j][fpga][hyb][i]=sqrt(channelVariance[j][fpga][hyb][i]);
-					}
-					channelVariance[6][fpga][hyb][i]/=channelAllCount[fpga][hyb][i];
-					channelVariance[6][fpga][hyb][i]=sqrt(channelVariance[6][fpga][hyb][i]);
-				}
-				else
-				{
-					if (i/128!=deadAPV)
-					{
-						deadAPV = i/128;
-						printf("No events on FPGA %d, hybrid %d, channel %d; assuming APV %d is dead\n",fpga,hyb,i,deadAPV);
+						if (i/128!=deadAPV)
+						{
+							deadAPV = i/128;
+							printf("No events on FPGA %d, hybrid %d, channel %d; assuming APV %d is dead\n",fpga,hyb,i,deadAPV);
+						}
 					}
 				}
 			}
-		}
 
 	//printf("correlation %f %f\n",corrHist->GetCorrelationFactor(),channelCovar[corr1][corr2]);
 	//printf("correlation %f\n",channelCovar[corr1][corr2]);
 
-	for (int fpga = 0;fpga<7;fpga++)
-		for (int hyb = 0;hyb<3;hyb++) if (hybridCount[fpga][hyb]) 
-		{
-			c1->Clear();
-			mg = new TMultiGraph();
-			for (int i=0;i<7;i++)
+	for (int rce = 0;rce<MAX_RCE;rce++)
+		for (int fpga = 0;fpga<MAX_FEB;fpga++)
+			for (int hyb = 0;hyb<MAX_HYB;hyb++) if (hybridCount[rce][fpga][hyb]) 
 			{
-				graph[i] = new TGraph(640,grChan,channelMean[i][fpga][hyb]);
-				graph[i]->SetMarkerColor(i+2);
-				mg->Add(graph[i]);
-			}
-			graph[6]->SetMarkerColor(1);
-			mg->SetTitle("Pedestal;Channel;ADC counts");
-			//mg->GetXaxis()->SetRangeUser(0,640);
-			mg->Draw("a*");
-			sprintf(name,"%s_pedestal_F%d_H%d.png",inname.Data(),fpga,hyb);
-			c1->SaveAs(name);
-			for (int i=0;i<7;i++)
-				delete graph[i];
-			delete mg;
+				c1->Clear();
+				mg = new TMultiGraph();
+				for (int i=0;i<7;i++)
+				{
+					graph[i] = new TGraph(640,grChan,channelMean[i][rce][fpga][hyb]);
+					graph[i]->SetMarkerColor(i+2);
+					mg->Add(graph[i]);
+				}
+				graph[6]->SetMarkerColor(1);
+				mg->SetTitle("Pedestal;Channel;ADC counts");
+				//mg->GetXaxis()->SetRangeUser(0,640);
+				mg->Draw("a*");
+				sprintf(name,"%s_pedestal_F%d_H%d.png",inname.Data(),fpga,hyb);
+				c1->SaveAs(name);
+				for (int i=0;i<7;i++)
+					delete graph[i];
+				delete mg;
 
-			c1->Clear();
-			mg = new TMultiGraph();
-			for (int i=0;i<7;i++)
-			{
-				graph[i] = new TGraph(640,grChan,channelVariance[i][fpga][hyb]);
-				graph[i]->SetMarkerColor(i+2);
-				mg->Add(graph[i]);
-			}
-			graph[6]->SetMarkerColor(1);
-			mg->SetTitle("Noise;Channel;ADC counts");
-			//mg->GetXaxis()->SetRangeUser(0,640);
-			mg->Draw("a*");
-			sprintf(name,"%s_noise_F%d_H%d.png",inname.Data(),fpga,hyb);
-			c1->SaveAs(name);
-			for (int i=0;i<7;i++)
-				delete graph[i];
-			delete mg;
+				c1->Clear();
+				mg = new TMultiGraph();
+				for (int i=0;i<7;i++)
+				{
+					graph[i] = new TGraph(640,grChan,channelVariance[i][rce][fpga][hyb]);
+					graph[i]->SetMarkerColor(i+2);
+					mg->Add(graph[i]);
+				}
+				graph[6]->SetMarkerColor(1);
+				mg->SetTitle("Noise;Channel;ADC counts");
+				//mg->GetXaxis()->SetRangeUser(0,640);
+				mg->Draw("a*");
+				sprintf(name,"%s_noise_F%d_H%d.png",inname.Data(),fpga,hyb);
+				c1->SaveAs(name);
+				for (int i=0;i<7;i++)
+					delete graph[i];
+				delete mg;
 
-			for (int i=0;i<640;i++)
-			{
-				int apv = i/128;
-				int channel = i%128;
-				if (flip_channels) apv = 4-apv;
-				if (channel == 0)
-					threshfile << fpga << "," << hyb << "," << apv << endl;
-				threshfile << apv*128+channel << "," << channelMean[6][fpga][hyb][i] + threshold_sigma*channelVariance[6][fpga][hyb][i] << endl;
+				for (int i=0;i<640;i++)
+				{
+					int apv = i/128;
+					int channel = i%128;
+					if (flip_channels) apv = 4-apv;
+					if (channel == 0)
+						threshfile << fpga << "," << hyb << "," << apv << endl;
+					threshfile << apv*128+channel << "," << channelMean[6][rce][fpga][hyb][i] + threshold_sigma*channelVariance[6][rce][fpga][hyb][i] << endl;
+				}
+				for (int i=0;i<640;i++) if (channelCount[rce][fpga][hyb][i]>0)
+				{
+					int apv = i/128;
+					int channel = i%128;
+					if (flip_channels) apv = 4-apv;
+					int sensorChannel =  apv*128+channel;
+					outfile << fpga << "\t" << hyb << "\t" << sensorChannel << "\t" << channelMean[6][rce][fpga][hyb][i] << "\t" << channelVariance[6][rce][fpga][hyb][i] << endl;
+				}
 			}
-			for (int i=0;i<640;i++) if (channelCount[fpga][hyb][i]>0)
-			{
-				int apv = i/128;
-				int channel = i%128;
-				if (flip_channels) apv = 4-apv;
-				int sensorChannel =  apv*128+channel;
-				outfile << fpga << "\t" << hyb << "\t" << sensorChannel << "\t" << channelMean[6][fpga][hyb][i] << "\t" << channelVariance[6][fpga][hyb][i] << endl;
-			}
-		}
 	// Start X-Windows
 	//theApp.Run();
 
