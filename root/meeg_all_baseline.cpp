@@ -87,7 +87,6 @@ int main ( int argc, char **argv ) {
 	DataRead        *dataRead;
 	int svt_bank_num = 3;
 	DevboardEvent    event;
-	DevboardSample   *sample;
 	TriggerEvent    triggerevent;
 	TriggerSample   *triggersample = new TriggerSample();
 	int		samples[6];
@@ -183,6 +182,7 @@ int main ( int argc, char **argv ) {
 	gStyle->SetStatH(0.1);                
 	gStyle->SetTitleOffset(1.4,"y");
 	gStyle->SetPadLeftMargin(0.15);
+	gStyle->SetMarkerStyle(6);
 	c1 = new TCanvas("c1","c1",1200,900);
 
 	// Start X11 view
@@ -203,14 +203,19 @@ int main ( int argc, char **argv ) {
 			inname.Remove(0,inname.Last('/')+1);
 		}
 	}
+	ofstream basefile;
+	cout << "Writing calibration to " << inname+".base" << endl;
+	basefile.open(inname+".base");
+	basefile << "#" << inname << endl;
+
 	ofstream threshfile;
 	cout << "Writing thresholds to " << inname+".thresholds" << endl;
 	threshfile.open(inname+".thresholds");
 	threshfile << "%" << inname << endl;
 
 	ofstream outfile;
-	cout << "Writing calibration to " << inname+".base" << endl;
-	outfile.open(inname+".base");
+	cout << "Writing calibration to " << inname+".basecal" << endl;
+	outfile.open(inname+".basecal");
 	outfile << "#" << inname << endl;
 
 	cout << "Reading data file " <<argv[optind] << endl;
@@ -235,9 +240,10 @@ int main ( int argc, char **argv ) {
 	} else {
 		dataRead->next(&event);
 	}
-	dataRead->dumpConfig(outconfig);
+	outconfig << dataRead->getConfigXml();
+	outconfig << endl;
+	outconfig << dataRead->getStatusXml();
 	outconfig.close();
-	//dataRead.dumpStatus();
 
 	runCount = atoi(dataRead->getConfig("RunCount").c_str());
 
@@ -266,18 +272,16 @@ int main ( int argc, char **argv ) {
 			//printf("not a data event\n");
 			continue;
 		}
-		if (use_fpga!=-1 && fpga!=use_fpga) continue;
 		//cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
-		int x = 0;
-		while (x < samplecount) {
+		for (int x=0; x < samplecount; x++) {
 			int hyb;
 			int apv;
 			int apvch;
 			int channel;
 
-			bool goodSample;
+			bool goodSample = true;
 
 			//printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
 			// Get sample
@@ -294,16 +298,19 @@ int main ( int argc, char **argv ) {
 					samples[y] = triggersample->value(y);
 				}
 			} else {
-				sample  = event.sample(x);
+				DevboardSample *sample  = event.sample(x);
 				hyb = sample->hybrid();
 				apv = sample->apv();
 				apvch = sample->channel();
 				for ( int y=0; y < 6; y++ ) {
 					//printf("%x\n",sample->value(y));
 					samples[y] = sample->value(y) & 0x3FFF;
+					if (samples[y]==0) goodSample = false;
 				}
 			}
+			if (use_fpga!=-1 && fpga!=use_fpga) continue;
 			if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
+			if (!goodSample) continue;
 			//printf("fpga %d, hybrid %d, apv %d, chan %d\n",event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel());
 
 			if (mux_channels) channel = chanMap[apvch];
@@ -347,6 +354,8 @@ int main ( int argc, char **argv ) {
 				for ( int y=0; y < 6; y++ ) {
 					//printf("%x\n",sample->value(y));
 					int value = samples[y];
+					if (value<3000)
+						printf("out of range: event %d, rce = %d, feb = %d, hyb = %d, channel = %d, sample[%d] = %d\n",eventCount,rce,fpga,hyb,channel,y,samples[y]);
 					double delta = value-channelMean[y][rce][fpga][hyb][channel];
 					if (channelCount[rce][fpga][hyb][channel]==1)
 					{
@@ -373,7 +382,6 @@ int main ( int argc, char **argv ) {
 					channelVariance[6][rce][fpga][hyb][channel] += delta*(value-channelMean[6][rce][fpga][hyb][channel]);
 				}
 			}
-			x++;
 		}
 		eventCount++;
 		/*
@@ -451,7 +459,7 @@ int main ( int argc, char **argv ) {
 				mg->SetTitle("Pedestal;Channel;ADC counts");
 				//mg->GetXaxis()->SetRangeUser(0,640);
 				mg->Draw("a*");
-				sprintf(name,"%s_pedestal_F%d_H%d.png",inname.Data(),fpga,hyb);
+				sprintf(name,"%s_pedestal_R%d_F%d_H%d.png",inname.Data(),rce,fpga,hyb);
 				c1->SaveAs(name);
 				for (int i=0;i<7;i++)
 					delete graph[i];
@@ -469,9 +477,33 @@ int main ( int argc, char **argv ) {
 				mg->SetTitle("Noise;Channel;ADC counts");
 				//mg->GetXaxis()->SetRangeUser(0,640);
 				mg->Draw("a*");
-				sprintf(name,"%s_noise_F%d_H%d.png",inname.Data(),fpga,hyb);
+				double max = 0;
+				for (int i=0;i<7;i++)
+					for (int j=0;j<640;j++)
+						if (channelVariance[i][rce][fpga][hyb][j]>max) max = channelVariance[i][rce][fpga][hyb][j];
+				mg->GetYaxis()->SetRangeUser(0,1.2*max);
+				sprintf(name,"%s_noise_R%d_F%d_H%d.png",inname.Data(),rce,fpga,hyb);
 				c1->SaveAs(name);
 				for (int i=0;i<7;i++)
+					delete graph[i];
+				delete mg;
+
+				c1->Clear();
+				mg = new TMultiGraph();
+				double grShift[640];
+				for (int i=0;i<6;i++)
+				{
+					for (int n=0;n<640;n++) grShift[n]=channelMean[i][rce][fpga][hyb][n]-channelMean[6][rce][fpga][hyb][n];
+					graph[i] = new TGraph(640,grChan,grShift);
+					graph[i]->SetMarkerColor(i+1);
+					mg->Add(graph[i]);
+				}
+				mg->SetTitle("Sample-to-sample shift;Channel;ADC counts");
+				//mg->GetXaxis()->SetRangeUser(0,640);
+				mg->Draw("a*");
+				sprintf(name,"%s_shift_R%d_F%d_H%d.png",inname.Data(),rce,fpga,hyb);
+				c1->SaveAs(name);
+				for (int i=0;i<6;i++)
 					delete graph[i];
 				delete mg;
 
@@ -479,7 +511,7 @@ int main ( int argc, char **argv ) {
 				{
 					int apv = i/128;
 					int channel = i%128;
-					if (flip_channels) apv = 4-apv;
+					if (!flip_channels) apv = 4-apv;
 					if (channel == 0)
 						threshfile << fpga << "," << hyb << "," << apv << endl;
 					threshfile << apv*128+channel << "," << channelMean[6][rce][fpga][hyb][i] + threshold_sigma*channelVariance[6][rce][fpga][hyb][i] << endl;
@@ -488,16 +520,25 @@ int main ( int argc, char **argv ) {
 				{
 					int apv = i/128;
 					int channel = i%128;
-					if (flip_channels) apv = 4-apv;
+					if (!flip_channels) apv = 4-apv;
 					int sensorChannel =  apv*128+channel;
 					outfile << fpga << "\t" << hyb << "\t" << sensorChannel << "\t" << channelMean[6][rce][fpga][hyb][i] << "\t" << channelVariance[6][rce][fpga][hyb][i] << endl;
+
+					basefile << rce << "\t" << fpga << "\t" << hyb << "\t" << sensorChannel << "\t";
+					for (int j=0;j<7;j++)
+					{
+						basefile<<channelMean[j][rce][fpga][hyb][i]<<"\t"<<channelVariance[j][rce][fpga][hyb][i]<<"\t";
+					}
+					basefile<<endl;
 				}
 			}
 	// Start X-Windows
 	//theApp.Run();
 
 	// Close file
+	threshfile.close();
 	outfile.close();
+	basefile.close();
 	delete dataRead;
 	return(0);
 }

@@ -32,6 +32,8 @@
 #include <stdarg.h>
 #include <DevboardEvent.h>
 #include <DevboardSample.h>
+#include <TriggerEvent.h>
+#include <TriggerSample.h>
 #include <Data.h>
 #include <DataRead.h>
 #include <DataReadEvio.h>
@@ -52,8 +54,9 @@ int main ( int argc, char **argv ) {
 	bool read_temp = true;
 	int hybrid_type = 0;
 	bool evio_format = false;
-	int fpga = -1;
-	int hybrid = -1;
+	bool triggerevent_format = false;
+	int use_fpga = -1;
+	int use_hybrid = -1;
 	int num_events = -1;
 	int c;
 	TCanvas         *c1;
@@ -70,7 +73,7 @@ int main ( int argc, char **argv ) {
 	}
 
 	bool channelActive[640];
-	double channelAvg[640];
+	double channelValue[640];
 	int channelCount[640];
 	double channelMean[640];
 	double channelVariance[640];
@@ -88,19 +91,20 @@ int main ( int argc, char **argv ) {
 
 	double          histMin[640];
 	double          histMax[640];
-	uint hybridMin, hybridMax;
+	int hybridMin, hybridMax;
 	//TGraph          *sigma;
 	int ni = 0;
 	double          grChan[640];
 	double          grMean[7][640];
 	double          grSigma[7][640];
+	for (int i=0;i<640;i++) {
+		grChan[i]=i;
+	}
 	DataRead        *dataRead;
 	DevboardEvent    event;
-	DevboardSample   *sample;
-	uint            x;
-	uint            y;
-	uint            value;
-	uint            channel;
+	TriggerEvent    triggerevent;
+	TriggerSample   *triggersample = new TriggerSample();
+	int		samples[6];
 	int            eventCount;
 	int runCount;
 	TString inname;
@@ -110,7 +114,7 @@ int main ( int argc, char **argv ) {
 	TGraph          *graph[7];
 	TMultiGraph *mg;
 
-	while ((c = getopt(argc,argv,"ho:nmct:H:F:e:Ed")) !=-1)
+	while ((c = getopt(argc,argv,"ho:nmct:H:F:e:EdV")) !=-1)
 		switch (c)
 		{
 			case 'h':
@@ -125,6 +129,7 @@ int main ( int argc, char **argv ) {
 				printf("-H: use only specified hybrid\n");
 				printf("-e: stop after specified number of events\n");
 				printf("-E: use EVIO file format\n");
+				printf("-V: use TriggerEvent event format\n");
 				return(0);
 				break;
 			case 'o':
@@ -148,16 +153,19 @@ int main ( int argc, char **argv ) {
 				hybrid_type = atoi(optarg);
 				break;
 			case 'F':
-				fpga = atoi(optarg);
+				use_fpga = atoi(optarg);
 				break;
 			case 'H':
-				hybrid = atoi(optarg);
+				use_hybrid = atoi(optarg);
 				break;
 			case 'e':
 				num_events = atoi(optarg);
 				break;
 			case 'E':
 				evio_format = true;
+				break;
+			case 'V':
+				triggerevent_format = true;
 				break;
 			case 'd':
 				debug = true;
@@ -187,6 +195,7 @@ int main ( int argc, char **argv ) {
 	gStyle->SetStatH(0.1);                
 	gStyle->SetTitleOffset(1.4,"y");
 	gStyle->SetPadLeftMargin(0.15);
+	gStyle->SetMarkerStyle(6);
 	c1 = new TCanvas("c1","c1",1200,900);
 
 	// Start X11 view
@@ -201,7 +210,7 @@ int main ( int argc, char **argv ) {
 
 	hybridMin = 16384;
 	hybridMax = 0;
-	for (channel=0; channel < 640; channel++) {
+	for (int channel=0; channel < 640; channel++) {
 		histMin[channel] = 16384;
 		histMax[channel] = 0;
 	}
@@ -249,10 +258,17 @@ int main ( int argc, char **argv ) {
 	cout << "Writing configuration to " <<outdir<<confname << endl;
 	outconfig.open(outdir+confname);
 
-	dataRead->next(&event);
-	dataRead->dumpConfig(outconfig);
+	bool readOK;
+
+	if (triggerevent_format) {
+		dataRead->next(&triggerevent);
+	} else {
+		dataRead->next(&event);
+	}
+	outconfig << dataRead->getConfigXml();
+	outconfig << endl;
+	outconfig << dataRead->getStatusXml();
 	outconfig.close();
-	//dataRead.dumpStatus();
 
 	runCount = atoi(dataRead->getConfig("RunCount").c_str());
 	int max_count = runCount==0 ? 10000 : runCount;
@@ -271,23 +287,33 @@ int main ( int argc, char **argv ) {
 	eventCount = 0;
 
 	do {
+		int rce = 0;
+		int fpga = 0;
+		int samplecount;
+
+		if (triggerevent_format) {
+			samplecount = triggerevent.count();
+		} else {
+			fpga = event.fpgaAddress();
+			samplecount = event.count();
+			if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
+				printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
+				read_temp = false;
+			}
+		}
+
 	        if(debug) printf("Event %d\n",eventCount);
 
-	        if(debug) printf("fpga %d\n",event.fpgaAddress());
-		if (event.fpgaAddress()==7) 
+		//if(debug) printf("fpga %d\n",event.fpgaAddress());
+		if (!triggerevent_format && fpga==7) 
 		{
-			printf("not a data event\n");
+			//printf("not a data event\n");
 			continue;
 		}
-		if (fpga!=-1 && ((int)event.fpgaAddress())!=fpga) continue;
-		if(debug) cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count() << " is" <<endl;
-		if(debug) cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
+		//if(debug) cout<<"  fpga #"<<fpga<<"; number of samples = "<<event.count() << " is" <<endl;
+		//if(debug) cout<<"  fpga #"<<fpga<<"; number of samples = "<<event.count()<<endl;
 		if (eventCount%1000==0) printf("Event %d\n",eventCount);
 		if (num_events!=-1 && eventCount >= num_events) break;
-		if (read_temp && !event.isTiFrame()) for (uint i=0;i<4;i++) {
-			printf("Event %d, temperature #%d: %f\n",eventCount,i,event.temperature(i,hybrid_type==1));
-			read_temp = false;
-		}
 		if (eventCount<max_count) {
 			moving_ti[eventCount] = eventCount;
 			for (int i=0;i<5;i++) apv_means[i][eventCount] = 0.0;
@@ -297,42 +323,67 @@ int main ( int argc, char **argv ) {
 			channelActive[i] = false;
 		}
 
-		for (x=0; x < event.count(); x++) {
+		for (int x=0; x < samplecount; x++) {
+			int hyb;
+			int apv;
+			int apvch;
+			int channel;
+
+			bool goodSample = true;
+
 			// Get sample
-			sample  = event.sample(x);
-			if(debug) printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
-			if (hybrid!=-1 && ((int)sample->hybrid())!=hybrid) continue;
+			if (triggerevent_format) {
+				triggerevent.sample(x,triggersample);
+				rce = triggersample->rceAddress();
+				fpga = triggersample->febAddress();
+				hyb = triggersample->hybrid();
+				apv = triggersample->apv();
+				apvch = triggersample->channel();
+				goodSample = (!triggersample->head() && !triggersample->tail());
+				for ( int y=0; y < 6; y++ ) {
+					//printf("%x\n",sample->value(y));
+					samples[y] = triggersample->value(y);
+				}
+			} else {
+				DevboardSample *sample  = event.sample(x);
+				hyb = sample->hybrid();
+				apv = sample->apv();
+				apvch = sample->channel();
+				for ( int y=0; y < 6; y++ ) {
+					//printf("%x\n",sample->value(y));
+					samples[y] = sample->value(y) & 0x3FFF;
+					if (samples[y]==0) goodSample = false;
+				}
+			}
+			//if(debug) printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
+			if (use_fpga!=-1 && fpga!=use_fpga) continue;
+			if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
+			if (!goodSample) continue;
 			//printf("hybrid %d\n",sample->hybrid());
 
-			if (mux_channels) channel = chanMap[sample->channel()];
-			else channel = sample->channel();
+			if (mux_channels) channel = chanMap[apvch];
+			else channel = apvch;
 
 			if (flip_channels)
-				channel += (4-sample->apv())*128;
+				channel += (4-apv)*128;
 			else
-				channel += sample->apv()*128;
+				channel += apv*128;
 
 			//if (eventCount==0) printf("channel %d\n",channel);
 
 			if ( channel >= (5 * 128) ) {
 				cout << "Channel " << dec << channel << " out of range" << endl;
-				cout << "Apv = " << dec << sample->apv() << endl;
-				cout << "Chan = " << dec << sample->channel() << endl;
+				cout << "Apv = " << dec << apv << endl;
+				cout << "Chan = " << dec << apvch << endl;
 			}
 
 
 			// Filter APVs
 			if ( eventCount >= 20 ) {
-				bool bad_event = false;
-				for ( y=0; y < 6; y++ ) if (sample->value(y)==0) {
-					printf("sample is zero: event %d, channel %d, sample %d\n",x,channel,y);
-					bad_event = true;
-				}
-				if (bad_event) continue;
-				channelAvg[channel] = 0;
-				for ( y=0; y < 6; y++ ) {
-					value = sample->value(y);
-					channelAvg[channel]+=value;
+				channelValue[channel] = 0;
+				for ( int y=0; y < 6; y++ ) {
+					int value = samples[y];
+					channelValue[channel]+=value;
 
 					//vhigh = (value << 1) & 0x2AAA;
 					//vlow  = (value >> 1) & 0x1555;
@@ -348,17 +399,18 @@ int main ( int argc, char **argv ) {
 					if ( value < hybridMin ) hybridMin = value;
 					if ( value > hybridMax ) hybridMax = value;
 				}
-				channelAvg[channel]/=6.0;
-				//channelAvg[channel] = sample->value(1);
+				channelValue[channel]/=6.0;
+				channelValue[channel] = samples[0];
+				//if (channel==17) printf("%d %d %d %d %d %d\n",eventCount,x,rce,fpga,hyb,samples[0]);
 
 				channelCount[channel]++;
 				channelActive[channel] = true;
 			}
 			double mean = 0;
-			for (y=0;y<6;y++) mean+=sample->value(y);
+			for (int y=0;y<6;y++) mean+=samples[y];
 			mean/=6.0;
 			if (eventCount<max_count) {
-				apv_means[sample->apv()][eventCount] += mean;
+				apv_means[apv][eventCount] += mean;
 			}
 			/*
 			   if (channel==corr1)
@@ -372,38 +424,77 @@ int main ( int argc, char **argv ) {
 			   */
 		}
 		if (eventCount<max_count) {
-		for (int i=0;i<5;i++) apv_means[i][eventCount] /= 128;
+			for (int i=0;i<5;i++) apv_means[i][eventCount] /= 128;
 		}
-		if (!skip_corr)
+		if (!skip_corr) {
+			double grDelta[640];
+			ni=0;
 			for (int i=0;i<640;i++) if (channelActive[i])
 			{
-				double delta = channelAvg[i]-channelMean[i];
+				double delta = channelValue[i]-channelMean[i];
 				if (channelCount[i]==1)
 				{
-					channelMean[i] = channelAvg[i];
+					channelMean[i] = channelValue[i];
 				}
 				else
 				{
 					channelMean[i] += delta/channelCount[i];
 				}
-				channelVariance[i] += delta*(channelAvg[i]-channelMean[i]);
+				channelVariance[i] += delta*(channelValue[i]-channelMean[i]);
 				for (int j=0;j<i;j++) if (channelActive[j])
 				{
-					channelCovar[i][j] += (channelAvg[i]-channelMean[i])*(channelAvg[j]-channelMean[j]);
+					channelCovar[i][j] += (channelValue[i]-channelMean[i])*(channelValue[j]-channelMean[j]);
 					/*
 					   if (i==corr1&&j==corr2)
 					   {
-					//if (channelAvg[i]<7620)
-					corrHist->Fill(channelAvg[i],channelAvg[j]);
+					//if (channelValue[i]<7620)
+					corrHist->Fill(channelValue[i],channelValue[j]);
 					//else
 					//printf("event %d\n",eventCount);
 					}
 					*/
 				}
+				if (i>255 && i<384) {
+					grChan[ni]=i;
+					grDelta[ni]=delta;
+					//printf("%d: %f, %f\n",ni,grChan[ni],grDelta[ni]);
+					ni++;
+				}
 			}
+			int startscope=1000;
+			if (eventCount==startscope-1) {
+				mg = new TMultiGraph();
+			}
+			if (ni>0 && eventCount>=startscope && eventCount<startscope+20) {
+				//printf("%f\n",grDelta[17]);
+				int i = eventCount-startscope;
+				TGraph* tempgraph;
+				tempgraph = new TGraph(ni,grChan,grDelta);
+				tempgraph->SetMarkerColor(i+1);
+				tempgraph->SetLineColor(i+1);
+				mg->Add(tempgraph);
+			}
+			if (eventCount==startscope+20) {
+				c1->Clear();
+				sprintf(name,"%s_base_delta.png",inname.Data());
+				printf("%s\n",name);
+				mg->Draw("ALP");
+				mg->GetYaxis()->SetRangeUser(-500,500);
+				c1->SaveAs(name);
+				for (int i=0;i<7;i++)
+					delete graph[i];
+				delete mg;
+			}
+		}
 		eventCount++;
 
-	} while ( dataRead->next(&event));
+		if (triggerevent_format) {
+			readOK = dataRead->next(&triggerevent);
+			readOK = dataRead->next(&triggerevent);
+		} else {
+			readOK = dataRead->next(&event);
+		}
+	} while (readOK);
 	dataRead->close();
 
 	if (eventCount != runCount)
@@ -430,8 +521,6 @@ int main ( int argc, char **argv ) {
 		graph[i] = new TGraph(min(eventCount,max_count),moving_ti,apv_means[i]);
 		graph[i]->SetMarkerColor(i+1);
 		if (i==4) graph[i]->SetMarkerColor(6);
-		graph[i]->SetMarkerStyle(20);
-		graph[i]->SetMarkerSize(0.25);
 		mg->Add(graph[i]);
 	}
 	mg->Draw("ap");
@@ -487,7 +576,8 @@ int main ( int argc, char **argv ) {
 		}
 	}
 
-	for (channel = 0; channel < 640; channel++) {
+	ni=0;
+	for (int channel = 0; channel < 640; channel++) {
 		int count;
 		if (histMin[channel]<=histMax[channel])
 		{
@@ -615,12 +705,12 @@ int main ( int argc, char **argv ) {
 		mg->Add(graph[i]);
 
 		if(i==0) {
-		  for (int ch=0;ch<graph[i]->GetN();ch++) {
-		    double x,y;
-		    graph[i]->GetPoint(ch,x,y);
-		    if (y > 50) printf("ch %f: noise %f above 50\n",x,y);
-		    if (y < 20) printf("ch %f: noise %f below 20\n",x,y);
-		  }
+			for (int ch=0;ch<graph[i]->GetN();ch++) {
+				double x,y;
+				graph[i]->GetPoint(ch,x,y);
+				if (y > 50) printf("ch %f: noise %f above 50\n",x,y);
+				if (y < 20) printf("ch %f: noise %f below 20\n",x,y);
+			}
 		}
 
 	}

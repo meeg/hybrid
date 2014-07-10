@@ -269,7 +269,7 @@ int main ( int argc, char **argv ) {
 				if (use_hybrid!=-1 && hybrid!=use_hybrid) continue;
 
 				int channel = sample->channel();
-				if (flip_channels)
+				if (!flip_channels)
 					channel += (4-sample->apv())*128;
 				else
 					channel += sample->apv()*128;
