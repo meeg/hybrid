@@ -427,8 +427,8 @@ int main ( int argc, char **argv ) {
 			for (int i=0;i<5;i++) apv_means[i][eventCount] /= 128;
 		}
 		if (!skip_corr) {
-			double grDelta[640];
-			ni=0;
+			//double grDelta[640];
+			//ni=0;
 			for (int i=0;i<640;i++) if (channelActive[i])
 			{
 				double delta = channelValue[i]-channelMean[i];
@@ -454,13 +454,16 @@ int main ( int argc, char **argv ) {
 					}
 					*/
 				}
+/*
 				if (i>255 && i<384) {
 					grChan[ni]=i;
 					grDelta[ni]=delta;
 					//printf("%d: %f, %f\n",ni,grChan[ni],grDelta[ni]);
 					ni++;
 				}
+*/
 			}
+/*
 			int startscope=1000;
 			if (eventCount==startscope-1) {
 				mg = new TMultiGraph();
@@ -485,11 +488,11 @@ int main ( int argc, char **argv ) {
 					delete graph[i];
 				delete mg;
 			}
+*/
 		}
 		eventCount++;
 
 		if (triggerevent_format) {
-			readOK = dataRead->next(&triggerevent);
 			readOK = dataRead->next(&triggerevent);
 		} else {
 			readOK = dataRead->next(&event);
