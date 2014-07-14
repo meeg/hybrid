@@ -38,6 +38,10 @@ def doRun(path):
 		# Reset counters (including error)
 		pythonDaq.daqResetCounters()
 		pythonDaq.daqSetConfig('DataFile',path)
+		configStatus = 0
+		while configStatus != 1:
+			configStatus = int(pythonDaq.daqVerifyConfig())
+			print "Verifying config: " + str(configStatus)
 		pythonDaq.daqSendCommand('OpenDataFile','')
 		pythonDaq.daqSetRunState('Running')
 		while pythonDaq.daqGetRunState() == "Running":
