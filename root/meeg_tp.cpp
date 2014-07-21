@@ -45,110 +45,110 @@ using namespace std;
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
-	int c;
-	bool plot_tp_fits = false;
-	bool plot_fit_results = false;
-	bool force_cal_grp = false;
-	bool use_baseline_cal = false;
-	bool flip_channels = true;
-	bool move_fitstart = false;
-	bool read_temp = true;
-	int hybrid_type = 0;
-	bool evio_format = false;
-	bool triggerevent_format = false;
-	int use_fpga = -1;
-	int use_hybrid = -1;
-	int num_events = -1;
-	double fit_shift;
-	ifstream calfile;
-	TString inname = "";
-	TString outdir = "";
-	int cal_grp = -1;
-	int cal_delay = 0;
-	double delay_step = SAMPLE_INTERVAL/8;
-	TCanvas         *c1;
-	//TH2I            *histAll;
-	short *allSamples[2][640][48] = {{{NULL}}};
-	//bool hasSamples[2][640][48] = {{{false}}};
-	//TH1D            *histSamples1D;
-	int          histMin[640];
-	for (int i=0;i<640;i++) histMin[i]=16384;
-	int          histMax[640];
-	for (int i=0;i<640;i++) histMax[i]=0;
-	//TGraph          *mean;
-	//TGraph          *sigma;
-	DataRead        *dataRead;
-	DevboardEvent    event;
-	TriggerEvent    triggerevent;
-	TriggerSample   *triggersample = new TriggerSample();
-	int		samples[6];
-	int            eventCount;
-	int runCount;
-	double          sum;
-	char            name[100];
-	char            name2[100];
-	char title[200];
-	int nChan[2] = {0};
-	double grChan[2][640];
-	double grTp[2][640];
-	double grA[2][640];
-	double grT0[2][640];
-	double grChisq[2][640];
-	double          calMean[640][7] = {{0.0}};
-	double          calSigma[640][7] = {{1.0}};
-	for (int i=0;i<640;i++) {
-		for (int j=0;j<7;j++) {
-			calMean[i][j] = 0.0;
-			calSigma[i][j] = 1.0;
-		}
-	}
+    int c;
+    bool plot_tp_fits = false;
+    bool plot_fit_results = false;
+    bool force_cal_grp = false;
+    bool use_baseline_cal = false;
+    bool flip_channels = true;
+    bool move_fitstart = false;
+    bool read_temp = true;
+    int hybrid_type = 0;
+    bool evio_format = false;
+    bool triggerevent_format = false;
+    int use_fpga = -1;
+    int use_hybrid = -1;
+    int num_events = -1;
+    double fit_shift;
+    ifstream calfile;
+    TString inname = "";
+    TString outdir = "";
+    int cal_grp = -1;
+    int cal_delay = 0;
+    double delay_step = SAMPLE_INTERVAL/8;
+    TCanvas         *c1;
+    //TH2I            *histAll;
+    short *allSamples[2][640][48] = {{{NULL}}};
+    //bool hasSamples[2][640][48] = {{{false}}};
+    //TH1D            *histSamples1D;
+    int          histMin[640];
+    for (int i=0;i<640;i++) histMin[i]=16384;
+    int          histMax[640];
+    for (int i=0;i<640;i++) histMax[i]=0;
+    //TGraph          *mean;
+    //TGraph          *sigma;
+    DataRead        *dataRead;
+    DevboardEvent    event;
+    TriggerEvent    triggerevent;
+    TriggerSample   *triggersample = new TriggerSample();
+    int		samples[6];
+    int            eventCount;
+    int runCount;
+    double          sum;
+    char            name[100];
+    char            name2[100];
+    char title[200];
+    int nChan[2] = {0};
+    double grChan[2][640];
+    double grTp[2][640];
+    double grA[2][640];
+    double grT0[2][640];
+    double grChisq[2][640];
+    double          calMean[640][7] = {{0.0}};
+    double          calSigma[640][7] = {{1.0}};
+    for (int i=0;i<640;i++) {
+        for (int j=0;j<7;j++) {
+            calMean[i][j] = 0.0;
+            calSigma[i][j] = 1.0;
+        }
+    }
 
-	while ((c = getopt(argc,argv,"hfrg:o:b:d:s:nt:H:F:e:EV")) !=-1)
-		switch (c)
-		{
-			case 'h':
-				printf("-h: print this help\n");
-				printf("-f: plot Tp fits for each channel\n");
-				printf("-g: force use of specified cal group\n");
-				printf("-r: plot fit results\n");
-				printf("-o: use specified output filename\n");
-				printf("-b: use specified baseline cal file\n");
-				printf("-d: use specified dtrig baseline cal file\n");
-				printf("-n: DAQ (Ryan's) channel numbering\n");
-				printf("-s: start fit at given delay after a first guess at T0\n");
-				printf("-t: hybrid type (1 for old test run hybrid, 2 for new 2014 hybrid)\n");
-				printf("-F: use only specified FPGA\n");
-				printf("-H: use only specified hybrid\n");
-				printf("-e: stop after specified number of events\n");
-				printf("-E: use EVIO file format\n");
-				printf("-V: use TriggerEvent event format\n");
-				return(0);
-				break;
-			case 'f':
-				plot_tp_fits = true;
-				break;
-			case 'r':
-				plot_fit_results = true;
-				break;
-			case 'n':
-				flip_channels = false;
-				break;
-			case 'g':
-				force_cal_grp = true;
-				cal_grp = atoi(optarg);
-				break;
-			case 'o':
-				inname = optarg;
-				outdir = optarg;
-				if (outdir.Contains('/')) {
-					outdir.Remove(outdir.Last('/')+1);
-				}
-				else outdir="";
-				break;
-			case 'b':
-				use_baseline_cal = true;
-				cout << "Reading baseline calibration from " << optarg << endl;
-				calfile.open(optarg);
+    while ((c = getopt(argc,argv,"hfrg:o:b:d:s:nt:H:F:e:EV")) !=-1)
+        switch (c)
+        {
+            case 'h':
+                printf("-h: print this help\n");
+                printf("-f: plot Tp fits for each channel\n");
+                printf("-g: force use of specified cal group\n");
+                printf("-r: plot fit results\n");
+                printf("-o: use specified output filename\n");
+                printf("-b: use specified baseline cal file\n");
+                printf("-d: use specified dtrig baseline cal file\n");
+                printf("-n: DAQ (Ryan's) channel numbering\n");
+                printf("-s: start fit at given delay after a first guess at T0\n");
+                printf("-t: hybrid type (1 for old test run hybrid, 2 for new 2014 hybrid)\n");
+                printf("-F: use only specified FPGA\n");
+                printf("-H: use only specified hybrid\n");
+                printf("-e: stop after specified number of events\n");
+                printf("-E: use EVIO file format\n");
+                printf("-V: use TriggerEvent event format\n");
+                return(0);
+                break;
+            case 'f':
+                plot_tp_fits = true;
+                break;
+            case 'r':
+                plot_fit_results = true;
+                break;
+            case 'n':
+                flip_channels = false;
+                break;
+            case 'g':
+                force_cal_grp = true;
+                cal_grp = atoi(optarg);
+                break;
+            case 'o':
+                inname = optarg;
+                outdir = optarg;
+                if (outdir.Contains('/')) {
+                    outdir.Remove(outdir.Last('/')+1);
+                }
+                else outdir="";
+                break;
+            case 'b':
+                use_baseline_cal = true;
+                cout << "Reading baseline calibration from " << optarg << endl;
+                calfile.open(optarg);
                 while (!calfile.eof()) {
                     int channel;
                     calfile >> channel;
@@ -310,11 +310,15 @@ int main ( int argc, char **argv ) {
 
             if (!force_cal_grp)
             {
-                cal_grp = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup").c_str());
+                string cgrp = dataRead->getConfig("cntrlFpga:hybrid:apv25:CalGroup");
+                if (cgrp.length()==0) cgrp = dataRead->getConfig("FrontEndTestFpga:FebCore:Hybrid:apv25:CalGroup");
+                cal_grp = atoi(cgrp.c_str());
                 cout<<"Read calibration group "<<cal_grp<<" from data file"<<endl;
             }
 
-            cal_delay = atoi(dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel").substr(4,1).c_str());
+            string csel = dataRead->getConfig("cntrlFpga:hybrid:apv25:Csel");
+            if (csel.length()==0) csel = dataRead->getConfig("FrontEndTestFpga:FebCore:Hybrid:apv25:Csel");
+            cal_delay = atoi(csel.substr(4,1).c_str());
             cout<<"Read calibration delay "<<cal_delay<<" from data file"<<endl;
             if (cal_delay==0)
             {
@@ -405,6 +409,8 @@ int main ( int argc, char **argv ) {
                 if (use_fpga!=-1 && fpga!=use_fpga) continue;
                 if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
                 if (!goodSample) continue;
+
+                channel = apvch;
 
                 if (flip_channels)
                     channel += (4-apv)*128;
