@@ -21,7 +21,7 @@
 #include <TFile.h>
 #include <TH1F.h>
 #include <meeg_utils.hh>
-#include <TH2F.h>
+#include <TH2I.h>
 #include <TF1.h>
 #include <TROOT.h>
 #include <TCanvas.h>
@@ -60,7 +60,7 @@ int main ( int argc, char **argv ) {
     int num_events = -1;
     int c;
     TCanvas         *c1;
-    TH2F            *histAll[7];
+    TH2I            *histAll[7];
     short *allSamples[640][7];
     for (int i=0;i<640;i++) for (int j=0;j<7;j++)
     {
@@ -86,6 +86,15 @@ int main ( int argc, char **argv ) {
             channelCovar[i][j] = 0.0;
         }
     }
+
+    int apvEventCount = 0;
+    double apvEventMean[5];
+    double hybridEventMean;
+    double apvMean[5];
+    double hybridMean = 0.0;
+    double apvVariance[5];
+    double hybridVariance = 0.0;
+
     //TH2S *corrHist;
     //corrHist = new TH2S("corrHist","Channel correlation",16384,-0.5,16383.5,16384,-0.5,16383.5);
 
@@ -233,10 +242,10 @@ int main ( int argc, char **argv ) {
     {
         sprintf(name,"Value_Hist_s%d",i);
         sprintf(title,"Baseline values, sample %d;ADC counts;Channel",i);
-        histAll[i] = new TH2F(name,title,16384,-0.5,16383.5,640,-0.5,639.5);
+        histAll[i] = new TH2I(name,title,16384,-0.5,16383.5,640,-0.5,639.5);
     }
     sprintf(title,"Baseline values, all samples;ADC counts;Channel");
-    histAll[6] = new TH2F("Value_Hist_All",title,16384,-0.5,16383.5,640,-0.5,639.5);
+    histAll[6] = new TH2I("Value_Hist_All",title,16384,-0.5,16383.5,640,-0.5,639.5);
 
 
     ofstream outfile;
@@ -322,6 +331,8 @@ int main ( int argc, char **argv ) {
         {
             channelActive[i] = false;
         }
+        for (int i=0;i<5;i++) apvEventMean[i] = 0;
+        hybridEventMean = 0;
 
         for (int x=0; x < samplecount; x++) {
             int hyb;
@@ -409,6 +420,8 @@ int main ( int argc, char **argv ) {
             double mean = 0;
             for (int y=0;y<6;y++) mean+=samples[y];
             mean/=6.0;
+            hybridEventMean += mean;
+            apvEventMean[apv] += mean;
             if (eventCount<max_count) {
                 apv_means[apv][eventCount] += mean;
             }
@@ -422,6 +435,19 @@ int main ( int argc, char **argv ) {
                moving_yi2[eventCount] = mean;
                }
              */
+        }
+        if (hybridEventMean!=0) {
+            apvEventCount++;
+            for (int i=0;i<5;i++) {
+                apvEventMean[i] /= 128;
+                int delta = apvEventMean[i] - apvMean[i];
+                apvMean[i] += delta/apvEventCount;
+                apvVariance[i] += delta*(apvEventMean[i]-apvMean[i]);
+            }
+            hybridEventMean /= 640;
+            int delta = hybridEventMean - hybridMean;
+            hybridMean += delta/apvEventCount;
+            hybridVariance += delta*(hybridEventMean-hybridMean);
         }
         if (eventCount<max_count) {
             for (int i=0;i<5;i++) apv_means[i][eventCount] /= 128;
@@ -452,7 +478,7 @@ int main ( int argc, char **argv ) {
                     //else
                     //printf("event %d\n",eventCount);
                     }
-                     */
+                    */
                 }
                 /*
                    if (i>255 && i<384) {
@@ -461,7 +487,7 @@ int main ( int argc, char **argv ) {
                 //printf("%d: %f, %f\n",ni,grChan[ni],grDelta[ni]);
                 ni++;
                 }
-                 */
+                */
             }
             /*
                int startscope=1000;
@@ -488,7 +514,7 @@ int main ( int argc, char **argv ) {
         delete graph[i];
         delete mg;
         }
-             */
+        */
         }
         eventCount++;
 
@@ -516,7 +542,7 @@ int main ( int argc, char **argv ) {
        mg->Draw("a*");
        c1->SaveAs("meeg.png");
        c1->Clear();
-     */
+       */
 
     mg = new TMultiGraph();
     for (int i=0;i<5;i++)
@@ -536,13 +562,18 @@ int main ( int argc, char **argv ) {
     for (int i=0;i<5;i++) delete[] apv_means[i];
     delete[] moving_ti;
 
+    for (int i=0;i<5;i++) {
+        printf("APV %d: common-mode noise %f\n",i,sqrt(apvVariance[i]/(apvEventCount-1)));
+    }
+    printf("Hybrid: common-mode noise %f\n",sqrt(hybridVariance/(apvEventCount-1)));
+
     /*
        c1->Clear();
        corrHist->GetXaxis()->SetRangeUser(histMin[corr1],histMax[corr1]);
        corrHist->GetYaxis()->SetRangeUser(histMin[corr2],histMax[corr2]);
        corrHist->Draw("colz");
        c1->SaveAs("meeg2.png");
-     */
+       */
 
     int deadAPV = -1;
     for (int i=0;i<640;i++)
@@ -590,17 +621,13 @@ int main ( int argc, char **argv ) {
             {
                 doStats_mean(16384,(int)histMin[channel],(int)histMax[channel],allSamples[channel][i],count,grMean[i][ni],grSigma[i][ni]);
                 outfile<<grMean[i][ni]<<"\t"<<grSigma[i][ni]<<"\t";
+                //printf("%d:\t%f\t%f\n",channel,grSigma[i][ni],sqrt(channelVariance[channel]));
             }
             outfile<<endl;
             ni++;
         }
     }
 
-
-    histAll[6]->GetXaxis()->SetRangeUser(hybridMin,hybridMax);
-    histAll[6]->Draw("colz");
-    sprintf(name,"%s_base.png",inname.Data());
-    c1->SaveAs(name);
 
     if (!skip_corr)
     {
@@ -667,6 +694,11 @@ int main ( int argc, char **argv ) {
         //printf("correlation %f %f\n",corrHist->GetCorrelationFactor(),channelCovar[corr1][corr2]);
         //printf("correlation %f\n",channelCovar[corr1][corr2]);
     }
+
+    histAll[6]->GetXaxis()->SetRangeUser(hybridMin,hybridMax);
+    histAll[6]->Draw("colz");
+    sprintf(name,"%s_base.png",inname.Data());
+    c1->SaveAs(name);
 
     for (int i=0;i<6;i++)
     {
