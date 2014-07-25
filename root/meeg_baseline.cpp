@@ -440,12 +440,12 @@ int main ( int argc, char **argv ) {
             apvEventCount++;
             for (int i=0;i<5;i++) {
                 apvEventMean[i] /= 128;
-                int delta = apvEventMean[i] - apvMean[i];
+                double delta = apvEventMean[i] - apvMean[i];
                 apvMean[i] += delta/apvEventCount;
                 apvVariance[i] += delta*(apvEventMean[i]-apvMean[i]);
             }
             hybridEventMean /= 640;
-            int delta = hybridEventMean - hybridMean;
+            double delta = hybridEventMean - hybridMean;
             hybridMean += delta/apvEventCount;
             hybridVariance += delta*(hybridEventMean-hybridMean);
         }
