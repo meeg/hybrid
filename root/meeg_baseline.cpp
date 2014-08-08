@@ -55,9 +55,11 @@ int main ( int argc, char **argv ) {
     int hybrid_type = 0;
     bool evio_format = false;
     bool triggerevent_format = false;
+    bool subtract_reference = false;
     int use_fpga = -1;
     int use_hybrid = -1;
     int num_events = -1;
+    int ignore_count = 20;
     int c;
     TCanvas         *c1;
     TH2I            *histAll[7];
@@ -74,6 +76,7 @@ int main ( int argc, char **argv ) {
 
     bool channelActive[640];
     double channelValue[640];
+    int eventSamples[640][6];
     int channelCount[640];
     double channelMean[640];
     double channelVariance[640];
@@ -86,6 +89,10 @@ int main ( int argc, char **argv ) {
             channelCovar[i][j] = 0.0;
         }
     }
+
+    int reference_offset_mean = 0;
+    int reference_offset[6];
+    int reference_delta[6];
 
     int apvEventCount = 0;
     double apvEventMean[5];
@@ -113,7 +120,6 @@ int main ( int argc, char **argv ) {
     DevboardEvent    event;
     TriggerEvent    triggerevent;
     TriggerSample   *triggersample = new TriggerSample();
-    int		samples[6];
     int            eventCount;
     int runCount;
     TString inname;
@@ -123,7 +129,7 @@ int main ( int argc, char **argv ) {
     TGraph          *graph[7];
     TMultiGraph *mg;
 
-    while ((c = getopt(argc,argv,"ho:nmct:H:F:e:EdV")) !=-1)
+    while ((c = getopt(argc,argv,"ho:nmct:H:F:e:EdVS")) !=-1)
         switch (c)
         {
             case 'h':
@@ -139,6 +145,7 @@ int main ( int argc, char **argv ) {
                 printf("-e: stop after specified number of events\n");
                 printf("-E: use EVIO file format\n");
                 printf("-V: use TriggerEvent event format\n");
+                printf("-S: subtract channel 639\n");
                 return(0);
                 break;
             case 'o':
@@ -175,6 +182,9 @@ int main ( int argc, char **argv ) {
                 break;
             case 'V':
                 triggerevent_format = true;
+                break;
+            case 'S':
+                subtract_reference = true;
                 break;
             case 'd':
                 debug = true;
@@ -287,7 +297,7 @@ int main ( int argc, char **argv ) {
     /*
        double *moving_yi = new double[runCount];
        double *moving_yi2 = new double[runCount];
-     */
+       */
 
     if(debug) printf("%d events expected from config\n",runCount);
 
@@ -331,14 +341,13 @@ int main ( int argc, char **argv ) {
         {
             channelActive[i] = false;
         }
-        for (int i=0;i<5;i++) apvEventMean[i] = 0;
-        hybridEventMean = 0;
 
         for (int x=0; x < samplecount; x++) {
             int hyb;
             int apv;
             int apvch;
             int channel;
+            int samples[6];
 
             bool goodSample = true;
 
@@ -388,54 +397,85 @@ int main ( int argc, char **argv ) {
                 cout << "Chan = " << dec << apvch << endl;
             }
 
+            if (subtract_reference && apv==0 && apvch==127) {
+                if (eventCount==ignore_count-1) {
+                    //for (int y=0;y<6;y++) reference_offset[y]=samples[y];
+                    for (int y=0;y<6;y++) reference_offset_mean += samples[y];
+                    reference_offset_mean /= 6;
+                } else if (eventCount >= ignore_count)
+                    //for (int y=0;y<6;y++) reference_delta[y]=samples[y]-reference_offset[y];
+                    for (int y=0;y<6;y++) reference_delta[y]=samples[y]-reference_offset_mean;
+            }
 
+            for ( int y=0; y < 6; y++ ) {
+                eventSamples[channel][y] = samples[y];
+            }
+            if ( eventCount >= ignore_count ) {
+                channelCount[channel]++;
+                channelActive[channel] = true;
+            }
+        }
+
+        if (subtract_reference && eventCount>=ignore_count) {
+            //int mean_delta = 0;
+            //for (int y=0;y<6;y++) mean_delta+=reference_delta[y];
+            //mean_delta /= 6;
+            for (int i=0;i<640;i++) for ( int y=0; y<6; y++ ) {
+                eventSamples[i][y]-=reference_delta[y];
+                //eventSamples[i][y]-=mean_delta;
+            }
+        }
+
+        for (int i=0;i<5;i++) apvEventMean[i] = 0;
+        hybridEventMean = 0;
+        for (int i=0;i<640;i++) {
             // Filter APVs
-            if ( eventCount >= 20 ) {
-                channelValue[channel] = 0;
+            if ( eventCount >= ignore_count ) {
+                channelValue[i] = 0;
                 for ( int y=0; y < 6; y++ ) {
-                    int value = samples[y];
-                    channelValue[channel]+=value;
+                    int value = eventSamples[i][y];
+                    channelValue[i]+=value;
 
                     //vhigh = (value << 1) & 0x2AAA;
                     //vlow  = (value >> 1) & 0x1555;
                     //value = vlow | vhigh;
 
-                    histAll[y]->Fill(value,channel);
-                    histAll[6]->Fill(value,channel);
-                    allSamples[channel][y][value]++;
-                    allSamples[channel][6][value]++;
+                    histAll[y]->Fill(value,i);
+                    histAll[6]->Fill(value,i);
+                    allSamples[i][y][value]++;
+                    allSamples[i][6][value]++;
 
-                    if ( value < histMin[channel] ) histMin[channel] = value;
-                    if ( value > histMax[channel] ) histMax[channel] = value;
+                    if ( value < histMin[i] ) histMin[i] = value;
+                    if ( value > histMax[i] ) histMax[i] = value;
                     if ( value < hybridMin ) hybridMin = value;
                     if ( value > hybridMax ) hybridMax = value;
                 }
-                channelValue[channel]/=6.0;
-                channelValue[channel] = samples[0];
+                channelValue[i]/=6.0;
+                channelValue[i] = eventSamples[i][0];
                 //if (channel==17) printf("%d %d %d %d %d %d\n",eventCount,x,rce,fpga,hyb,samples[0]);
 
-                channelCount[channel]++;
-                channelActive[channel] = true;
             }
             double mean = 0;
-            for (int y=0;y<6;y++) mean+=samples[y];
+            for (int y=0;y<6;y++) mean+=eventSamples[i][y];
             mean/=6.0;
-            hybridEventMean += mean;
-            apvEventMean[apv] += mean;
+            int apv = i/128;
+            if (flip_channels) apv = 4-apv;
+            hybridEventMean += eventSamples[i][5];
+            apvEventMean[apv] += eventSamples[i][5];
             if (eventCount<max_count) {
                 apv_means[apv][eventCount] += mean;
             }
-            /*
-               if (channel==corr1)
-               {
-               moving_yi[eventCount] = mean;
-               }
-               if (channel==corr2)
-               {
-               moving_yi2[eventCount] = mean;
-               }
-             */
         }
+        /*
+           if (channel==corr1)
+           {
+           moving_yi[eventCount] = mean;
+           }
+           if (channel==corr2)
+           {
+           moving_yi2[eventCount] = mean;
+           }
+           */
         if (hybridEventMean!=0) {
             apvEventCount++;
             for (int i=0;i<5;i++) {
@@ -489,33 +529,34 @@ int main ( int argc, char **argv ) {
                 }
                 */
             }
-            /*
-               int startscope=1000;
-               if (eventCount==startscope-1) {
-               mg = new TMultiGraph();
-               }
-               if (ni>0 && eventCount>=startscope && eventCount<startscope+20) {
-        //printf("%f\n",grDelta[17]);
-        int i = eventCount-startscope;
-        TGraph* tempgraph;
-        tempgraph = new TGraph(ni,grChan,grDelta);
-        tempgraph->SetMarkerColor(i+1);
-        tempgraph->SetLineColor(i+1);
-        mg->Add(tempgraph);
         }
-        if (eventCount==startscope+20) {
-        c1->Clear();
-        sprintf(name,"%s_base_delta.png",inname.Data());
-        printf("%s\n",name);
-        mg->Draw("ALP");
-        mg->GetYaxis()->SetRangeUser(-500,500);
-        c1->SaveAs(name);
-        for (int i=0;i<7;i++)
-        delete graph[i];
-        delete mg;
-        }
-        */
-        }
+        /*
+           int startscope=1000;
+           if (eventCount==startscope-1) {
+           mg = new TMultiGraph();
+           }
+           if (ni>0 && eventCount>=startscope && eventCount<startscope+20) {
+           printf("%f\n",grDelta[17]);
+           int i = eventCount-startscope;
+           TGraph* tempgraph;
+           tempgraph = new TGraph(ni,grChan,grDelta);
+           tempgraph->SetMarkerColor(i+1);
+           tempgraph->SetLineColor(i+1);
+           mg->Add(tempgraph);
+           }
+           if (eventCount==startscope+20) {
+           c1->Clear();
+           sprintf(name,"%s_base_delta.png",inname.Data());
+           printf("%s\n",name);
+           mg->Draw("ALP");
+           mg->GetYaxis()->SetRangeUser(-500,500);
+           c1->SaveAs(name);
+           for (int i=0;i<7;i++)
+           delete graph[i];
+           delete mg;
+           }
+           */
+
         eventCount++;
 
         if (triggerevent_format) {

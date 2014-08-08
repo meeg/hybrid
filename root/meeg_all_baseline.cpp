@@ -511,7 +511,7 @@ int main ( int argc, char **argv ) {
                 {
                     int apv = i/128;
                     int channel = i%128;
-                    if (!flip_channels) apv = 4-apv;
+                    if (flip_channels) apv = 4-apv;
                     if (channel == 0)
                         threshfile << fpga << "," << hyb << "," << apv << endl;
                     threshfile << apv*128+channel << "," << channelMean[6][rce][fpga][hyb][i] + threshold_sigma*channelVariance[6][rce][fpga][hyb][i] << endl;
@@ -520,7 +520,7 @@ int main ( int argc, char **argv ) {
                 {
                     int apv = i/128;
                     int channel = i%128;
-                    if (!flip_channels) apv = 4-apv;
+                    if (flip_channels) apv = 4-apv;
                     int sensorChannel =  apv*128+channel;
                     outfile << fpga << "\t" << hyb << "\t" << sensorChannel << "\t" << channelMean[6][rce][fpga][hyb][i] << "\t" << channelVariance[6][rce][fpga][hyb][i] << endl;
 
