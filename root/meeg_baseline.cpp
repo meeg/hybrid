@@ -790,6 +790,25 @@ int main ( int argc, char **argv ) {
         }
 
     }
+    TGraph *CMnoise[5];
+    for (int i=0;i<5;i++)
+    {
+        int apv = flip_channels?4-i:i;
+        double chan[2] = {128.0*apv,128.0*(apv+1)-1};
+        double noise = sqrt(apvVariance[apv]/(apvEventCount-1));
+        double yi[2] = {noise,noise};
+        CMnoise[i] = new TGraph(2,chan,yi);
+        CMnoise[i]->SetLineColor(2);
+        mg->Add(CMnoise[i],"L");
+    }
+    TGraph *hybridNoise;
+    {
+        double chan[2] = {0,639};
+        double noise = sqrt(hybridVariance/(apvEventCount-1));
+        double yi[2] = {noise,noise};
+        hybridNoise = new TGraph(2,chan,yi);
+        mg->Add(hybridNoise,"L");
+    }
     graph[6]->SetMarkerColor(1);
     mg->SetTitle("Noise;Channel;ADC counts");
     mg->Draw("a*");
@@ -798,6 +817,9 @@ int main ( int argc, char **argv ) {
     c1->SaveAs(name);
     for (int i=0;i<7;i++)
         delete graph[i];
+    for (int i=0;i<5;i++)
+        delete CMnoise[i];
+    delete hybridNoise;
     delete mg;
 
     c1->Clear();
