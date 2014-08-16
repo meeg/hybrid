@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # daqHardReset          
 # daqSoftReset          
 # daqRefreshState       
@@ -83,7 +83,7 @@ hybrid_type = 0
 cal_type = 0
 
 # Read in the command line arguments
-options, remainder = getopt.getopt(sys.argv[1:], 't:c:sfhv', ['cal-type','hybrid-type','svt','enable-filter','help','voltage-trim',])
+options, remainder = getopt.gnu_getopt(sys.argv[1:], 't:c:sfhv', ['cal-type','hybrid-type','svt','enable-filter','help','voltage-trim',])
 
 # Parse the command line arguments
 for opt, arg in options:
@@ -116,6 +116,7 @@ pythonDaq.daqOpen("frontEndTest",1);
 
 print "Starting calibration run ... "
 
+print os.path.dirname(os.path.realpath(__file__))
 
 # Configure the DAQ
 pythonDaq.daqHardReset()
@@ -125,7 +126,8 @@ if svt_test:
     pythonDaq.daqSetConfig("cntrlFpga:TholdEnable", "False")
 else:
     #pythonDaq.daqLoadSettings('/u1/software/daq/config/calibration_config.xml');
-    pythonDaq.daqLoadSettings('/u1/software/software_new/meeg/FrontEndBoardConfig.xml');
+    #pythonDaq.daqLoadSettings('/u1/software/software_new/meeg/FrontEndBoardConfig.xml');
+    pythonDaq.daqLoadSettings(os.path.dirname(os.path.realpath(__file__))+'/FrontEndBoardConfig.xml');
     #pythonDaq.daqSetConfig("cntrlFpga:AdcClkInvert", "False");
 
 
