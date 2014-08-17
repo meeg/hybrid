@@ -23,7 +23,7 @@
 #include <vector>
 #include <sys/types.h>
 #include <DataRead.h>
-#include <TrackerEvent.h>
+#include <Data.h>
 using namespace std;
 #define MAXEVIOBUF   1000000
 
@@ -35,8 +35,9 @@ class DataReadEvio : public DataRead {
 	bool debug_;
 
 	int maxbuf ;
-	TrackerEvent *fpga_banks[8];
+	Data *fpga_banks[8];
 	int fpga_count, fpga_it;
+	int svt_bank_num;
 
 	void parse_event( unsigned int *buf);
 	void parse_eventBank( unsigned int *buf,int bank_length);
@@ -71,7 +72,9 @@ class DataReadEvio : public DataRead {
 	//! Deconstructor
 	~DataReadEvio ( );
 
-	bool open ( string file);
+	void set_bank_num(int bank_num);
+
+	bool open ( string file, bool compressed = false );
 
 	void close();
 

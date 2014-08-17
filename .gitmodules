@@ -1,0 +1,3 @@
+[submodule "t0fit"]
+	path = t0fit
+	url =  https://github.com/meeg/t0fit.git

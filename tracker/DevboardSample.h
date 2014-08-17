@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerSample.h
+// File          : DevboardSample.h
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -18,20 +18,16 @@
 // Modification history :
 // 08/26/2011: created
 //-----------------------------------------------------------------------------
-#ifndef __TRACKER_SAMPLE_H__
-#define __TRACKER_SAMPLE_H__
+#ifndef __DEVBOARD_SAMPLE_H__
+#define __DEVBOARD_SAMPLE_H__
 #include <sys/types.h>
 using namespace std;
 
-//! Tracker Sample Container Class
-class TrackerSample {
+//! Devboard Event Container Class
+class DevboardSample {
 
-protected:
-   // Sample size
-   uint size_;
-   
       // Local data
-      uint *ldata_;
+      uint ldata_[4];
 
       // Data pointer
       uint *data_;
@@ -39,12 +35,10 @@ protected:
    public:
 
       //! Constructor for static pointer
-      TrackerSample (uint size);
+      DevboardSample ();
 
       //! Constructor with copy
-      TrackerSample (uint size, uint *data );
-
-      ~TrackerSample();
+      DevboardSample ( uint *data );
 
       //! Set data pointer.
       /*!
@@ -52,8 +46,48 @@ protected:
       */
       void setData ( uint *data );
 
-      uint size();
+      //! Get hybrid index.
+      /*!
+       * Returns hybrid index.
+      */
+      uint hybrid ( );
 
+      //! Get error flag
+      /*!
+       * Returns apv error flag
+      */
+      bool error ( );
+
+      //! Get threshold drop flag
+      /*!
+       * Returns threshold drop flag
+      */
+      bool drop ( );
+
+      //! Get apv index.
+      /*!
+       * Returns apv index.
+      */
+      uint apv ( );
+
+      //! Get channel index.
+      /*!
+       * Returns channel index.
+      */
+      uint channel ( );
+
+      //! Get FpgaAddress value from header.
+      /*!
+       * Returns fpgaAddress
+      */
+      uint fpgaAddress ( );
+
+      //! Get adc value at index.
+      /*!
+       * Returns adc value value.
+       * \param index sub-sample index, 0-5.
+      */
+      uint value ( uint index );
 
 };
 

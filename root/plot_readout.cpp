@@ -24,8 +24,8 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
-#include <TrackerEvent.h>
-#include <TrackerSample.h>
+#include <DevboardEvent.h>
+#include <DevboardSample.h>
 #include <Data.h>
 #include <DataRead.h>
 using namespace std;
@@ -38,8 +38,8 @@ int main ( int argc, char **argv ) {
    double          grX[128*6];
    TGraph          *plot;
    DataRead        dataRead;
-   TrackerEvent    event;
-   TrackerSample   *sample;
+   DevboardEvent    event;
+   DevboardSample   *sample;
    uint            idx;
    uint            x;
    uint            y;
@@ -90,7 +90,7 @@ int main ( int argc, char **argv ) {
             grY[x] = 0;
          }
 
-         for (x=0; x < 4; x++) {
+         for (x=0; x < 128; x++) {
 
             // Get sample
             sample  = event.sample(x);
@@ -99,22 +99,24 @@ int main ( int argc, char **argv ) {
             if ( sample->hybrid() == tarHybrid && sample->apv() == tarApv ) {
                channel = sample->channel();
 
-               for (y=0;y<6;y++) {
-                  idx   = y * 4 + x;
-                  value = sample->value(y);
+               //for (y=0;y<6;y++) {
+                  //idx   = y * 20 + x;
+                  idx   = x;
+                  //value = sample->value(y);
+                  value = sample->value(0);
 
                   grX[idx] = idx;
                   grY[idx] = value;
-
-                  hist[idx]->Fill(value);
-                  if ( value < histMin[idx] ) histMin[idx] = value;
-                  if ( value > histMax[idx] ) histMax[idx] = value;
-               }
+//
+                  //hist[idx]->Fill(value);
+                  ////if ( value < histMin[idx] ) histMin[idx] = value;
+                  //if ( value > histMax[idx] ) histMax[idx] = value;
+               //}
             }
          }
 
          c1->cd();
-         plot = new TGraph(24,grX,grY);
+         plot = new TGraph(128,grX,grY);
          plot->GetYaxis()->SetRangeUser(5000,9000);
          plot->Draw("a*");
          c1->Update();

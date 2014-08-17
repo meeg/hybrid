@@ -23,107 +23,58 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "TrackerEvent.h"
+#include "TrackerSample.h"
 using namespace std;
 
 void TrackerEvent::update() { }
 
 // Constructor
-TrackerEvent::TrackerEvent () : Data() {
-   double       temp;
-   double       tk;
-   double       res;
-   double       volt;
-   unsigned int idx;
-
-   // Fill temperature lookup table
-   temp = minTemp_;
-   while ( temp < maxTemp_ ) {
-      tk = k0_ + temp;
-      //res = t25_ * exp(coeffA_+(coeffB_/tk)+(coeffC_/(tk*tk))+(coeffD_/(tk*tk*tk)));      
-      res = constA_ * exp(beta_/tk);
-      volt = (res*vmax_)/(rdiv_+res);
-      idx = (uint)((volt / vref_) * (double)(adcCnt_-1));
-      if ( idx < adcCnt_ ) tempTable_[idx] = temp; 
-      temp += incTemp_;
-   }
+TrackerEvent::TrackerEvent (uint eventCode, uint sampleSize) : Data() {
+   eventCode_ = eventCode;
+   sampleSize_ = sampleSize;
 }
 
 // Deconstructor
-TrackerEvent::~TrackerEvent () {
-}
-
-// Get TI flag from header
-bool TrackerEvent::isTiFrame ( ) {
-   return((data_[0] & 0x80000000) != 0);
-}
+TrackerEvent::~TrackerEvent () {}
 
 // Get FpgaAddress value from header.
-uint TrackerEvent::fpgaAddress ( ) {
-   return(data_[0] & 0xFFFF);
+uint TrackerEvent::dataEventCode ( ) {
+   return((data_[0] >> 24) & 0xFF);
+}
+
+bool TrackerEvent::eventCodeMatch() {
+   return (dataEventCode() == eventCode_);
 }
 
 // Get sequence count from header.
 uint TrackerEvent::sequence ( ) {
-   return(data_[1]);
-}
-
-// Get trigger block from header.
-uint * TrackerEvent::tiData ( ) {
-   return(&(data_[2]));
-}
-
-// Get temperature values from header.
-double TrackerEvent::temperature ( uint index ) {
-   if ( isTiFrame () ) return(0.0);
-   else switch (index) {
-      case  0: return(tempTable_[(data_[2]&0xFFF)]);
-      case  1: return(tempTable_[((data_[2]>>16)&0xFFF)]);
-      case  2: return(tempTable_[(data_[3]&0xFFF)]);
-      case  3: return(tempTable_[((data_[3]>>16)&0xFFF)]);
-      case  4: return(tempTable_[(data_[4]&0xFFF)]);
-      case  5: return(tempTable_[((data_[4]>>16)&0xFFF)]);
-      case  6: return(tempTable_[(data_[5]&0xFFF)]);
-      case  7: return(tempTable_[((data_[5]>>16)&0xFFF)]);
-      case  8: return(tempTable_[(data_[6]&0xFFF)]);
-      case  9: return(tempTable_[((data_[6]>>16)&0xFFF)]);
-      case 10: return(tempTable_[(data_[7]&0xFFF)]);
-      case 11: return(tempTable_[((data_[7]>>16)&0xFFF)]);
-      default: return(0.0);
-   }
+   return(data_[0] && 0xFFFFFF);
 }
 
 // Get sample count
 uint TrackerEvent::count ( ) {
-   if ( isTiFrame () ) return(0);
-   else return((size_-(headSize_ + tailSize_))/sampleSize_);
-}
-
-// Get sample at index
-TrackerSample *TrackerEvent::sample (uint index) {
-   if ( isTiFrame () ) return(NULL);
-   else if ( index >= count() ) return(NULL);
-   else {
-      sample_.setData(&(data_[headSize_+(index*sampleSize_)]));
-         // Improper frame size
-	     if ( ((size_ - (headSize_ + tailSize_)) % sampleSize_) != 0 ) {
-	           data_  = NULL;
-	                 size_  = 0;
-	                       cout<<"Improper frame size ... "<<endl;
-	                             return(false);
-	                                }
-      return(&sample_);
+   if (eventCodeMatch()) {
+      return((size_- (kHeadSize + kTailSize) ) / sampleSize_);
+   } else {
+      return 0;
    }
 }
 
 // Get sample at index
-TrackerSample *TrackerEvent::sampleCopy (uint index) {
-   TrackerSample *tmp;
-
-   if ( isTiFrame () ) return(NULL);
-   else if ( index >= count() ) return(NULL);
-   else {
-      tmp = new TrackerSample (&(data_[headSize_+(index*sampleSize_)]));
-      return(tmp);
+void TrackerEvent::sample (uint index, TrackerSample* sample) {
+   if ( index < count() ) {
+      sample->setData(&(data_[kHeadSize + (index*sampleSize_)]));
    }
 }
+
+// Get sample at index
+// TrackerSample *TrackerEvent::sampleCopy (uint index) {
+//    TrackerSample *tmp;
+
+//    if ( index >= count() ) return(NULL);
+//    else {
+//       tmp = new TrackerSample (&(data_[kHeadSize+(index*sampleSize_)]));
+//       return(tmp);
+//    }
+// }
 

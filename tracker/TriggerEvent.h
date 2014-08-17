@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerEvent.h
+// File          : TriggerEvent.h
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -31,7 +31,7 @@
 //       Header[6] = TempJ[15:0], TempI[15:0] -- Hybrid 2
 //       Header[7] = TempL[15:0], TempK[15:0] -- Hybrid 2
 //
-//       Samples... (See TrackerSample.h)
+//       Samples... (See TriggerSample.h)
 //
 //    For T = 1:
 //
@@ -51,70 +51,34 @@
 // Modification history :
 // 08/26/2011: created
 //-----------------------------------------------------------------------------
-#ifndef __TRACKER_EVENT_H__
-#define __TRACKER_EVENT_H__
+#ifndef __TRIGGER_EVENT_H__
+#define __TRIGGER_EVENT_H__
 
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <unistd.h>
 #include <sys/types.h>
-#include "TrackerSample.h"
+#include "TriggerEvent.h"
+#include "TrackerEvent.h"
 #include <Data.h>
 using namespace std;
 
-//! Tracker Event Container Class
-class TrackerEvent : public Data {
+//! Trigger Event Container Class
+class TriggerEvent : public TrackerEvent {
 
-      // Frame Constants
-      static const uint kHeadSize   = 1;
-      static const uint kTailSize   = 1;
-
-      uint eventCode_;
-      uint sampleSize_;
-
-      // Update
-      void update();
+   void update();
 
    public:
 
       //! Constructor
-      TrackerEvent (uint eventCode, uint sampleSize);
+   TriggerEvent ();
 
-      //! Deconstructor
-      ~TrackerEvent ();
+   //! Deconstructor
+   ~TriggerEvent ();
 
-      uint dataEventCode();
+   
 
-      bool eventCodeMatch();
-
-      //! Get sequence count from header.
-      /*!
-       * Returns sequence count
-      */
-      uint sequence ( );
-
-      //! Get sample count
-      /*!
-       * Returns sample count
-      */
-      uint count ( );
-
-      //! Get sample at index
-      /*!
-       * Returns pointer to static sample object without memory allocation.
-       * Contents of returned object will change next time sample() is called.
-       * \param index Sample index. 0 - count()-1.
-      */
-      void sample (uint index, TrackerSample* sample);
-
-      //! Get sample at index
-      /*!
-       * Returns pointer to copy of sample object. A newly allocated sample object
-       * is created and must be deleted after use.
-       * \param index Sample index. 0 - count()-1.
-      */
-/*       TrackerSample *sampleCopy (uint index); */
 
 };
 

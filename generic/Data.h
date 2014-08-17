@@ -18,7 +18,12 @@
 
 #include <string>
 #include <sys/types.h>
+#include <bzlib.h>
 using namespace std;
+
+#ifdef __CINT__
+#define uint unsigned int
+#endif
 
 //! Class to contain generic register data.
 class Data {
@@ -39,10 +44,16 @@ class Data {
 
    public:
 
-      // Data types
-      static const uint RawData   = 0;
-      static const uint XmlConfig = 1;
-      static const uint XmlStatus = 2;
+      // Data types. 
+      // Count is n*32bits for type = 0, byte count for all others
+      enum DataType {
+         RawData     = 0,
+         XmlConfig   = 1,
+         XmlStatus   = 2,
+         XmlRunStart = 3,
+         XmlRunStop  = 4,
+         XmlRunTime  = 5
+      };
 
       //! Constructor
       /*! 
@@ -63,6 +74,13 @@ class Data {
        * \param size Data size
       */
       bool read ( int fd, uint size );
+
+      //! Read data from compressed file
+      /*! 
+       * \param bzFile Compressed file 
+       * \param size Data size
+      */
+      bool read ( BZFILE *bzFile, uint size );
 
       //! Copy data from buffer
       /*! 

@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerEvent.h
+// File          : DevboardEvent.h
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
@@ -31,7 +31,7 @@
 //       Header[6] = TempJ[15:0], TempI[15:0] -- Hybrid 2
 //       Header[7] = TempL[15:0], TempK[15:0] -- Hybrid 2
 //
-//       Samples... (See TrackerSample.h)
+//       Samples... (See DevboardSample.h)
 //
 //    For T = 1:
 //
@@ -51,27 +51,50 @@
 // Modification history :
 // 08/26/2011: created
 //-----------------------------------------------------------------------------
-#ifndef __TRACKER_EVENT_H__
-#define __TRACKER_EVENT_H__
+#ifndef __DEVBOARD_EVENT_H__
+#define __DEVBOARD_EVENT_H__
 
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <unistd.h>
 #include <sys/types.h>
-#include "TrackerSample.h"
+#include "DevboardSample.h"
 #include <Data.h>
 using namespace std;
 
-//! Tracker Event Container Class
-class TrackerEvent : public Data {
+//! Devboard Event Container Class
+class DevboardEvent : public Data {
+
+      // Temperature Constants
+      static const double coeffA_     = -1.4141963e1;
+      static const double coeffB_     =  4.4307830e3;
+      static const double coeffC_     = -3.4078983e4;
+      static const double coeffD_     = -8.8941929e6;
+      static const double beta_       = 3750;
+      static const double constA_     = 0.03448533;
+      static const double t25_        = 10000.0;
+      static const double k0_         = 273.15;
+      static const double vmax_       = 2.5;
+      static const double vref_       = 2.5;
+      static const double vrefNew_    = 2.048;
+      static const double rdiv_       = 10000;
+      static const double minTemp_    = -50;
+      static const double maxTemp_    = 150;
+      static const double incTemp_    = 0.01;
+      static const uint   adcCnt_     = 4096;
+
+      // Temperature lookup table
+      double tempTable_[adcCnt_];
+      double tempTableNew_[adcCnt_];
 
       // Frame Constants
-      static const uint kHeadSize   = 1;
-      static const uint kTailSize   = 1;
+      static const unsigned int headSize_   = 8;
+      static const unsigned int tailSize_   = 1;
+      static const unsigned int sampleSize_ = 4;
 
-      uint eventCode_;
-      uint sampleSize_;
+      // Internal sample contrainer
+      DevboardSample sample_;
 
       // Update
       void update();
@@ -79,20 +102,38 @@ class TrackerEvent : public Data {
    public:
 
       //! Constructor
-      TrackerEvent (uint eventCode, uint sampleSize);
+      DevboardEvent ();
 
       //! Deconstructor
-      ~TrackerEvent ();
+      ~DevboardEvent ();
 
-      uint dataEventCode();
+      //! Is frame TI frame?
+      bool isTiFrame ( );
 
-      bool eventCodeMatch();
+      //! Get FpgaAddress value from header.
+      /*!
+       * Returns fpgaAddress
+      */
+      uint fpgaAddress ( );
 
       //! Get sequence count from header.
       /*!
        * Returns sequence count
       */
       uint sequence ( );
+
+      //! Get trigger block from header.
+      /*!
+       * Returns trigger block
+      */
+      uint * tiData ( );
+
+      //! Get temperature values from header.
+      /*!
+       * Returns temperature value.
+       * \param index temperature index, 0-11.
+      */
+      double temperature ( uint index, bool oldHybrid = false );
 
       //! Get sample count
       /*!
@@ -106,7 +147,7 @@ class TrackerEvent : public Data {
        * Contents of returned object will change next time sample() is called.
        * \param index Sample index. 0 - count()-1.
       */
-      void sample (uint index, TrackerSample* sample);
+      DevboardSample *sample (uint index);
 
       //! Get sample at index
       /*!
@@ -114,7 +155,7 @@ class TrackerEvent : public Data {
        * is created and must be deleted after use.
        * \param index Sample index. 0 - count()-1.
       */
-/*       TrackerSample *sampleCopy (uint index); */
+      DevboardSample *sampleCopy (uint index);
 
 };
 

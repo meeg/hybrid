@@ -27,7 +27,7 @@ using namespace std;
 // Constructor
 DataReadEvio::DataReadEvio ( ) {
 	debug_=false;
-	//  debug_=true;
+	//debug_=true;
 	fd_ = -1;
 	maxbuf=MAXEVIOBUF;
 	fragment_offset[0] = 2;//BANK
@@ -35,13 +35,18 @@ DataReadEvio::DataReadEvio ( ) {
 	fragment_offset[2]=1;//TAGSEGMENT
 	fpga_count = 0;
 	fpga_it = 0;
+	svt_bank_num = 3;
 }
 
 // Deconstructor
 DataReadEvio::~DataReadEvio ( ) { }
 
+void DataReadEvio::set_bank_num(int bank_num) {
+	svt_bank_num = bank_num;
+}
+
 // Open file
-bool DataReadEvio::open ( string file) {
+bool DataReadEvio::open ( string file, bool compressed ) {
 	int status;
 	char * filename = (char *) malloc((file.size()+1)*sizeof(char));
 	strcpy(filename,file.c_str());
@@ -63,7 +68,7 @@ bool DataReadEvio::next(Data *data) {
 	if (fpga_count>fpga_it)
 	{
 		if(debug_)printf("pulling a bank out of cache\n");
-		TrackerEvent *source_data = fpga_banks[fpga_it++];
+		Data *source_data = fpga_banks[fpga_it++];
 		data->copy(source_data->data(),source_data->size());
 		if (fpga_it==fpga_count)
 		{
@@ -99,21 +104,24 @@ bool DataReadEvio::next(Data *data) {
 				parse_event(buf);
 				//fpga_it = fpga_banks.begin();
 				nodata=false;  
+				free(buf);
 			}else{
 				if(evtTag==20)return(false); //this is the end of data
 				//otherwise, just skip it. 
 				cout<<"Not a data event...skipping"<<endl;
+				free(buf);
 			}
 		} else if (status==EOF)
 		{
 			cout << "end of file" << endl;
+			free(buf);
 			return(false);
 		}else{
 			cout<<"oops...broke trying to evRead; error code "<<status<<endl;
 
+			free(buf);
 			return(false);
 		}
-		delete buf;
 	}  while(nodata);
 	if(debug_)cout<<"Found a data event"<<endl;
 	return(next(data));
@@ -169,7 +177,11 @@ void DataReadEvio::parse_eventBank(unsigned int *buf, int bank_length) {
 		int fragType = getFragType(type);
 		if (fragType==BANK)
 		{
-			switch (tag) {
+			if (tag==svt_bank_num) {
+				if (debug_) printf("SVT bank\n");
+				parse_SVTBank(&buf[ptr+2],length-2);
+			}
+			else switch (tag) {
 				case 1:
 					if (debug_) printf("ECal top bank\n");
 					parse_ECalBank(&buf[ptr+2],length-2);
@@ -177,10 +189,6 @@ void DataReadEvio::parse_eventBank(unsigned int *buf, int bank_length) {
 				case 2:
 					if (debug_) printf("ECal bottom bank\n");
 					parse_ECalBank(&buf[ptr+2],length-2);
-					break;
-				case 3:
-					if (debug_) printf("SVT bank\n");
-					parse_SVTBank(&buf[ptr+2],length-2);
 					break;
 				default:
 					printf("Unexpected bank tag %d\n",tag);
@@ -215,16 +223,16 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
 
 		if (fragType==UINT32)
 		{
-			TrackerEvent* tb=new TrackerEvent();
+			Data* tb=new Data();
 			uint *data_  = (uint *)malloc((length-1) * sizeof(uint));
 			memcpy(data_+1,&buf[ptr+2],(length-2)*sizeof(uint));
 			data_[0] = tag;
 			if (tag==7) data_[0]+=0x80000000;
 			tb->copy(data_,length-1);
 			free(data_);
-			if(debug_){
-				cout<<"Made TrackerBank for FPGA = "<<tb->fpgaAddress()<<endl;    
-			}
+			//if(debug_){
+			//	cout<<"Made DevboardBank for FPGA = "<<tb->fpgaAddress()<<endl;    
+			//}
 			fpga_banks[fpga_count++] = tb;
 		}
 		else

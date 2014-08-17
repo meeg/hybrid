@@ -13,8 +13,6 @@
 #include <TGraph.h>
 #include <TStyle.h>
 #include <stdarg.h>
-#include <TrackerEvent.h>
-#include <TrackerSample.h>
 #include <Data.h>
 #include <DataRead.h>
 #include <TMath.h>
@@ -92,7 +90,7 @@ void doStats(int n, int nmin, int nmax, short int *y, int &count, double &center
 	int *newy = new int[n];
 	for (int i=nmin; i<=nmax; i++) newy[i] = y[i];
 	doStats(n, nmin, nmax, newy, count, center, spread);
-	delete newy;
+	delete[] newy;
 }
 
 void doStats_mean(int n, int nmin, int nmax, int *y, int &count, double &center, double &spread)
@@ -137,9 +135,11 @@ void plotResults(const char *title, const char *name, const char *filename, int 
 	TMultiGraph *mg = new TMultiGraph();
 	TGraph *graph[8];
 	int k;
+	double max = 0;
 	char nameN[100];
 	for (int i = 0; i<n;i++)
 	{
+		if (y[i]>max) max = y[i];
 		k=((int)floor(x[i]+0.5))%8;
 		grpX[k][grpN[k]]=x[i];
 		grpY[k][grpN[k]]=y[i];
@@ -157,6 +157,9 @@ void plotResults(const char *title, const char *name, const char *filename, int 
 	}
 	mg->SetTitle(title);
 	mg->Draw("a*");
+
+	mg->GetYaxis()->SetRangeUser(0,1.2*max);
+
 	canvas->SaveAs(filename);
 	for (int i=0;i<8;i++) if (grpN[i]>0)
 	{

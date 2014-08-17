@@ -1,49 +1,35 @@
 //-----------------------------------------------------------------------------
-// File          : TrackerSample.cpp
+// File          : TriggerEvent.cpp
 // Author        : Ryan Herbst  <rherbst@slac.stanford.edu>
 // Created       : 08/26/2011
 // Project       : Heavy Photon API
 //-----------------------------------------------------------------------------
 // Description :
-// Sample Container
+// Event Container
 //-----------------------------------------------------------------------------
 // Copyright (c) 2011 by SLAC. All rights reserved.
 // Proprietary and confidential to SLAC.
 //-----------------------------------------------------------------------------
 // Modification history :
 // 08/26/2011: created
+// 02/14/2012: Updates to match FPGA. Added hooks for future TI frames.
 //-----------------------------------------------------------------------------
+#include <iostream>
+#include <string>
 #include <string.h>
+#include <unistd.h>
+#include <math.h>
 #include <stdlib.h>
-#include "TrackerSample.h"
+#include <sys/stat.h>
+#include <fcntl.h>
+#include "TriggerEvent.h"
+#include "TrackerEvent.h"
 using namespace std;
 
-// Constructor for static pointer
-TrackerSample::TrackerSample (uint size) {
-   size_ = size;
-   ldata_ = (uint *)malloc(sizeof(uint) * size);
-   data_ = ldata_;
-}
+// Constructor
+TriggerEvent::TriggerEvent () : TrackerEvent(1, 4) {}
 
-// Constructor with copy
-TrackerSample::TrackerSample (uint size, uint *data ) {
-   size_ = size;
-   ldata_ = (uint *)malloc(sizeof(uint) * size);
-   memcpy(ldata_, data, sizeof(uint)*size);
-   data_ = ldata_;
-}
+// Deconstructor
+TriggerEvent::~TriggerEvent () {}
 
-TrackerSample::~TrackerSample () {
-   free(ldata_);
-}
-
-// Set data pointer.
-void TrackerSample::setData ( uint *data ) {
-   data_ = data;
-}
-
-uint TrackerSample::size() {
-   return size_;
-}
-
-
+void TriggerEvent::update() {}
