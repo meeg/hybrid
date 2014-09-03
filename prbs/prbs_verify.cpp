@@ -181,6 +181,64 @@ int getFragType(int type){
 }
 
 
+void parse_DPMBank(unsigned int *buf, int bank_length) {
+   if(debug) printf("parse_DPMBank with length %i\n",bank_length);
+	int ptr = 0;
+	int length,type,word,fragType,seed, padding=0;
+	unsigned short tag;
+	unsigned short num;
+    unsigned int expected;
+    bool valid;
+    unsigned int word_errors = 0;
+    bool debug_pred = false;
+	while (ptr<bank_length) {
+		if (debug) printf("ptr = %d, bank_length = %d\n",ptr,bank_length);
+		length      = buf[ptr]+1;
+		tag         = (buf[ptr+1]>>16)&0xffff;
+		type        = (buf[ptr+1]>>8)&0x3f;
+		padding     = (buf[ptr+1]>>14)&0x3;
+		num         = buf[ptr+1]&0xff;
+        if(debug)
+        {
+           printf("Spitting out DPM bank header data: \n"); 
+           printf("length: %i, tag: %d\n",length,tag);
+           printf("padding: %i, type: %i, num: %d\n", padding, type, num);
+        }
+		fragType = getFragType(type);        
+		if (fragType==UINT32)
+		{
+           seed = 5;
+           expected = buf[seed];
+           if(debug && debug_pred) printf("seed: 0x%x\n",expected);
+           for(word=seed+1; word<length; ++word) {
+              if(debug && !debug_pred) {
+                 printf("0x%x\t",buf[word]);
+                 if((word-2)%5==0) printf("\n");
+              }
+              expected = flfsr32(expected);
+              if(debug && debug_pred) printf(" data: 0x%x pred: 0x%x -> ", buf[word], expected);
+              if(expected!=buf[word]) {
+                 valid = false;
+                 word_errors++;
+                 if(debug && debug_pred) printf(" NO\n");
+              } else {
+                 valid = true;
+                 if(debug && debug_pred) printf(" YES\n");
+              }
+           }
+           if(debug && debug_pred) printf("\n");
+        }
+		else {
+           printf("data type of DPM bank should be UINT32 but was %d??\n",type);
+           exit(1);
+        }
+		ptr+=length;
+	}
+    printf("\nword errors in this bank: %d\n",word_errors);
+    
+}
+
+
 void check_lfsr(unsigned int *buf, int length) {
    if(debug) printf("parse_DPM with length %i\n",length);	   
    //uint *data_  = (uint *)malloc((length) * sizeof(uint));
@@ -219,8 +277,10 @@ unsigned int flfsr32(unsigned int input) {
       PRBS_SEED_SIZE_G           : natural range 32 to 128    := 32;
       PRBS_TAPS_G                : NaturalArray               := (0 => 31, 1 => 6, 2 => 2, 3 => 1);
 */
-   unsigned int bit = ( (input >> 31) ^ (input >> 30) ^ (input >> 26) ^ (input >> 1) ) & 1;
-   unsigned int next = (input >> 1) | (bit << 31);
+   //unsigned int bit = ( (input >> 31) ^ (input >> 6) ^ (input >> 2) ^ (input >> 1) ) & 1;
+   //unsigned int next = (input >> 1) | (bit << 31);
+   unsigned int bit = ( (input >> 31) ^ (input >> 6) ^ (input >> 2) ^ (input >> 1 ) ) & 1; // &1 at the end picks out least sign bit
+   unsigned int next = (input << 1) | bit; // shift into least sign bit
    return next;
 }
 
@@ -257,39 +317,39 @@ void parse_eventBank(unsigned int *buf, int bank_length) {
        }
        int fragType = getFragType(type);
        if (fragType==UINT32)
-       {
+       { 
           switch (tag) {
              case DPM0:
                 if(debug) printf("DPM0 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM1:
                 if(debug) printf("DPM1 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM2:
                 if(debug) printf("DPM2 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM3:
                 if(debug) printf("DPM3 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM4:
                 if(debug) printf("DPM4 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM5:
                 if(debug) printf("DPM5 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM6:
                 if(debug) printf("DPM6 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              case DPM7:
                 if(debug) printf("DPM7 bank %d (0x%x)\n",tag,tag);
-                check_lfsr(&buf[ptr+2], length-2);
+                parse_DPMBank(&buf[ptr+2], length-2);
                 break;
              default:
                 if(debug) printf("Unexpected bank tag %d (0x%x)\n",tag,tag);
