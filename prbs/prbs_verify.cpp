@@ -210,23 +210,32 @@ void parse_DPMBank(unsigned int *buf, int bank_length) {
            seed = 5;
            expected = buf[seed];
            if(debug && debug_pred) printf("seed: 0x%x\n",expected);
-           for(word=seed+1; word<length; ++word) {
+           for(word=2; word<length; ++word) {
               if(debug && !debug_pred) {
                  printf("0x%x\t",buf[word]);
                  if((word-2)%5==0) printf("\n");
               }
-              expected = flfsr32(expected);
-              if(debug && debug_pred) printf(" data: 0x%x pred: 0x%x -> ", buf[word], expected);
-              if(expected!=buf[word]) {
-                 valid = false;
-                 word_errors++;
-                 if(debug && debug_pred) printf(" NO\n");
-              } else {
-                 valid = true;
-                 if(debug && debug_pred) printf(" YES\n");
+              if(word<seed) {
+                 //do nothing
               }
+              else if(word==seed) {
+                 // set the seed
+                 expected = buf[word];            
+              } else {
+                 //predict
+                 expected = flfsr32(expected);
+                 if(debug && debug_pred) printf(" data: 0x%x pred: 0x%x -> ", buf[word], expected);
+                 if(expected!=buf[word]) {
+                    valid = false;
+                    word_errors++;
+                    if(debug && debug_pred) printf(" NO\n");
+                 } else {
+                    valid = true;
+                    if(debug && debug_pred) printf(" YES\n");
+                 }
+              }
+              if(debug && debug_pred) printf("\n");
            }
-           if(debug && debug_pred) printf("\n");
         }
 		else {
            printf("data type of DPM bank should be UINT32 but was %d??\n",type);
