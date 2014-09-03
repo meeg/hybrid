@@ -190,8 +190,8 @@ void check_lfsr(unsigned int *buf, int length) {
    bool valid;
    unsigned int word_errors = 0;
    // seed 
-   expected = buf[5];
-   for(word=6; word<length; ++word) {
+   expected = buf[0];
+   for(word=1; word<length; ++word) {
       if(debug) printf("input 0x%x\t->\t0x%x?\n",expected,buf[word]);
       expected =  flfsr32(expected);
       if(debug) printf("predicted\t0x%x",expected);
