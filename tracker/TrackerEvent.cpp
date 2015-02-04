@@ -48,7 +48,7 @@ bool TrackerEvent::eventCodeMatch() {
 
 // Get sequence count from header.
 uint TrackerEvent::sequence ( ) {
-   return(data_[0] && 0xFFFFFF);
+   return(data_[0] & 0xFFFFFF);
 }
 
 // Get sample count
