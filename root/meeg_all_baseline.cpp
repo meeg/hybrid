@@ -283,7 +283,6 @@ int main ( int argc, char **argv ) {
 
             bool goodSample = true;
 
-            //printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
             // Get sample
             if (triggerevent_format) {
                 triggerevent.sample(x,triggersample);
@@ -311,7 +310,8 @@ int main ( int argc, char **argv ) {
             if (use_fpga!=-1 && fpga!=use_fpga) continue;
             if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
             if (!goodSample) continue;
-            //printf("fpga %d, hybrid %d, apv %d, chan %d\n",event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel());
+            //printf("fpga %d, hybrid %d, apv %d, chan %d\n",fpga,hyb,apv,apvch);
+            //printf("event %d\tx=%d\tR%d F%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,fpga,hyb,apv,apvch,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
 
             if (mux_channels) channel = chanMap[apvch];
             else channel = apvch;
@@ -354,7 +354,7 @@ int main ( int argc, char **argv ) {
                 for ( int y=0; y < 6; y++ ) {
                     //printf("%x\n",sample->value(y));
                     int value = samples[y];
-                    if (value<3000)
+                    if (value<1000)
                         printf("out of range: event %d, rce = %d, feb = %d, hyb = %d, channel = %d, sample[%d] = %d\n",eventCount,rce,fpga,hyb,channel,y,samples[y]);
                     double delta = value-channelMean[y][rce][fpga][hyb][channel];
                     if (channelCount[rce][fpga][hyb][channel]==1)

@@ -119,7 +119,10 @@ print "Starting calibration run ... "
 print os.path.dirname(os.path.realpath(__file__))
 
 # Configure the DAQ
+pythonDaq.daqSendCommand('FrontEndTestFpga:AxiVersion:FpgaReload','')
+time.sleep(5)
 pythonDaq.daqHardReset()
+pythonDaq.daqReadStatus()
 if svt_test:
     pythonDaq.daqLoadSettings('/u1/software/daq/config/local_defaults.xml') 
     pythonDaq.daqLoadSettings('/u1/software/daq/config/coda_groupC.xml')
@@ -146,6 +149,7 @@ for i in range (0,4):
         pythonDaq.daqSetConfig("FrontEndTestFpga:FebCore:Hybrid"+str(i)+"PwrEn","False")
 
 
+pythonDaq.daqSendCommand('FrontEndTestFpga:FebCore:HybridHardReset','')
 
 #if filter_enabled:
     #pythonDaq.daqSetConfig("cntrlFpga:FiltEnable",  "True") 
@@ -160,12 +164,15 @@ if hybrid_type==1:
 elif hybrid_type==2:
     pythonDaq.daqSetConfig("FrontEndTestFpga:FebCore:HybridType","New")
     print "Configured for new (2014 run) hybrid" 
+elif hybrid_type==0:
+    #pythonDaq.daqSetConfig("FrontEndTestFpga:FebCore:HybridType","New")
+    print "Not configuring a hybrid type" 
 else:
     pythonDaq.daqSetConfig("FrontEndTestFpga:FebCore:HybridType","Old")
     print "WARNING: no hybrid type set; use -t to specify old or new hybrid"
     print "Configured for old (test run) hybrid" 
 
-pythonDaq.daqSoftReset();
+pythonDaq.daqSendCommand('HybridSoftReset','')
 pythonDaq.daqSetRunParameters("1000Hz",2000);
 #pythonDaq.daqSetConfig("cntrlFpga:hybrid:apv25:Ical", str(22))
 #pythonDaq.daqSetConfig("cntrlFpga:hybrid:apv25:Isha", str(100))
@@ -216,3 +223,4 @@ if cal_type>=1:
        
     print "Calibration run complete"
 
+#pythonDaq.daqSendCommand('FrontEndTestFpga:AxiVersion:FpgaReload','')
