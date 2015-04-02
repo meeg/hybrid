@@ -40,8 +40,8 @@
 #include <unistd.h>
 using namespace std;
 
-#define MAX_RCE 4
-#define MAX_FEB 4
+#define MAX_RCE 14
+#define MAX_FEB 10
 #define MAX_HYB 4
 
 //#define corr1 599
@@ -170,7 +170,13 @@ int main ( int argc, char **argv ) {
 
     if (evio_format) {
         DataReadEvio *tmpDataRead = new DataReadEvio();
-        tmpDataRead->set_bank_num(svt_bank_num);
+        if (!triggerevent_format)
+            tmpDataRead->set_bank_num(svt_bank_num);
+        else
+        {
+            tmpDataRead->set_engrun(true);
+            tmpDataRead->set_bank_num(51);
+        }
         dataRead = tmpDataRead;
     } else 
         dataRead = new DataRead();
@@ -258,6 +264,7 @@ int main ( int argc, char **argv ) {
         //printf("fpga %d\n",event.fpgaAddress());
         if (triggerevent_format) {
             samplecount = triggerevent.count();
+            //printf("datacode %d, sequence %d, samplecount %d\n",triggerevent.dataEventCode(),triggerevent.sequence(),samplecount);
         } else {
             fpga = event.fpgaAddress();
             samplecount = event.count();

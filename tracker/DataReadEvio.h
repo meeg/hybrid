@@ -35,9 +35,14 @@ class DataReadEvio : public DataRead {
 	bool debug_;
 
 	int maxbuf ;
-	Data *fpga_banks[8];
+	Data *fpga_banks[16];
 	int fpga_count, fpga_it;
-	int svt_bank_num;
+	int svt_bank_min,svt_bank_range;
+    
+    bool is_engrun;
+    int physics_event_tag;
+    int svt_data_tag;
+
 
 	void parse_event( unsigned int *buf);
 	void parse_eventBank( unsigned int *buf,int bank_length);
@@ -72,7 +77,9 @@ class DataReadEvio : public DataRead {
 	//! Deconstructor
 	~DataReadEvio ( );
 
+	void set_engrun(bool engrun);
 	void set_bank_num(int bank_num);
+	void set_bank_range(int bank_num);
 
 	bool open ( string file, bool compressed = false );
 
