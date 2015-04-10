@@ -40,7 +40,6 @@ class DataReadEvio : public DataRead {
 	int svt_bank_min,svt_bank_range;
     
     bool is_engrun;
-    int physics_event_tag;
     int svt_data_tag;
 
 

@@ -85,7 +85,7 @@ int main ( int argc, char **argv ) {
         grChan[i] = i;
     }
     DataRead        *dataRead;
-    int svt_bank_num = 3;
+    int svt_bank_num = -1;
     DevboardEvent    event;
     TriggerEvent    triggerevent;
     TriggerSample   *triggersample = new TriggerSample();
@@ -170,13 +170,10 @@ int main ( int argc, char **argv ) {
 
     if (evio_format) {
         DataReadEvio *tmpDataRead = new DataReadEvio();
-        if (!triggerevent_format)
-            tmpDataRead->set_bank_num(svt_bank_num);
-        else
-        {
+        if (triggerevent_format)
             tmpDataRead->set_engrun(true);
-            tmpDataRead->set_bank_num(51);
-        }
+        if (svt_bank_num>0)
+            tmpDataRead->set_bank_num(svt_bank_num);
         dataRead = tmpDataRead;
     } else 
         dataRead = new DataRead();

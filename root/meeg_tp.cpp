@@ -40,6 +40,8 @@
 #include <unistd.h>
 #include "meeg_utils.hh"
 
+#define N_TIME_CONSTS 2
+
 using namespace std;
 
 // Process the data
@@ -90,7 +92,7 @@ int main ( int argc, char **argv ) {
     char title[200];
     int nChan[2] = {0};
     double grChan[2][640];
-    double grTp[2][640];
+    double grTp[N_TIME_CONSTS][2][640];
     double grA[2][640];
     double grT0[2][640];
     double grChisq[2][640];
@@ -487,14 +489,61 @@ int main ( int argc, char **argv ) {
     double yi[48], ey[48], ti[48];
     int ni;
     TGraphErrors *fitcurve;
+    /*
     TF1 *shapingFunction = new TF1("Shaping Function",
-            "[3]+[0]*(max(x-[1],0)/[2])*exp(1-((x-[1])/[2]))",-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+            "[0]+[1]*(x>[2])*((x-[2])/[3])*exp(1-((x-[2])/[3]))",-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+            */
 
+    //TF1 *shapingFunction = new TF1("Shaping Function",
+            //"[0]+\
+            //[1]*(x>[2])*(\
+                //([3]/(([3]-[4])*([3]-[5])))*exp(([2]-x)/[3])+\
+                //([4]/(([4]-[5])*([4]-[3])))*exp(([2]-x)/[4])+\
+                //([5]/(([5]-[3])*([5]-[4])))*exp(([2]-x)/[5]))",
+            //-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+
+    //TF1 *shapingFunction = new TF1("Shaping Function",
+            //"[0]+\
+            //[1]*(x>[2])*\
+            //([3]/(([3]-[4])*([3]-[4])))*(\
+                //exp(([2]-x)/[3])-\
+                //(1+(([3]-[4])/([3]*[4]))*(x-[2]))*exp(([2]-x)/[4]))",
+            //-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+
+    //TF1 *shapingFunction = new TF1("Shaping Function",
+            //"[0]+\
+            //[1]*(x>[2])*(\
+                //([3]*[3]/(([3]-[4])*([3]-[5])*([3]-[6])))*exp(([2]-x)/[3])+\
+                //([4]*[4]/(([4]-[5])*([4]-[6])*([4]-[3])))*exp(([2]-x)/[4])+\
+                //([5]*[5]/(([5]-[6])*([5]-[3])*([5]-[4])))*exp(([2]-x)/[5])+\
+                //([6]*[6]/(([6]-[3])*([6]-[4])*([6]-[5])))*exp(([2]-x)/[6]))",
+            //-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+
+    //TF1 *shapingFunction = new TF1("Shaping Function",
+            //"[0]+\
+            //[1]*(x>[2])*(\
+                //([3]*[3]/(([3]-[4])*([3]-[5])*([3]-[5])))*exp(([2]-x)/[3])+\
+                //([4]*[4]/(([4]-[5])*([4]-[5])*([4]-[3])))*exp(([2]-x)/[4])+\
+                //(([3]*[3]/(([4]-[3])*([3]-[5])*([3]-[5]))) - ([4]*[4]/(([4]-[3])*([4]-[5])*([4]-[5]))))*exp(([2]-x)/[5])+\
+                //((x-[2])/(([5]-[3])*([5]-[4])))*exp(([2]-x)/[5]))",
+            //-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+
+    TF1 *shapingFunction = new TF1("Shaping Function",
+            "[0]+\
+            [1]*(x>[2])*\
+            ([3]*[3]/(([3]-[4])*([3]-[4])*([3]-[4])))*(\
+                exp(([2]-x)/[3])-\
+                (1+\
+                 (([3]-[4])/([3]*[4]))*(x-[2])+\
+                 (([3]-[4])*([3]-[4])/(2*[3]*[4]*[3]*[4]))*(x-[2])*(x-[2]))*exp(([2]-x)/[4]))",
+            -1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+            
+            
     double chanNoise[2][640]={{0.0}};
     double chanChan[640];
     //TH1S *histSamples1D = new TH1S("h1","h1",16384,-0.5,16383.5);
     TH2S *histSamples;
-    double A, T0, Tp, A0, fit_start;
+    double A, T0, A0, fit_start;
 
     for (int i=0;i<640;i++) chanChan[i] = i;
 
@@ -559,32 +608,66 @@ int main ( int argc, char **argv ) {
         }
 
         fitcurve = new TGraphErrors(ni,ti,yi,NULL,ey);
-        if (sgn==0) shapingFunction->SetParameter(0,TMath::MaxElement(ni,yi)-yi[0]);
-        else shapingFunction->SetParameter(0,TMath::MinElement(ni,yi)-yi[0]);
-        shapingFunction->SetParameter(1,12.0);
-        shapingFunction->SetParameter(2,50.0);
-        shapingFunction->FixParameter(3,yi[0]);
+        if (sgn==0) shapingFunction->SetParameter(1,TMath::MaxElement(ni,yi)-yi[0]);
+        else shapingFunction->SetParameter(1,TMath::MinElement(ni,yi)-yi[0]);
+        shapingFunction->SetParameter(2,-10.0);
+        //shapingFunction->SetParameter(3,50.0);
+        shapingFunction->SetParameter(3,80.0);
+        shapingFunction->SetParameter(4,12.0);
+        //shapingFunction->SetParameter(5,10.0);
+        //shapingFunction->SetParameter(6,70.0);
+        shapingFunction->FixParameter(0,yi[0]);
         A0 = yi[0];
         if (ni>0)
         {
             if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
             {
-                A = shapingFunction->GetParameter(0);
-                T0 = shapingFunction->GetParameter(1);
-                Tp = shapingFunction->GetParameter(2);
+                A = shapingFunction->GetParameter(1);
+                T0 = shapingFunction->GetParameter(2);
+                for (int i=0;i<N_TIME_CONSTS;i++) {
+                    grTp[i][sgn][nChan[sgn]]=shapingFunction->GetParameter(3+i);
+                }
+                //printf("%f, %f, %f, %f\n",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2),shapingFunction->GetParameter(3));
+                //printf("%f, %f, %f, %f, %f, %f\n",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2),shapingFunction->GetParameter(3),shapingFunction->GetParameter(4),shapingFunction->GetParameter(5));
+                //printf("%f, %f, %f, %f, %f\n",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2),shapingFunction->GetParameter(3),shapingFunction->GetParameter(4));
+                //printf("%f, %f, %f, %f, %f, %f, %f\n",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2),shapingFunction->GetParameter(3),shapingFunction->GetParameter(4),shapingFunction->GetParameter(5),shapingFunction->GetParameter(6));
+                double residuals[8];
+                //for (int i =0;i<8;i++) {
+                //    residuals[i]=0;
+                //}
+                for (int i =0;i<8;i++) {
+                    double dataX,dataY;
+                    fitcurve->GetPoint(i,dataX,dataY);
+                    double res = dataY - shapingFunction->Eval(dataX);
+                    residuals[i] = res;
+                    //residuals[i] += res/6.0;
+                    //printf("%f, %f, %f\n",dataX,dataY,res);
+                }
+                for (int i =0;i<48;i++) {
+                    double dataX,dataY;
+                    fitcurve->GetPoint(i,dataX,dataY);
+                    fitcurve->SetPoint(i,dataX,dataY-residuals[i%8]);
+                }
+                fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
                 if (move_fitstart)
                 {
                     fit_start = T0+fit_shift;
                     fitcurve->Fit(shapingFunction,"Q0","",fit_start,5*SAMPLE_INTERVAL);
-                    A = shapingFunction->GetParameter(0);
-                    T0 = shapingFunction->GetParameter(1);
-                    Tp = shapingFunction->GetParameter(2);
+                    A = shapingFunction->GetParameter(1);
+                    T0 = shapingFunction->GetParameter(2);
+                    for (int i=0;i<N_TIME_CONSTS;i++) {
+                        grTp[i][sgn][nChan[sgn]]=shapingFunction->GetParameter(3+i);
+                    }
                 }
+                printf("%f, %f, %f",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2));
+                for (int i=0;i<N_TIME_CONSTS;i++) {
+                    printf(", %f",shapingFunction->GetParameter(3+i));
+                }
+                printf("\n");
                 grChan[sgn][nChan[sgn]]=channel;
                 grA[sgn][nChan[sgn]]=A;
                 if (sgn==1) grA[sgn][nChan[sgn]]*=-1;
                 grT0[sgn][nChan[sgn]]=T0;
-                grTp[sgn][nChan[sgn]]=Tp;
                 grChisq[sgn][nChan[sgn]]=shapingFunction->GetChisquare();
                 nChan[sgn]++;
             }
@@ -634,7 +717,11 @@ int main ( int argc, char **argv ) {
     {
         for (int i=0;i<nChan[sgn];i++)
         {
-            tpfile[sgn] <<grChan[sgn][i]<<"\t"<<grA[sgn][i]<<"\t"<<grT0[sgn][i]<<"\t"<<grTp[sgn][i]<<"\t"<<grChisq[sgn][i]<<endl;
+            tpfile[sgn] <<grChan[sgn][i]<<"\t"<<grA[sgn][i]<<"\t"<<grT0[sgn][i]<<"\t";
+            for (int j=0;j<N_TIME_CONSTS;j++) {
+                tpfile[sgn] <<grTp[j][sgn][i]<<"\t";
+            }
+            tpfile[sgn] <<grChisq[sgn][i]<<endl;
         }
         for (int i=0;i<640;i++) noisefile[sgn]<<i<<"\t"<<chanNoise[sgn][i]<<endl;
     }
@@ -653,11 +740,13 @@ int main ( int argc, char **argv ) {
         sprintf(title,"Fitted T0, %s pulses;Channel;T0 [ns]",sgn?"negative":"positive");
         plotResults(title, name, name2, nChan[sgn], grChan[sgn], grT0[sgn], c1);
 
-        c1->SetLogy(0);
-        sprintf(name,"Tp_%s",sgn?"neg":"pos");
-        sprintf(name2,"%s_tp_Tp_%s.png",inname.Data(),sgn?"neg":"pos");
-        sprintf(title,"Fitted Tp, %s pulses;Channel;Tp [ns]",sgn?"negative":"positive");
-        plotResults(title, name, name2, nChan[sgn], grChan[sgn], grTp[sgn], c1);
+        for (int j=0;j<N_TIME_CONSTS;j++) {
+            c1->SetLogy(0);
+            sprintf(name,"Tp%d_%s",j+1,sgn?"neg":"pos");
+            sprintf(name2,"%s_tp_Tp%d_%s.png",inname.Data(),j,sgn?"neg":"pos");
+            sprintf(title,"Fitted Tp%d, %s pulses;Channel;Tp [ns]",j,sgn?"negative":"positive");
+            plotResults(title, name, name2, nChan[sgn], grChan[sgn], grTp[j][sgn], c1);
+        }
 
         c1->SetLogy(0);
         sprintf(name,"Chisq_%s",sgn?"neg":"pos");

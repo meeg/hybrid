@@ -42,8 +42,8 @@
 
 using namespace std;
 
-#define MAX_RCE 4
-#define MAX_FEB 4
+#define MAX_RCE 14
+#define MAX_FEB 10
 #define MAX_HYB 4
 
 // Process the data
@@ -85,8 +85,8 @@ int main ( int argc, char **argv ) {
     TriggerEvent    triggerevent;
     TriggerSample   *triggersample = new TriggerSample();
     int		samples[6];
-    int            eventCount;
-    int runCount;
+    int            eventCount=0;
+    int runCount=0;
     char            name[100];
     char            name2[100];
     char title[200];
@@ -168,9 +168,12 @@ int main ( int argc, char **argv ) {
         hybrid_type = 1;
     }
 
-    if (evio_format)
-        dataRead = new DataReadEvio();
-    else 
+    if (evio_format) {
+        DataReadEvio *tmpDataRead = new DataReadEvio();
+        if (triggerevent_format)
+            tmpDataRead->set_engrun(true);
+        dataRead = tmpDataRead;
+    } else 
         dataRead = new DataRead();
 
     gROOT->SetStyle("Plain");
@@ -271,7 +274,7 @@ int main ( int argc, char **argv ) {
 
 
         // Process each event
-        eventCount = 0;
+        //eventCount = 0;
         do {
             int rce = 0;
             int fpga = 0;
@@ -294,6 +297,11 @@ int main ( int argc, char **argv ) {
             }
             if (eventCount%1000==0) printf("Event %d\n",eventCount);
             if (num_events!=-1 && eventCount >= num_events) break;
+            if (evio_format && triggerevent_format) {
+                int run_stage = eventCount/14/1000;
+                cal_grp = run_stage/8;
+                cal_delay = (run_stage%8) + 1;
+            }
             for (int x=0; x < samplecount; x++) {
                 int hyb;
                 int apv;
@@ -337,6 +345,10 @@ int main ( int argc, char **argv ) {
                 else
                     channel += apv*128;
 
+                /*if (rce==0 && fpga==6 && hyb==2 && channel==16) {
+                    printf("calgrp %d, caldelay %d, ",cal_grp,cal_delay);
+                    printf("event %d\tx=%d\tR%d F%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,fpga,hyb,apv,apvch,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
+                }*/
                 if ( channel >= (5 * 128) ) {
                     cout << "Channel " << dec << channel << " out of range" << endl;
                     cout << "Apv = " << dec << apv << endl;
@@ -405,7 +417,7 @@ int main ( int argc, char **argv ) {
             printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
         }
         optind++;
-        if (evio_format) {
+        if (evio_format && !triggerevent_format) {
             if (!force_cal_grp) cal_grp++;
             if (cal_grp==8)
             {

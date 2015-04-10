@@ -37,7 +37,6 @@ DataReadEvio::DataReadEvio ( ) {
 	fpga_it = 0;
 	svt_bank_min = 3;
 	svt_bank_range = 1;
-    physics_event_tag = 1;
     svt_data_tag = 3;
     is_engrun = false;
 }
@@ -48,8 +47,11 @@ DataReadEvio::~DataReadEvio ( ) { }
 void DataReadEvio::set_engrun(bool engrun) {
 	is_engrun = engrun;
     if (engrun) {
-        physics_event_tag = 160;
+        svt_bank_min = 51;
         svt_bank_range = 16;
+    } else {
+        svt_bank_min = 3;
+        svt_bank_range = 1;
     }
 }
 
@@ -116,7 +118,7 @@ bool DataReadEvio::next(Data *data) {
             //  then hand make a "Data" object 
             eventInfo(buf);
             if(debug_)printf("evtTag = %d\n",evtTag);
-            if(evtTag==physics_event_tag){
+            if(evtTag>=32 || evtTag<16){
                 parse_event(buf);
                 //fpga_it = fpga_banks.begin();
                 nodata=false;  
