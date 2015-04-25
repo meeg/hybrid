@@ -46,6 +46,31 @@ using namespace std;
 #define MAX_FEB 10
 #define MAX_HYB 4
 
+#define N_ROCS 14
+#define EVENTS_PER_DELAY 100
+
+#define N_TIME_CONSTS 2
+
+Double_t fitf_intnorm(Double_t *x,Double_t *par)
+{
+    Double_t amp = 0.0;
+    if (x[0]>par[2]) {
+        amp += (pow(par[3],2)/(pow(par[3]-par[4],3)))*(
+                exp((par[2]-x[0])/par[3])-
+                exp((par[2]-x[0])/par[4])*(1+
+                    (x[0]-par[2])*(par[3]-par[4])/(par[3]*par[4])+
+                    pow(((x[0]-par[2])*(par[3]-par[4])/(par[3]*par[4])),2)/2));
+    }
+    return amp;
+}
+
+Double_t fitf(Double_t *x,Double_t *par)
+{
+    Double_t x0[1];
+    x0[0] = 3.0*pow(par[3]*pow(par[4],3),0.25)+par[2];
+    return par[0]+par[1]*fitf_intnorm(x,par)/fitf_intnorm(x0,par);
+}
+
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
@@ -70,14 +95,14 @@ int main ( int argc, char **argv ) {
     int cal_delay = 0;
     double delay_step = SAMPLE_INTERVAL/8;
     TCanvas         *c1;
-    int hybridCount[MAX_RCE][MAX_FEB][MAX_HYB];
+    bool hybridFound[MAX_RCE][MAX_FEB][MAX_HYB];
     int **allCounts[MAX_RCE][MAX_FEB][MAX_HYB];
     double **allMeans[MAX_RCE][MAX_FEB][MAX_HYB];
     double **allVariances[MAX_RCE][MAX_FEB][MAX_HYB];
     for (int rce = 0;rce<MAX_RCE;rce++)
         for (int fpga = 0;fpga<MAX_FEB;fpga++)
             for (int hyb = 0;hyb<MAX_HYB;hyb++) {
-                hybridCount[rce][fpga][hyb] = 0;
+                hybridFound[rce][fpga][hyb] = false;
             }
 
     DataRead        *dataRead;
@@ -273,6 +298,8 @@ int main ( int argc, char **argv ) {
         }
 
 
+        bool found_calgroup = true;
+        bool checkedGroup[8];
         // Process each event
         //eventCount = 0;
         do {
@@ -297,10 +324,14 @@ int main ( int argc, char **argv ) {
             }
             if (eventCount%1000==0) printf("Event %d\n",eventCount);
             if (num_events!=-1 && eventCount >= num_events) break;
-            if (evio_format && triggerevent_format) {
-                int run_stage = eventCount/14/1000;
-                cal_grp = run_stage/8;
-                cal_delay = (run_stage%8) + 1;
+            for (int i=0;i<8;i++) {
+                checkedGroup[i] = false;
+            }
+            if (evio_format && triggerevent_format && eventCount%N_ROCS==0) {
+                //found_calgroup = false;
+                int run_stage = eventCount/N_ROCS/EVENTS_PER_DELAY;
+                cal_grp = run_stage%8;
+                cal_delay = ((run_stage/8)%8) + 1;
             }
             for (int x=0; x < samplecount; x++) {
                 int hyb;
@@ -346,234 +377,284 @@ int main ( int argc, char **argv ) {
                     channel += apv*128;
 
                 /*if (rce==0 && fpga==6 && hyb==2 && channel==16) {
-                    printf("calgrp %d, caldelay %d, ",cal_grp,cal_delay);
-                    printf("event %d\tx=%d\tR%d F%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,fpga,hyb,apv,apvch,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
-                }*/
+                  printf("calgrp %d, caldelay %d, ",cal_grp,cal_delay);
+                  printf("event %d\tx=%d\tR%d F%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,fpga,hyb,apv,apvch,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
+                  }*/
                 if ( channel >= (5 * 128) ) {
                     cout << "Channel " << dec << channel << " out of range" << endl;
                     cout << "Apv = " << dec << apv << endl;
                     cout << "Chan = " << dec << apvch << endl;
                 }
 
-                if ((apvch-cal_grp)%8!=0) continue;
+                if (found_calgroup && (apvch-cal_grp)%8!=0) continue;
 
                 // Filter APVs
-                if ( eventCount >= 20 ) {
-                    if (hybridCount[rce][fpga][hyb]==0) {
-                        printf("found new hybrid: rce = %d, feb = %d, hyb = %d\n",rce,fpga,hyb);
-                        //allCounts[rce][fpga][hyb] = new int[640][48];
-                        //allMeans[rce][fpga][hyb] = new double[640][48];
-                        //allVariances[rce][fpga][hyb] = new double[640][48];
-                        allCounts[rce][fpga][hyb] = new int*[640];
-                        allMeans[rce][fpga][hyb] = new double*[640];
-                        allVariances[rce][fpga][hyb] = new double*[640];
-                        for (int i=0;i<640;i++) {
-                            allCounts[rce][fpga][hyb][i] = new int[48];
-                            allMeans[rce][fpga][hyb][i] = new double[48];
-                            allVariances[rce][fpga][hyb][i] = new double[48];
-                            for (int j=0;j<48;j++) {
-                                allCounts[rce][fpga][hyb][i][j] = 0;
-                                allMeans[rce][fpga][hyb][i][j] = 0.0;
-                                allVariances[rce][fpga][hyb][i][j] = 0.0;
-                            }
+                //if ( eventCount < 20 ) continue;
+                if (evio_format && triggerevent_format) {
+                    if (eventCount%(N_ROCS*EVENTS_PER_DELAY)<N_ROCS*8) continue;
+                } else
+                    if (eventCount<20) continue;
+                if (!hybridFound[rce][fpga][hyb]) {
+                    printf("found new hybrid: rce = %d, feb = %d, hyb = %d\n",rce,fpga,hyb);
+                    //allCounts[rce][fpga][hyb] = new int[640][48];
+                    //allMeans[rce][fpga][hyb] = new double[640][48];
+                    //allVariances[rce][fpga][hyb] = new double[640][48];
+                    allCounts[rce][fpga][hyb] = new int*[640];
+                    allMeans[rce][fpga][hyb] = new double*[640];
+                    allVariances[rce][fpga][hyb] = new double*[640];
+                    for (int i=0;i<640;i++) {
+                        allCounts[rce][fpga][hyb][i] = new int[48];
+                        allMeans[rce][fpga][hyb][i] = new double[48];
+                        allVariances[rce][fpga][hyb][i] = new double[48];
+                        for (int j=0;j<48;j++) {
+                            allCounts[rce][fpga][hyb][i][j] = 0;
+                            allMeans[rce][fpga][hyb][i][j] = 0.0;
+                            allVariances[rce][fpga][hyb][i][j] = 0.0;
                         }
-                    }
-                    hybridCount[rce][fpga][hyb]++;
-
-                    int sum = 0;
-                    for ( int y=0; y < 6; y++ ) {
-                        sum += samples[y];
-                    }
-                    sum-=6*samples[0];
-                    if (sum<0) continue;
-                    //int sgn = eventCount%2;
-                    for ( int y=0; y < 6; y++ ) {
-                        int bin = 8*y+8-cal_delay;
-                        allCounts[rce][fpga][hyb][channel][bin]++;
-                        double delta = samples[y]-allMeans[rce][fpga][hyb][channel][bin];
-                        if (allCounts[rce][fpga][hyb][channel][bin]==1)
-                        {
-                            allMeans[rce][fpga][hyb][channel][bin] = samples[y];
-                        }
-                        else
-                        {
-                            allMeans[rce][fpga][hyb][channel][bin] += delta/allCounts[rce][fpga][hyb][channel][bin];
-                        }
-                        allVariances[rce][fpga][hyb][channel][bin] += delta*(samples[y]-allMeans[rce][fpga][hyb][channel][bin]);
                     }
                 }
-            }
-            eventCount++;
+                hybridFound[rce][fpga][hyb] = true;
 
-            if (triggerevent_format) {
-                readOK = dataRead->next(&triggerevent);
-            } else {
-                readOK = dataRead->next(&event);
-            }
-        } while (readOK);
-        dataRead->close();
-        if (eventCount != runCount)
-        {
-            printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
-        }
-        optind++;
-        if (evio_format && !triggerevent_format) {
-            if (!force_cal_grp) cal_grp++;
-            if (cal_grp==8)
+                int sum = 0;
+                for ( int y=0; y < 6; y++ ) {
+                    sum += samples[y];
+                }
+
+                sum-=6*samples[0];
+                /*if (abs(sum)>8000 && abs(samples[5]-samples[0]) > abs(samples[2]-samples[0])) {
+                  printf("event %d, channel %d, sum=%d, %d %d %d %d %d %d\n",eventCount,apvch, sum,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
+                  }*/
+                /*
+                if (!checkedGroup[apvch%8] && abs(sum)>5000 && !found_calgroup) {
+                    //if (!checkedGroup[apvch%8] && abs(sum)>4500 && abs(samples[5]-samples[0]) < abs(samples[2]-samples[0]) && !found_calgroup) {
+                    found_calgroup = true;
+                    if (checkedGroup[apvch%8]) printf("sample %d, apvch %d\n",x,apvch);
+                    if (apvch%8 != cal_grp)
+                        printf("event %d, found calgroup on channel %d, feb %d, hyb %d, apvch %d, sum=%d, %d %d %d %d %d %d\n",eventCount,channel,fpga,hyb,apvch, sum,samples[0],samples[1]-samples[0],samples[2]-samples[0],samples[3]-samples[0],samples[4]-samples[0],samples[5]-samples[0]);
+                }
+                checkedGroup[apvch%8] = true;
+                if (!found_calgroup) continue;*/
+                if (sum<0) continue;
+                //int sgn = eventCount%2;
+                for ( int y=0; y < 6; y++ ) {
+                    int bin = 8*y+8-cal_delay;
+                    allCounts[rce][fpga][hyb][channel][bin]++;
+                    double delta = samples[y]-allMeans[rce][fpga][hyb][channel][bin];
+                    if (allCounts[rce][fpga][hyb][channel][bin]==1)
+                    {
+                        allMeans[rce][fpga][hyb][channel][bin] = samples[y];
+                    }
+                    else
+                    {
+                        allMeans[rce][fpga][hyb][channel][bin] += delta/allCounts[rce][fpga][hyb][channel][bin];
+                    }
+                    allVariances[rce][fpga][hyb][channel][bin] += delta*(samples[y]-allMeans[rce][fpga][hyb][channel][bin]);
+                }
+                }
+                /*
+                if (!found_calgroup && eventCount%N_ROCS!=9) {
+                    printf("event %d, didn't find cal group\n",eventCount);
+                }*/
+                eventCount++;
+
+                if (triggerevent_format) {
+                    readOK = dataRead->next(&triggerevent);
+                } else {
+                    readOK = dataRead->next(&event);
+                }
+            } while (readOK);
+            dataRead->close();
+            if (eventCount != runCount)
             {
-                cal_grp = 0;
-                cal_delay++;
+                printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
+            }
+            optind++;
+            if (evio_format && !triggerevent_format) {
+                if (!force_cal_grp) cal_grp++;
+                if (cal_grp==8)
+                {
+                    cal_grp = 0;
+                    cal_delay++;
+                }
             }
         }
+
+
+        //TF1 *shapingFunction = new TF1("Shaping Function","[0]+[1]*(x>[2])*((x-[2])/[3])*exp(1-((x-[2])/[3]))",-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+        /*
+           TF1 *shapingFunction = new TF1("Shaping Function",
+           "[0]+\
+           [1]*(x>[2])*\
+           ([3]*[3]/(([3]-[4])*([3]-[4])*([3]-[4])))*(\
+           exp(([2]-x)/[3])-\
+           (1+\
+           (([3]-[4])/([3]*[4]))*(x-[2])+\
+           (([3]-[4])*([3]-[4])/(2*[3]*[4]*[3]*[4]))*(x-[2])*(x-[2]))*exp(([2]-x)/[4]))",
+           -1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+           */
+        TF1 *shapingFunction = new TF1("Shaping Function",fitf,-1.0*SAMPLE_INTERVAL,5.0*SAMPLE_INTERVAL,5);
+
+        for (int rce = 0;rce<MAX_RCE;rce++)
+            for (int fpga = 0;fpga<MAX_FEB;fpga++)
+                for (int hyb = 0;hyb<MAX_HYB;hyb++)
+                    if (hybridFound[rce][fpga][hyb])
+                    {
+                        double chanNoise[640];
+                        double chanTp[N_TIME_CONSTS][640];
+                        double chanT0[640];
+                        double chanA[640];
+                        double chanChisq[640];
+                        for (int i=0;i<640;i++)
+                        {
+                            chanNoise[i] = 0;
+                            for (int j=0;j<N_TIME_CONSTS;j++) {
+                                chanTp[j][i] = 0;
+                            }
+                            chanT0[i] = 0;
+                            chanA[i] = 0;
+                            chanChisq[i] = 0;
+                            double yi[48], ey[48], ti[48];
+                            int ni = 0;
+                            TGraphErrors *fitcurve;
+
+                            double A, T0, Tp, A0, fit_start;
+
+                            for (int bin=0;bin<48;bin++)
+                            {
+                                if (allCounts[rce][fpga][hyb][i][bin])
+                                {
+                                    allVariances[rce][fpga][hyb][i][bin]/=allCounts[rce][fpga][hyb][i][bin];
+                                    allVariances[rce][fpga][hyb][i][bin]=sqrt(allVariances[rce][fpga][hyb][i][bin]);
+                                    yi[ni] = allMeans[rce][fpga][hyb][i][bin];
+                                    ey[ni] = allVariances[rce][fpga][hyb][i][bin]/sqrt(allCounts[rce][fpga][hyb][i][bin]);
+                                    ti[ni] = (bin-8)*delay_step;
+                                    ni++;
+                                    chanNoise[i]+=allVariances[rce][fpga][hyb][i][bin];
+                                }
+                            }
+                            if (ni==0) continue;
+                            chanNoise[i]/=ni;
+                            noisefile << rce << "\t" << fpga << "\t" << hyb << "\t" << i << "\t";
+                            noisefile << chanNoise[i] << endl;
+
+                            fitcurve = new TGraphErrors(ni,ti,yi,NULL,ey);
+                            shapingFunction->SetParameter(1,TMath::MaxElement(ni,yi)-yi[0]);
+                            shapingFunction->SetParameter(2,-10.0);
+                            shapingFunction->SetParameter(3,80.0);
+                            shapingFunction->SetParameter(4,12.0);
+
+                            shapingFunction->FixParameter(0,yi[0]);
+                            A0 = yi[0];
+                            if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
+                            {
+                                A = shapingFunction->GetParameter(1);
+                                T0 = shapingFunction->GetParameter(2);
+                                for (int j=0;j<N_TIME_CONSTS;j++) {
+                                    chanTp[j][i] = shapingFunction->GetParameter(3+j);
+                                }
+                                if (move_fitstart)
+                                {
+                                    fit_start = T0+fit_shift;
+                                    fitcurve->Fit(shapingFunction,"Q0","",fit_start,5*SAMPLE_INTERVAL);
+                                    A = shapingFunction->GetParameter(1);
+                                    T0 = shapingFunction->GetParameter(2);
+                                    for (int j=0;j<N_TIME_CONSTS;j++) {
+                                        chanTp[j][i] = shapingFunction->GetParameter(3+j);
+                                    }
+                                }
+                                chanA[i] = A;
+                                chanT0[i] = T0;
+                                chanChisq[i] = shapingFunction->GetChisquare();
+                            } else
+                            {
+                                printf("Could not fit pulse shape for FPGA %d, hybrid %d, channel %d\n",fpga,hyb,i);
+                            }
+                            if (plot_tp_fits)
+                            {
+                                c1->Clear();
+                                fitcurve->Draw("AL");
+                                if (move_fitstart)
+                                {
+                                    shapingFunction->SetLineStyle(1);
+                                    shapingFunction->SetLineWidth(1);
+                                    shapingFunction->SetLineColor(2);
+                                    shapingFunction->SetRange(fit_start,5*SAMPLE_INTERVAL);
+                                    shapingFunction->DrawCopy("LSAME");
+                                    shapingFunction->SetRange(-1*SAMPLE_INTERVAL,fit_start);
+                                    shapingFunction->SetLineStyle(2);
+                                    shapingFunction->Draw("LSAME");
+                                }
+                                else
+                                {
+                                    shapingFunction->SetLineStyle(1);
+                                    shapingFunction->SetLineWidth(1);
+                                    shapingFunction->SetLineColor(2);
+                                    shapingFunction->SetRange(-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+                                    shapingFunction->Draw("LSAME");
+                                }
+                                sprintf(name,"%s_tp_fit_F%d_H%d_%i.png",inname.Data(),fpga,hyb,i);
+                                c1->SaveAs(name);
+                            }
+                            delete fitcurve;
+
+                            shapefile << rce << "\t" << fpga << "\t" << hyb << "\t" << i << "\t";
+                            for (int j=0;j<ni;j++)
+                            {
+                                shapefile<<"\t"<<ti[j]-T0<<"\t"<<(yi[j]-A0)/A<<"\t"<<ey[j]/A;
+                            }
+                            shapefile<<endl;
+
+                            tpfile << rce << "\t" << fpga << "\t" << hyb << "\t" << i << "\t";
+                            tpfile << chanA[i]<<"\t"<<chanT0[i]<<"\t";
+                            for (int j=0;j<N_TIME_CONSTS;j++) {
+                                if (chanTp[j][i]>1000)
+                                    tpfile <<1000<<"\t";
+                                else
+                                    tpfile <<chanTp[j][i]<<"\t";
+                            }
+                            tpfile <<chanChisq[i]<<endl;
+                        }
+                        if (plot_fit_results)
+                        {
+                            c1->SetLogy(0);
+                            sprintf(name,"A_R%d_F%d_H%d",rce,fpga,hyb);
+                            sprintf(name2,"%s_tp_R%d_F%d_H%d_A.png",inname.Data(),rce,fpga,hyb);
+                            sprintf(title,"Fitted amplitude;Channel;Amplitude [ADC counts]");
+                            plotResults(title, name, name2, 640, chanChan, chanA, c1);
+
+                            c1->SetLogy(0);
+                            sprintf(name,"T0_R%d_F%d_H%d",rce,fpga,hyb);
+                            sprintf(name2,"%s_tp_R%d_F%d_H%d_T0.png",inname.Data(),rce,fpga,hyb);
+                            sprintf(title,"Fitted T0;Channel;T0 [ns]");
+                            plotResults(title, name, name2, 640, chanChan, chanT0, c1);
+
+                            for (int j=0;j<N_TIME_CONSTS;j++) {
+                                c1->SetLogy(0);
+                                sprintf(name,"Tp%d_R%d_F%d_H%d",j+1,rce,fpga,hyb);
+                                sprintf(name2,"%s_tp_R%d_F%d_H%d_Tp%d.png",inname.Data(),rce,fpga,hyb,j+1);
+                                sprintf(title,"Fitted Tp%d;Channel;Tp [ns]",j+1);
+                                plotResults(title, name, name2, 640, chanChan, chanTp[j], c1);
+                            }
+
+                            c1->SetLogy(0);
+                            sprintf(name,"Chisq_R%d_F%d_H%d",rce,fpga,hyb);
+                            sprintf(name2,"%s_tp_R%d_F%d_H%d_Chisq.png",inname.Data(),rce,fpga,hyb);
+                            sprintf(title,"Fit chisq;Channel;Chisq");
+                            plotResults(title, name, name2, 640, chanChan, chanChisq, c1);
+
+                            c1->SetLogy(0);
+                            sprintf(name,"Noise_R%d_F%d_H%d",rce,fpga,hyb);
+                            sprintf(name2,"%s_tp_R%d_F%d_H%d_Noise.png",inname.Data(),rce,fpga,hyb);
+                            sprintf(title,"Mean RMS noise per sample;Channel;Noise [ADC counts]");
+                            plotResults(title, name, name2, 640, chanChan, chanNoise, c1);
+                        }
+
+                    }
+
+        // Close file
+        tpfile.close();
+        shapefile.close();
+        noisefile.close();
+        return(0);
     }
-
-
-    TF1 *shapingFunction = new TF1("Shaping Function","[3]+[0]*(max(x-[1],0)/[2])*exp(1-((x-[1])/[2]))",-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
-    for (int rce = 0;rce<MAX_RCE;rce++)
-        for (int fpga = 0;fpga<MAX_FEB;fpga++)
-            for (int hyb = 0;hyb<MAX_HYB;hyb++)
-                if (hybridCount[rce][fpga][hyb])
-                {
-                    double chanNoise[640];
-                    double chanTp[640];
-                    double chanT0[640];
-                    double chanA[640];
-                    double chanChisq[640];
-                    for (int i=0;i<640;i++)
-                    {
-                        chanNoise[i] = 0;
-                        chanTp[i] = 0;
-                        chanT0[i] = 0;
-                        chanA[i] = 0;
-                        chanChisq[i] = 0;
-                        double yi[48], ey[48], ti[48];
-                        int ni = 0;
-                        TGraphErrors *fitcurve;
-
-                        double A, T0, Tp, A0, fit_start;
-
-                        for (int bin=0;bin<48;bin++)
-                        {
-                            if (allCounts[rce][fpga][hyb][i][bin])
-                            {
-                                allVariances[rce][fpga][hyb][i][bin]/=allCounts[rce][fpga][hyb][i][bin];
-                                allVariances[rce][fpga][hyb][i][bin]=sqrt(allVariances[rce][fpga][hyb][i][bin]);
-                                yi[ni] = allMeans[rce][fpga][hyb][i][bin];
-                                ey[ni] = allVariances[rce][fpga][hyb][i][bin]/sqrt(allCounts[rce][fpga][hyb][i][bin]);
-                                ti[ni] = (bin-8)*delay_step;
-                                ni++;
-                                chanNoise[i]+=allVariances[rce][fpga][hyb][i][bin];
-                            }
-                        }
-                        if (ni==0) continue;
-                        chanNoise[i]/=ni;
-                        noisefile << rce << "\t" << fpga << "\t" << hyb << "\t" << i << "\t";
-                        noisefile << chanNoise[i] << endl;
-
-                        fitcurve = new TGraphErrors(ni,ti,yi,NULL,ey);
-                        shapingFunction->SetParameter(0,TMath::MaxElement(ni,yi)-yi[0]);
-                        shapingFunction->SetParameter(1,12.0);
-                        shapingFunction->SetParameter(2,50.0);
-                        shapingFunction->FixParameter(3,yi[0]);
-                        A0 = yi[0];
-                        if (fitcurve->Fit(shapingFunction,"Q0","",-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL)==0)
-                        {
-                            A = shapingFunction->GetParameter(0);
-                            T0 = shapingFunction->GetParameter(1);
-                            Tp = shapingFunction->GetParameter(2);
-                            if (move_fitstart)
-                            {
-                                fit_start = T0+fit_shift;
-                                fitcurve->Fit(shapingFunction,"Q0","",fit_start,5*SAMPLE_INTERVAL);
-                                A = shapingFunction->GetParameter(0);
-                                T0 = shapingFunction->GetParameter(1);
-                                Tp = shapingFunction->GetParameter(2);
-                            }
-                            chanA[i] = A;
-                            chanT0[i] = T0;
-                            chanTp[i] = Tp;
-                            chanChisq[i] = shapingFunction->GetChisquare();
-                        } else
-                        {
-                            printf("Could not fit pulse shape for FPGA %d, hybrid %d, channel %d\n",fpga,hyb,i);
-                        }
-                        if (plot_tp_fits)
-                        {
-                            c1->Clear();
-                            fitcurve->Draw("AL");
-                            if (move_fitstart)
-                            {
-                                shapingFunction->SetLineStyle(1);
-                                shapingFunction->SetLineWidth(1);
-                                shapingFunction->SetLineColor(2);
-                                shapingFunction->SetRange(fit_start,5*SAMPLE_INTERVAL);
-                                shapingFunction->DrawCopy("LSAME");
-                                shapingFunction->SetRange(-1*SAMPLE_INTERVAL,fit_start);
-                                shapingFunction->SetLineStyle(2);
-                                shapingFunction->Draw("LSAME");
-                            }
-                            else
-                            {
-                                shapingFunction->SetLineStyle(1);
-                                shapingFunction->SetLineWidth(1);
-                                shapingFunction->SetLineColor(2);
-                                shapingFunction->SetRange(-1*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
-                                shapingFunction->Draw("LSAME");
-                            }
-                            sprintf(name,"%s_tp_fit_F%d_H%d_%i.png",inname.Data(),fpga,hyb,i);
-                            c1->SaveAs(name);
-                        }
-                        delete fitcurve;
-
-                        shapefile << rce << "\t" << fpga << "\t" << hyb << "\t" << i << "\t";
-                        for (int j=0;j<ni;j++)
-                        {
-                            shapefile<<"\t"<<ti[j]-T0<<"\t"<<(yi[j]-A0)/A<<"\t"<<ey[j]/A;
-                        }
-                        shapefile<<endl;
-
-                        tpfile << rce << "\t" << fpga << "\t" << hyb << "\t" << i << "\t";
-                        tpfile << chanA[i]<<"\t"<<chanT0[i]<<"\t"<<chanTp[i]<<"\t"<<chanChisq[i]<<endl;
-                    }
-                    if (plot_fit_results)
-                    {
-                        c1->SetLogy(0);
-                        sprintf(name,"A_R%d_F%d_H%d",rce,fpga,hyb);
-                        sprintf(name2,"%s_tp_R%d_F%d_H%d_A.png",inname.Data(),rce,fpga,hyb);
-                        sprintf(title,"Fitted amplitude;Channel;Amplitude [ADC counts]");
-                        plotResults(title, name, name2, 640, chanChan, chanA, c1);
-
-                        c1->SetLogy(0);
-                        sprintf(name,"T0_R%d_F%d_H%d",rce,fpga,hyb);
-                        sprintf(name2,"%s_tp_R%d_F%d_H%d_T0.png",inname.Data(),rce,fpga,hyb);
-                        sprintf(title,"Fitted T0;Channel;T0 [ns]");
-                        plotResults(title, name, name2, 640, chanChan, chanT0, c1);
-
-                        c1->SetLogy(0);
-                        sprintf(name,"Tp_R%d_F%d_H%d",rce,fpga,hyb);
-                        sprintf(name2,"%s_tp_R%d_F%d_H%d_Tp.png",inname.Data(),rce,fpga,hyb);
-                        sprintf(title,"Fitted Tp;Channel;Tp [ns]");
-                        plotResults(title, name, name2, 640, chanChan, chanTp, c1);
-
-                        c1->SetLogy(0);
-                        sprintf(name,"Chisq_R%d_F%d_H%d",rce,fpga,hyb);
-                        sprintf(name2,"%s_tp_R%d_F%d_H%d_Chisq.png",inname.Data(),rce,fpga,hyb);
-                        sprintf(title,"Fit chisq;Channel;Chisq");
-                        plotResults(title, name, name2, 640, chanChan, chanChisq, c1);
-
-                        c1->SetLogy(0);
-                        sprintf(name,"Noise_R%d_F%d_H%d",rce,fpga,hyb);
-                        sprintf(name2,"%s_tp_R%d_F%d_H%d_Noise.png",inname.Data(),rce,fpga,hyb);
-                        sprintf(title,"Mean RMS noise per sample;Channel;Noise [ADC counts]");
-                        plotResults(title, name, name2, 640, chanChan, chanNoise, c1);
-                    }
-
-                }
-
-    // Close file
-    tpfile.close();
-    shapefile.close();
-    noisefile.close();
-    return(0);
-}
 

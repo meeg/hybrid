@@ -743,8 +743,8 @@ int main ( int argc, char **argv ) {
         for (int j=0;j<N_TIME_CONSTS;j++) {
             c1->SetLogy(0);
             sprintf(name,"Tp%d_%s",j+1,sgn?"neg":"pos");
-            sprintf(name2,"%s_tp_Tp%d_%s.png",inname.Data(),j,sgn?"neg":"pos");
-            sprintf(title,"Fitted Tp%d, %s pulses;Channel;Tp [ns]",j,sgn?"negative":"positive");
+            sprintf(name2,"%s_tp_Tp%d_%s.png",inname.Data(),j+1,sgn?"neg":"pos");
+            sprintf(title,"Fitted Tp%d, %s pulses;Channel;Tp [ns]",j+1,sgn?"negative":"positive");
             plotResults(title, name, name2, nChan[sgn], grChan[sgn], grTp[j][sgn], c1);
         }
 
