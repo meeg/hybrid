@@ -1,6 +1,8 @@
 # Variables
-CFLAGS  := -g -Wall `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I$(PWD)/../evio -I.
-LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lbz2 -lrt -lgsl -lgslcblas
+CFLAGS  := -g -Wall -Wno-gnu-static-float-init `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I$(PWD)/../evio -I.
+LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lbz2 -lgsl -lgslcblas
+# remove -lrt to compile on mac os x
+#LFLAGS  := -lrt
 CC      := g++
 GCC      := gcc
 BIN     := $(PWD)/../bin
