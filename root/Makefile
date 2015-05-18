@@ -16,7 +16,7 @@ GEN_OBJ := $(patsubst $(GEN_DIR)/%.cpp,$(OBJ)/%.o,$(GEN_SRC))
 
 # Tracker Sources
 TRK_DIR := $(PWD)/../tracker
-TRK_SRC := $(TRK_DIR)/DevboardEvent.cpp $(TRK_DIR)/DevboardSample.cpp $(TRK_DIR)/DataReadEvio.cpp $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TriggerEvent.cpp $(TRK_DIR)/TriggerSample.cpp
+TRK_SRC := $(TRK_DIR)/DevboardEvent.cpp $(TRK_DIR)/DevboardSample.cpp $(TRK_DIR)/DataReadEvio.cpp $(TRK_DIR)/TrackerEvent.cpp $(TRK_DIR)/TrackerSample.cpp $(TRK_DIR)/TriggerEvent.cpp $(TRK_DIR)/TriggerSample.cpp $(TRK_DIR)/TiTriggerEvent.cpp
 #TRK_HDR := $(TRK_DIR)/DevboardEvent.h   $(TRK_DIR)/DevboardSample.h $(TRK_DIR)/DataReadEvio.h
 TRK_OBJ := $(patsubst $(TRK_DIR)/%.cpp,$(OBJ)/%.o,$(TRK_SRC))
 

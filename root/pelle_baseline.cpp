@@ -29,10 +29,11 @@
 //#include <TApplication.h>
 #include <TGraph.h>
 #include <TStyle.h>
+#include <TLegend.h>
 #include <stdarg.h>
 #include <DevboardEvent.h>
 #include <DevboardSample.h>
-#include <TriggerEvent.h>
+#include <TiTriggerEvent.h>
 #include <TriggerSample.h>
 #include <Data.h>
 #include <DataRead.h>
@@ -65,7 +66,8 @@ int main ( int argc, char **argv ) {
   int pulseShapeCh = -1;
   int pulseShapeFeb = -1;
   int pulseShapeHyb = -1;
-  TCanvas         *c1;
+  const int nTimeBins = 10;
+  TCanvas         *c1, *c2;
   int chanMap[128];
   for (int idx = 0; idx < 128; idx++ ) {
     chanMap[(32*(idx%4)) + (8*(idx/4)) - (31*(idx/16))] = idx;
@@ -78,12 +80,10 @@ int main ( int argc, char **argv ) {
   int *channelAllCount[MAX_RCE][MAX_FEB][MAX_HYB];
   TH2F *baselineHist2D[MAX_RCE][MAX_FEB][MAX_HYB];
   TH2F *baselineSamplesHist2D[MAX_RCE][MAX_FEB][MAX_HYB][6];
-  for (int rce = 0;rce<MAX_RCE;rce++)
-    for (int fpga = 0;fpga<MAX_FEB;fpga++)
-      for (int hyb = 0;hyb<MAX_HYB;hyb++) {
-        hybridCount[rce][fpga][hyb] = 0;
-      }
-  
+  TH2F *baselineSamples0TimeBinHist2D[MAX_RCE][MAX_FEB][MAX_HYB][nTimeBins];
+  TH1F* timeStampDiffHist;
+  TH1F* timeStampDiffBinHist;
+
   double          grChan[640];
   for (int i=0;i<640;i++){
     grChan[i] = i;
@@ -91,10 +91,11 @@ int main ( int argc, char **argv ) {
   DataRead        *dataRead;
   int svt_bank_num = 3;
   DevboardEvent    event;
-  TriggerEvent    triggerevent;
+  TiTriggerEvent    triggerevent;
   TriggerSample   *triggersample = new TriggerSample();
   int		samples[6];
   int            eventCount;
+  int            tiEventCount;
   int runCount = -1;
   TString inname;
   TString outdir;
@@ -214,6 +215,7 @@ int main ( int argc, char **argv ) {
   gStyle->SetPadLeftMargin(0.15);
   gStyle->SetMarkerStyle(6);
   c1 = new TCanvas("c1","c1",1200,900);
+  c2 = new TCanvas("c2","c2",1200,900);
 
   // Start X11 view
   //TApplication theApp("App",NULL,NULL);
@@ -270,14 +272,25 @@ int main ( int argc, char **argv ) {
 
   // Process each event
   eventCount = 0;
+  tiEventCount = 0;
 
 
 
   printf("Init some histos\n");
 
+  oss.str("");
+  oss << "timeStampDiff";
+  timeStampDiffHist = new TH1F(oss.str().c_str(),oss.str().c_str(),100,0,100.);
+  oss << "timeStampDiffBin";
+  timeStampDiffBinHist = new TH1F(oss.str().c_str(),oss.str().c_str(),nTimeBins,0,nTimeBins);
+
+
   for (int rce = 0;rce<MAX_RCE;rce++) {
     for (int fpga = 0;fpga<MAX_FEB;fpga++) {
       for (int hyb = 0;hyb<MAX_HYB;hyb++) {
+
+        hybridCount[rce][fpga][hyb] = 0;
+
         oss.str("");
         oss << "baseline-rce-"<<rce<<"-fpga-"<<fpga<<"-hyb-"<<hyb;
         baselineHist2D[rce][fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,10,0., 14000.0);
@@ -287,6 +300,12 @@ int main ( int argc, char **argv ) {
           oss << "baselinesamples-rce-"<<rce<<"-fpga-"<<fpga<<"-hyb-"<<hyb<<"-sample-"<<sample;
           baselineSamplesHist2D[rce][fpga][hyb][sample] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,10,0., 14000.0);
         }
+
+        for (int tb = 0;tb<nTimeBins;tb++) {
+          oss.str("");        
+          oss << "baselinesample0timebin-rce-"<<rce<<"-fpga-"<<fpga<<"-hyb-"<<hyb<<"-sample0-timebin-"<<tb;
+          baselineSamples0TimeBinHist2D[rce][fpga][hyb][tb] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,10,0., 14000.0);
+        }
         
         for (int ch =0;ch<640;ch++) {          
           pulseShapeHist[rce][fpga][hyb][ch] = NULL;
@@ -295,6 +314,14 @@ int main ( int argc, char **argv ) {
     }
   }
 
+
+  unsigned long timeStamp;
+  unsigned long tiEventNumber;
+  unsigned long timeStampPrev = 0;
+  unsigned long tiEventNumberPrev = 0;
+  unsigned long timeStampDiff = 0;
+  double timeStampDiffD = 0;
+  uint tiTimeBin = 0;
 
 
   do {
@@ -320,13 +347,15 @@ int main ( int argc, char **argv ) {
         continue;
       }
     //cout<<"  fpga #"<<event.fpgaAddress()<<"; number of samples = "<<event.count()<<endl;
-    if (eventCount%1000==0) printf("Event %d\n",eventCount);
+    if (eventCount%1000==0) printf("Event %d\n",eventCount);    
     if (num_events!=-1 && eventCount >= num_events) break;
+
     for (int x=0; x < samplecount; x++) {
       int hyb;
       int apv;
       int apvch;
       int channel;
+      
 
       bool goodSample = true;
 
@@ -391,6 +420,38 @@ int main ( int argc, char **argv ) {
         }
         hybridCount[rce][fpga][hyb]++;
         channelCount[rce][fpga][hyb][channel]++;
+
+
+        // calculate the time to the previous trigger
+        if(triggerevent.tiEventNumber()>tiEventNumber) {
+          tiEventCount++;
+          // it's a new event, save the old ones
+          tiEventNumberPrev = tiEventNumber;
+          timeStampPrev = timeStamp;
+          // update the current ones
+          tiEventNumber = triggerevent.tiEventNumber();
+          timeStamp = triggerevent.timeStamp();
+          // difference in time
+          timeStampDiff = timeStamp-timeStampPrev;
+          timeStampDiffD = 4.0e-3*((double)timeStamp-timeStampPrev);
+          
+          timeStampDiffHist->Fill(timeStampDiffD);
+          tiTimeBin = (uint)(timeStampDiffD/10.0);
+          if(tiTimeBin>=nTimeBins) tiTimeBin=9;
+          timeStampDiffBinHist->Fill(tiTimeBin);
+
+        }
+        //cout << timeStampDiff <<  " 4ns clocks ( "<< timeStampDiffD <<" us) -> timebin (25us bins) " <<  tiTimeBin << endl;
+        
+
+        if(tiEventCount%100==0) {
+          printf("processing hybrid: rce = %d, feb = %d, hyb = %d\n",rce,fpga,hyb);        
+          if(triggerevent_format) {
+            printf("TI event number %ld (prev %ld)\n",tiEventNumber, tiEventNumberPrev);
+            printf("time stamp %ld (prev %ld diff %ld tiTimeBin %d)\n",timeStamp, timeStampPrev, timeStampDiff, tiTimeBin);
+          }
+        }
+
         
         if ( doPulseShape && pulseShapeHist[rce][fpga][hyb][channel] == NULL) {
           oss.str("");
@@ -405,9 +466,10 @@ int main ( int argc, char **argv ) {
           if (value<1000) {
             printf("out of range: event %d, rce = %d, feb = %d, hyb = %d, channel = %d, sample[%d] = %d\n",eventCount,rce,fpga,hyb,channel,y,samples[y]);
           }
-          
+                    
           baselineHist2D[rce][fpga][hyb]->Fill(channel,value);
           baselineSamplesHist2D[rce][fpga][hyb][y]->Fill(channel,value);
+          baselineSamples0TimeBinHist2D[rce][fpga][hyb][tiTimeBin]->Fill(channel,value);
           
           channelAllCount[rce][fpga][hyb][channel]++;
           
@@ -435,11 +497,26 @@ int main ( int argc, char **argv ) {
       printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
     }
   
+
+  printf("Process summary:\nEventCount = %d\nTiEventCount=%d\n",eventCount,tiEventCount);
+
+
+  c1->Clear();
+  sprintf(name,"%s_timestampdiff.png",inname.Data());
+  printf("Drawing %s\n",name);
+  timeStampDiffHist->Draw();
+  c1->SaveAs(name);
+
+  c1->Clear();
+  sprintf(name,"%s_timestampdiffbin.png",inname.Data());
+  printf("Drawing %s\n",name);
+  timeStampDiffBinHist->Draw();
+  c1->SaveAs(name);
+
   
   TH2F* pulseShapeHistPerHybrid;
-
   TH1F* occupancy[MAX_RCE][MAX_FEB][MAX_HYB];
-  
+  TH1F* occupancytimebin[MAX_RCE][MAX_FEB][MAX_HYB][nTimeBins];
   for (int rce = 0;rce<MAX_RCE;rce++) {
     for (int fpga = 0;fpga<MAX_FEB;fpga++) {
       for (int hyb = 0;hyb<MAX_HYB;hyb++) {
@@ -501,7 +578,7 @@ int main ( int argc, char **argv ) {
           sprintf(name,"%s_occupancy_R%d_F%d_H%d.png",inname.Data(),rce,fpga,hyb);
           printf("Drawing %s\n",name);
           occupancy[rce][fpga][hyb] = (TH1F*) baselineHist2D[rce][fpga][hyb]->ProjectionX();
-          if (eventCount>0) occupancy[rce][fpga][hyb]->Scale(1.0/eventCount);
+          if (tiEventCount>0) occupancy[rce][fpga][hyb]->Scale(1.0/tiEventCount);
           else  occupancy[rce][fpga][hyb]->Scale(0.0); // set to 0          
           occupancy[rce][fpga][hyb]->Draw();
           //c1->SetLogy();
@@ -524,6 +601,55 @@ int main ( int argc, char **argv ) {
             baselineSamplesHist2D[rce][fpga][hyb][sample]->Draw("colz");
             c1->SaveAs(name);
           }
+
+          
+          c2->Clear();
+          TLegend* leg = new TLegend(0.35,0.5,0.73,0.85);
+          leg->SetFillColor(0);
+          Color_t color;
+          for(int timebin=0; timebin<nTimeBins; ++timebin) {
+            c1->cd();
+            c1->Clear();            
+            sprintf(name,"%s_baselinesamples0timebins_R%d_F%d_H%d_T%d.png",inname.Data(),rce,fpga,hyb,timebin);
+            printf("Drawing %s\n",name);
+            baselineSamples0TimeBinHist2D[rce][fpga][hyb][timebin]->Draw("colz");
+            c1->SaveAs(name);
+
+            c1->Clear();          
+            sprintf(name,"%s_occupancy_timebins_R%d_F%d_H%d_T%d.png",inname.Data(),rce,fpga,hyb,timebin);
+            printf("Drawing %s\n",name);
+            occupancytimebin[rce][fpga][hyb][timebin] = (TH1F*) baselineSamples0TimeBinHist2D[rce][fpga][hyb][timebin]->ProjectionX();
+            // find the number of ti events in this time bin to normalize correctly
+            uint tiEventCountTimeBin = timeStampDiffBinHist->GetBinContent(timebin+1);
+            if (tiEventCountTimeBin>0) occupancytimebin[rce][fpga][hyb][timebin]->Scale(1.0/tiEventCountTimeBin);
+            else  occupancytimebin[rce][fpga][hyb][timebin]->Scale(0.0); // set to 0          
+            occupancytimebin[rce][fpga][hyb][timebin]->Draw();
+            myText(0.6,0.6,TString::Format("%d events in timebin",tiEventCountTimeBin).Data(),0.05,1);
+            //c1->SetLogy();
+            c1->SaveAs(name);
+
+            c2->cd();
+            if(timebin<9) color = (Color_t)timebin+1;
+            else color = (Color_t)timebin+2;
+            occupancytimebin[rce][fpga][hyb][timebin]->SetLineColor(color);
+            if(timebin==0)
+              occupancytimebin[rce][fpga][hyb][timebin]->Draw();
+            else
+              occupancytimebin[rce][fpga][hyb][timebin]->Draw("same");
+            leg->AddEntry( occupancytimebin[rce][fpga][hyb][timebin], TString::Format("#DeltaT_{bin} %d#mus",timebin*10).Data(),"L");
+            
+          }
+
+          sprintf(name,"%s_occupancy_timebinsAll_R%d_F%d_H%d.png",inname.Data(),rce,fpga,hyb);
+          printf("Drawing %s\n",name);
+          c2->cd();
+          leg->Draw();
+          c2->SaveAs(name);
+          delete leg;
+
+          
+          
+
 
 
           for(int sample=0; sample<6; ++sample) {

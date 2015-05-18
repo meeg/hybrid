@@ -66,15 +66,20 @@ using namespace std;
 //! Tracker Event Container Class
 class TrackerEvent : public Data {
 
-      // Frame Constants
-      static const uint kHeadSize   = 1;
-      static const uint kTailSize   = 1;
 
-      uint eventCode_;
-      uint sampleSize_;
+ private:
+  // Update
+  void update();
 
-      // Update
-      void update();
+
+ protected:
+  // Frame Constants
+  static const uint kHeadSize   = 1;
+  static const uint kTailSize   = 1;
+  
+  uint eventCode_;
+  uint sampleSize_;
+  
 
    public:
 
