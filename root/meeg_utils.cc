@@ -19,6 +19,7 @@
 #include <TMultiGraph.h>
 #include <TGraphErrors.h>
 #include <unistd.h>
+#include <TLatex.h>
 
 /*
    int chanMap[128];
@@ -223,3 +224,17 @@ void plotResults2(const char *title, const char *name, const char *name2, const 
 	delete mg;
 }
 
+///===================================================
+/// myText
+///===================================================
+void myText(Double_t x,Double_t y,const char *text, Double_t tsize=0.05,Color_t color=1) {
+
+  TLatex l; l.SetTextSize(tsize); 
+  l.SetNDC();
+  l.SetTextColor(color);
+  l.DrawLatex(x,y,text);
+}
+void myText(Double_t x,Double_t y,TString text, Double_t tsize=0.05,Color_t color=1) {
+   const char* t = text.Data();
+   myText(x,y,t,tsize,color);
+}
