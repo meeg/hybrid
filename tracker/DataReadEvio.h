@@ -42,6 +42,8 @@ class DataReadEvio : public DataRead {
     bool is_engrun;
     int svt_data_tag;
     int svt_ti_data_tag;
+    int svt_ti_data_size;
+    int svt_config_tag;
 
 
 	void parse_event( unsigned int *buf);

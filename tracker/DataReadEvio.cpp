@@ -39,6 +39,8 @@ DataReadEvio::DataReadEvio ( ) {
 	svt_bank_range = 1;
     svt_data_tag = 3;
     svt_ti_data_tag = 57610;
+    svt_ti_data_size = 4;
+    svt_config_tag = 57614;
     is_engrun = false;
 }
 
@@ -271,7 +273,7 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
         }
         else if (fragType==UINT32 && (!is_engrun || tag==svt_ti_data_tag))  {
           tiDataLen = length-2;
-          if(is_engrun && tiDataLen!=4) {
+          if(is_engrun && tiDataLen!=svt_ti_data_size) {
             printf("DataReadEvio: Error: TI data length is wrong!? (%d)\n",tiDataLen);
             exit(1);            
           }
@@ -281,6 +283,15 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
           memcpy(tiDataPtr,&buf[ptr+2],tiDataLen*sizeof(uint));
           if(debug_local) printf("Done memcpy\n");
         }
+        else if (fragType==CHARSTAR8 && tag==svt_config_tag)  {
+          printf("Found config/status bank %d in length(%lu %lu)\n",length,sizeof(uint),sizeof(char));
+           char* str = (char*) malloc((length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+           memcpy(str,&buf[ptr+2],(length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+           printf("Done copy\n");
+           printf("\"%s\"\n",str);
+           printf("Done\n");
+           free(str);
+        } 
         else if (debug_)
             printf("data type of SVT bank should be UINT32 but was %d\n",type);
         ptr+=length;
@@ -301,15 +312,17 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
         if(debug_local) printf("Done copy the TI data to the data object");
         
       } else {
-        if(debug_local) printf("Inject empty TI data");
-        uint len = tb->size()+tiDataLen;
-        uint *d  = (uint *)malloc(len * sizeof(uint));
-        if(debug_local) printf("Allocated %d for the new data\n", len);
-        memcpy(d,tb->data(),tb->size()*sizeof(uint));
-        memcpy(d+tb->size(),tiDataPtr,tiDataLen*sizeof(uint));
-        if(debug_local) printf("Done memcpy\n");
-        tb->copy(d,len);
-        if(debug_local) printf("Done copy the TI data to the data object");        
+        if(is_engrun) {
+          if(debug_local) printf("Inject empty TI data");
+          uint len = tb->size()+svt_ti_data_size;
+          uint *d  = (uint *)malloc(len * sizeof(uint));
+          if(debug_local) printf("Allocated %d for the new data\n", len);
+          memcpy(d,tb->data(),tb->size()*sizeof(uint));
+          memset(d+tb->size(),0xff,svt_ti_data_size*sizeof(uint));
+          if(debug_local) printf("Done memcpy\n");
+          tb->copy(d,len);
+          if(debug_local) printf("Done copy the fake TI data to the data object");        
+        }
       }
     } else {
       if(debug_local) printf("No tb object built. free TI data if it's there\n");
