@@ -749,10 +749,17 @@ int main ( int argc, char **argv ) {
           
           
           TH1F* occupancytimebin[nTimeBins];
-          TGraphErrors* grbaselinesample0timebin[640];
-          TGraphErrors* grbaselinermssample0timebin[640];
+
+          TH1F* baselineSample0TimeBinPerCh[640][nTimeBins];
+          for(int i=0;i<640;++i) {
+            for(int j=0;j<nTimeBins;++j) {
+              baselineSample0TimeBinPerCh[i][j] = NULL;
+            }
+          }
           
           
+
+
           for(int timebin=0; timebin<nTimeBins; ++timebin) {
             
             c1->cd();
@@ -761,40 +768,41 @@ int main ( int argc, char **argv ) {
             printf("Drawing %s\n",name);
             baselineSamples0TimeBinHist2D[rce][fpga][hyb][timebin]->Draw("colz");
             c1->SaveAs(name);
+
             
             // do per channel plot for selected hybrid only
             if(doTimeEvo) {
-              TH1F* bCh[640];
               for(int xbin=1; xbin<=baselineSamples0TimeBinHist2D[rce][fpga][hyb][timebin]->GetNbinsX();++xbin) {
                 int ch = xbin-1;
                 sprintf(name,"%s_baselinesample0_timebins_R%d_F%d_H%d_CH%d_T%d.png",inname.Data(),rce,fpga,hyb,ch,timebin);
-                bCh[ch] = (TH1F*) baselineSamples0TimeBinHist2D[rce][fpga][hyb][timebin]->ProjectionY(name,xbin,xbin,"E");   
-                bCh[ch]->SetDirectory(0);
+                baselineSample0TimeBinPerCh[ch][timebin] = (TH1F*) baselineSamples0TimeBinHist2D[rce][fpga][hyb][timebin]->ProjectionY(name,xbin,xbin,"E");   
+                baselineSample0TimeBinPerCh[ch][timebin]->SetDirectory(0);
                 
                 /*
                 c1->cd();
                 c1->Clear();          
                 printf("Drawing %s\n",name); 
-                bCh[ch]->Draw("hist");
+                baselineSample0TimeBinPerCh[ch][timebin]->Draw("hist");
                 //myText(0.6,0.6,TString::Format("%d events in timebin",tiEventCountTimeBin).Data(),0.05,1);
                 //c1->SetLogy();
                 c1->SaveAs(name);
-                */
+
+
                 if(grbaselinesample0timebin[ch]==NULL) {
                   grbaselinesample0timebin[ch] = new TGraphErrors();
                   grbaselinermssample0timebin[ch] = new TGraphErrors();
                 }
-                if(bCh[ch]->GetEntries()>2) {
+                if(baselineSample0TimeBinPerCh[ch][timebin]->GetEntries()>2) {
                   double t = timeBins[timebin];
                   int n =  grbaselinesample0timebin[ch]->GetN();
-                  grbaselinesample0timebin[ch]->SetPoint(n,t,bCh[ch]->GetMean());
-                  grbaselinesample0timebin[ch]->SetPointError(n,0,bCh[ch]->GetMeanError());
-                  grbaselinermssample0timebin[ch]->SetPoint(n,t,bCh[ch]->GetRMS());
-                  grbaselinermssample0timebin[ch]->SetPointError(n,0,bCh[ch]->GetRMSError());
+                  grbaselinesample0timebin[ch]->SetPoint(n,t,baselineSample0TimeBinPerCh[ch][timebin]->GetMean());
+                  grbaselinesample0timebin[ch]->SetPointError(n,0,baselineSample0TimeBinPerCh[ch][timebin]->GetMeanError());
+                  grbaselinermssample0timebin[ch]->SetPoint(n,t,baselineSample0TimeBinPerCh[ch][timebin]->GetRMS());
+                  grbaselinermssample0timebin[ch]->SetPointError(n,0,baselineSample0TimeBinPerCh[ch][timebin]->GetRMSError());
                 }
+                */
+
               }
-              // delete them
-              for(int i=0;i<640;++i) delete bCh[i];
             }
             
             
@@ -864,11 +872,54 @@ int main ( int argc, char **argv ) {
 
           
           if(doTimeEvo) {
+
+            
+            
+            TH1F* baselineSample0TimeBinPerChAll[nTimeBins];
+            TGraphErrors* grbaselinesample0timebin[640];
+            TGraphErrors* grbaselinermssample0timebin[640];
+            for(int i=0;i<640;++i) {
+              grbaselinesample0timebin[i] = NULL;
+              grbaselinermssample0timebin[i] = NULL;
+            }
+            
+            for(int timebin=0;timebin<nTimeBins;++timebin) baselineSample0TimeBinPerChAll[timebin] = NULL;
+            
             for(int ch=0;ch<640;++ch) {
               if(largeTiDtOcc>0) {
                 if(highestOcc[ch]/largeTiDtOcc[ch]>thresholdOcc) {
                   c1->cd();
                   c1->Clear();
+
+
+                  
+                  
+                  if(grbaselinesample0timebin[ch]==NULL) {
+                    grbaselinesample0timebin[ch] = new TGraphErrors();
+                    grbaselinermssample0timebin[ch] = new TGraphErrors();
+                  }
+
+                  for(int timebin=0;timebin<nTimeBins;++timebin) {
+                    
+                    if(baselineSample0TimeBinPerCh[ch][timebin]->GetEntries()>2) {
+                      double t = timeBins[timebin];
+                      int n =  grbaselinesample0timebin[ch]->GetN();
+                      grbaselinesample0timebin[ch]->SetPoint(n,t,baselineSample0TimeBinPerCh[ch][timebin]->GetMean());
+                      grbaselinesample0timebin[ch]->SetPointError(n,0,baselineSample0TimeBinPerCh[ch][timebin]->GetMeanError());
+                      grbaselinermssample0timebin[ch]->SetPoint(n,t,baselineSample0TimeBinPerCh[ch][timebin]->GetRMS());
+                      grbaselinermssample0timebin[ch]->SetPointError(n,0,baselineSample0TimeBinPerCh[ch][timebin]->GetRMSError());
+                    }
+
+                    // merge them
+                    if( baselineSample0TimeBinPerChAll[timebin] == NULL) {
+                      baselineSample0TimeBinPerChAll[timebin] = (TH1F*) baselineSample0TimeBinPerCh[ch][timebin]->Clone(TString::Format("%sAll",baselineSample0TimeBinPerCh[ch][timebin]->GetName()).Data());
+                      baselineSample0TimeBinPerChAll[timebin]->SetDirectory(0);
+                      baselineSample0TimeBinPerChAll[timebin]->Reset();
+                    }
+                    baselineSample0TimeBinPerChAll[timebin]->Add(baselineSample0TimeBinPerCh[ch][timebin]);
+                    
+                  }
+                  
                   sprintf(name,"%s_baselinesample0mean_timebins_R%d_F%d_H%d_CH%d.png",inname.Data(),rce,fpga,hyb,ch);
                   grbaselinesample0timebin[ch]->SetMarkerSize(1.0);
                   grbaselinesample0timebin[ch]->SetMarkerStyle(20);
@@ -882,13 +933,79 @@ int main ( int argc, char **argv ) {
                   grbaselinermssample0timebin[ch]->SetMarkerStyle(20);
                   grbaselinermssample0timebin[ch]->Draw("ALP");
                   c1->SaveAs(name);
+                  
+
                 }
+              } //largeOccDiff
+            } //ch
+            
+            for(int i=0;i<640;++i) {
+              if(grbaselinesample0timebin[i]!=NULL) {
+                delete grbaselinesample0timebin[i];
+                delete grbaselinermssample0timebin[i];
               }
-              delete grbaselinesample0timebin[ch];
-              delete grbaselinermssample0timebin[ch];
+            }
+
+            TGraphErrors* grbaselinesample0timebinAll = new TGraphErrors();
+            TGraphErrors* grbaselinermssample0timebinAll = new TGraphErrors();
+
+            
+            for(int timebin=0;timebin<nTimeBins;++timebin) {
+              if( baselineSample0TimeBinPerChAll[timebin] != NULL) {
+                c1->Clear();    
+                sprintf(name,"%s_baselinesamples0_timebins_R%d_F%d_H%d_CHALL_T%d.png",inname.Data(),rce,fpga,hyb,timebin);
+                printf("Drawing %s\n",name);
+                c1->cd();
+                baselineSample0TimeBinPerChAll[timebin]->Draw();
+                c1->SaveAs(name);
+                
+                if(baselineSample0TimeBinPerChAll[timebin]->GetEntries()>2) {
+                  
+                  double t = timeBins[timebin];
+                  int n =  grbaselinesample0timebinAll->GetN();
+                  grbaselinesample0timebinAll->SetPoint(n,t,baselineSample0TimeBinPerChAll[timebin]->GetMean());
+                  grbaselinesample0timebinAll->SetPointError(n,0,baselineSample0TimeBinPerChAll[timebin]->GetMeanError());
+                  grbaselinermssample0timebinAll->SetPoint(n,t,baselineSample0TimeBinPerChAll[timebin]->GetRMS());
+                  grbaselinermssample0timebinAll->SetPointError(n,0,baselineSample0TimeBinPerChAll[timebin]->GetRMSError());
+                }
+                delete baselineSample0TimeBinPerChAll[timebin];
+              }
+            }
+
+            c1->Clear();    
+            sprintf(name,"%s_baselinesamples0mean_timebins_R%d_F%d_H%d_CHALL.png",inname.Data(),rce,fpga,hyb);
+            printf("Drawing %s\n",name);
+            c1->cd();
+            grbaselinesample0timebinAll->SetMarkerSize(1.0);
+            grbaselinesample0timebinAll->SetMarkerStyle(20);
+            grbaselinesample0timebinAll->Draw("ALP");
+            c1->SaveAs(name);
+            delete grbaselinesample0timebinAll;
+
+            c1->Clear();    
+            sprintf(name,"%s_baselinesamples0rms_timebins_R%d_F%d_H%d_CHALL.png",inname.Data(),rce,fpga,hyb);
+            printf("Drawing %s\n",name);
+            c1->cd();
+            grbaselinermssample0timebinAll->SetMarkerSize(1.0);
+            grbaselinermssample0timebinAll->SetMarkerStyle(20);
+            grbaselinermssample0timebinAll->Draw("ALP");
+            c1->SaveAs(name);
+            delete grbaselinermssample0timebinAll;
+                
+            
+            
+          } //doTimeEvo
+          
+
+          for(int i=0;i<640;++i) {
+            for(int j=0;j<nTimeBins;++j) {
+              if(baselineSample0TimeBinPerCh[i][j]!=NULL) {
+                delete baselineSample0TimeBinPerCh[i][j];
+              }
             }
           }
-          
+
+
           sprintf(name,"%s_occupancy_timebinsAll_R%d_F%d_H%d.png",inname.Data(),rce,fpga,hyb);
           printf("Drawing %s\n",name);
           c2->cd();
