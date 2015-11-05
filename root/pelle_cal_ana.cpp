@@ -42,6 +42,7 @@ bool isHeadMultiSample;
 int rce;
 int hybrid;
 int apv;
+int apvch;
 int channel;
 int feb;
 int debug;
@@ -49,10 +50,14 @@ int errorCountAll;
 int errorCountHead;
 ostringstream oss;
 char name[200];
-TH2F *baselineSamplesHist2D[MAX_RCE][MAX_FEB][MAX_HYB][6];
+TH2F *baselineSamplesHist2D[MAX_FEB][MAX_HYB][6];
+TH2F *samplesHist2D[MAX_FEB][MAX_HYB];
 TH1F*sampleCountHist;
 TCanvas *c1, *c2;
 TString inname;
+bool flip_channels = true;
+bool mux_channels = false;
+int chanMap[128];
 
 
 
@@ -92,6 +97,9 @@ int main(int argc, char**argv ) {
       }
     }
 
+  for (int idx = 0; idx < 128; idx++ ) {
+     chanMap[(32*(idx%4)) + (8*(idx/4)) - (31*(idx/16))] = idx;
+  }
 
 
   DataReadEvio* dataRead = new DataReadEvio();
@@ -112,17 +120,18 @@ int main(int argc, char**argv ) {
 
 
   cout << "create histograms" << endl;
-  for (int rce = 0;rce<MAX_RCE;rce++) {
     for (int fpga = 0;fpga<MAX_FEB;fpga++) {
-      for (int hyb = 0;hyb<MAX_HYB;hyb++) {
-        for (int sample = 0;sample<6;sample++) {
+       for (int hyb = 0;hyb<MAX_HYB;hyb++) {
           oss.str("");        
-          oss << "baselinesamples-rce-"<<rce<<"-fpga-"<<fpga<<"-hyb-"<<hyb<<"-sample-"<<sample;
-          baselineSamplesHist2D[rce][fpga][hyb][sample] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,10,0., 14000.0);
-        }        
-      }
+          oss << "samples-fpga-"<<fpga<<"-hyb-"<<hyb;
+          samplesHist2D[fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),6,0.0,6.0,20,0.,14000.0);
+          for (int sample = 0;sample<6;sample++) {
+             oss.str("");        
+             oss << "baselinesamples-fpga-"<<fpga<<"-hyb-"<<hyb<<"-sample-"<<sample;
+             baselineSamplesHist2D[fpga][hyb][sample] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,10,0., 14000.0);
+          }        
+       }
     }
-  }
 
   oss.str("");        
   oss << "sampleCountHist";
@@ -167,8 +176,16 @@ int main(int argc, char**argv ) {
       feb = triggerSample->febAddress();
       hybrid = triggerSample->hybrid();
       apv = triggerSample->apv();
-      channel = triggerSample->channel();
+      apvch = triggerSample->channel();
       
+      if (mux_channels) channel = chanMap[apvch];
+      else channel = apvch;
+      
+      if (flip_channels)
+        channel += (4-apv)*128;
+      else
+        channel += apv*128;
+
       
       
       if( debug > 0) 
@@ -180,7 +197,8 @@ int main(int argc, char**argv ) {
       if( debug > 0) cout << " ADC samples: ";
       for(int y = 0; y < 6; ++y) {
         uint val = triggerSample->value( y );
-        baselineSamplesHist2D[rce][feb][hybrid][y]->Fill(channel,val);
+        baselineSamplesHist2D[feb][hybrid][y]->Fill(channel,val);
+        samplesHist2D[feb][hybrid]->Fill(y,val);
         
         if( debug > 0) cout << " " << val;
       } 
@@ -227,22 +245,34 @@ int main(int argc, char**argv ) {
   c2->Print(name);
   
 
-  for (int rce = 0;rce<MAX_RCE;rce++) {
-    for (int fpga = 0;fpga<MAX_FEB;fpga++) {
-      for (int hyb = 0;hyb<MAX_HYB;hyb++) {        
+  for (int fpga = 0;fpga<MAX_FEB;fpga++) {
+     for (int hyb = 0;hyb<MAX_HYB;hyb++) {        
+        c2->Clear();            
+        c2->cd();
+        sprintf(name,"%s_samples_F%d_H%d.png",inname.Data(),fpga,hyb);
+        printf("Drawing %s\n",name);
+        samplesHist2D[fpga][hyb]->Draw("colz");
+        //c2->SaveAs(name);
+        sprintf(name,"%s_baselinesamples.ps",inname.Data());
+        c2->Print(name);
+     }
+  }
+
+
+  for (int fpga = 0;fpga<MAX_FEB;fpga++) {
+     for (int hyb = 0;hyb<MAX_HYB;hyb++) {        
         for(int sample=0; sample<6; ++sample) {
-          c2->Clear();            
-          c2->cd();
-          sprintf(name,"%s_baselinesamples_R%d_F%d_H%d_S%d.png",inname.Data(),rce,fpga,hyb,sample);
-          printf("Drawing %s\n",name);
-          baselineSamplesHist2D[rce][fpga][hyb][sample]->Draw("colz");
+           c2->Clear();            
+           c2->cd();
+           sprintf(name,"%s_baselinesamples_F%d_H%d_S%d.png",inname.Data(),fpga,hyb,sample);
+           printf("Drawing %s\n",name);
+          baselineSamplesHist2D[fpga][hyb][sample]->Draw("colz");
           //c2->SaveAs(name);
           sprintf(name,"%s_baselinesamples.ps",inname.Data());
           c2->Print(name);
         }
       }
     }
-  }
   
   sprintf(name,"%s_baselinesamples.ps]",inname.Data());
   c1->Print(name);
