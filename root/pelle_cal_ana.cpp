@@ -24,6 +24,7 @@
 #include <TCanvas.h>
 #include <TStyle.h>
 #include <TROOT.h>
+#include <TFile.h>
 
 
 using namespace std;
@@ -31,7 +32,7 @@ using namespace std;
 #define MAX_RCE 14
 #define MAX_FEB 10
 #define MAX_HYB 4
-
+#define MAX_DELAY 9
 
 TiTriggerEvent triggerEvent;
 TriggerSample* triggerSample;
@@ -48,10 +49,12 @@ int feb;
 int debug;
 int errorCountAll;
 int errorCountHead;
+int delay;
 ostringstream oss;
 char name[200];
 TH2F *baselineSamplesHist2D[MAX_FEB][MAX_HYB][6];
 TH2F *samplesHist2D[MAX_FEB][MAX_HYB];
+TH2F *samplesDelayHist2D[MAX_DELAY][MAX_FEB][MAX_HYB];
 TH1F*sampleCountHist;
 TCanvas *c1, *c2;
 TString inname;
@@ -124,12 +127,18 @@ int main(int argc, char**argv ) {
        for (int hyb = 0;hyb<MAX_HYB;hyb++) {
           oss.str("");        
           oss << "samples-fpga-"<<fpga<<"-hyb-"<<hyb;
-          samplesHist2D[fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),6,0.0,6.0,20,0.,14000.0);
+          samplesHist2D[fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),6,0.0,6.0,50,0.,10000.0);
           for (int sample = 0;sample<6;sample++) {
              oss.str("");        
              oss << "baselinesamples-fpga-"<<fpga<<"-hyb-"<<hyb<<"-sample-"<<sample;
-             baselineSamplesHist2D[fpga][hyb][sample] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,10,0., 14000.0);
+             baselineSamplesHist2D[fpga][hyb][sample] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,50,0., 10000.0);
           }        
+          for(int idelay=0;idelay<MAX_DELAY;++idelay) {
+            oss.str("");        
+            oss << "samples-delay-"<< idelay <<"-fpga-"<<fpga<<"-hyb-"<<hyb;
+            samplesDelayHist2D[idelay][fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),6,0.0,6.0,50,0.,10000.0);
+            
+          }
        }
     }
 
@@ -146,7 +155,7 @@ int main(int argc, char**argv ) {
   int tiEventNumber;
   int tiEventNumberPrev = -1;
   int tiEvents = 0;
-  
+  int delay = 0;
   while( dataRead->next(&triggerEvent) == true ) {
     
     if( debug > 0 || (tiEvents % 10000 == 0) ) cout << "read event " << eventCount << " tiEvents " << tiEvents << endl;
@@ -156,6 +165,10 @@ int main(int argc, char**argv ) {
     
     tiEventNumber = triggerEvent.tiEventNumber();
     if(tiEventNumber > tiEventNumberPrev) {
+
+      if( tiEvents % 100 == 0 && tiEvents > 0) delay++;
+      cout << "delay " << delay << " " << tiEvents << endl;
+
       tiEventNumberPrev = tiEventNumber;
       tiEvents++;
     }
@@ -165,6 +178,9 @@ int main(int argc, char**argv ) {
     if( debug > 0) cout << "sampleCount: " << sampleCount << endl;
     
     sampleCountHist->Fill(sampleCount);
+
+
+
 
     for( int iSampleCount=0; iSampleCount!=sampleCount; ++iSampleCount) {
       
@@ -199,6 +215,7 @@ int main(int argc, char**argv ) {
         uint val = triggerSample->value( y );
         baselineSamplesHist2D[feb][hybrid][y]->Fill(channel,val);
         samplesHist2D[feb][hybrid]->Fill(y,val);
+        samplesDelayHist2D[delay][feb][hybrid]->Fill(y,val);
         
         if( debug > 0) cout << " " << val;
       } 
@@ -234,6 +251,10 @@ int main(int argc, char**argv ) {
   gStyle->SetMarkerStyle(6);
   c1 = new TCanvas("c1","c1",1200,900);
   c2 = new TCanvas("c2","c2",1200,900);
+
+  sprintf(name,"%s_cal_ana.root",inname.Data());
+  TFile* outputFile = new TFile(name,"RECREATE");
+  
   
   sprintf(name,"%s_baselinesamples.ps[",inname.Data());
   c2->Print(name);
@@ -244,6 +265,9 @@ int main(int argc, char**argv ) {
   sprintf(name,"%s_baselinesamples.ps",inname.Data());
   c2->Print(name);
   
+  outputFile->cd();
+  sampleCountHist->Write();
+
 
   for (int fpga = 0;fpga<MAX_FEB;fpga++) {
      for (int hyb = 0;hyb<MAX_HYB;hyb++) {        
@@ -255,27 +279,49 @@ int main(int argc, char**argv ) {
         //c2->SaveAs(name);
         sprintf(name,"%s_baselinesamples.ps",inname.Data());
         c2->Print(name);
+        outputFile->cd();
+        samplesHist2D[fpga][hyb]->Write();
+
+        for (int idelay=0; idelay<MAX_DELAY; ++idelay) {
+          c2->Clear();            
+          c2->cd();
+          sprintf(name,"%s_samples_delay_D%d_F%d_H%d.png",inname.Data(),idelay,fpga,hyb);
+          printf("Drawing %s\n",name);
+          samplesDelayHist2D[idelay][fpga][hyb]->Draw("colz");
+          sprintf(name,"%s_baselinesamples.ps",inname.Data());
+          c2->Print(name);
+          outputFile->cd();
+          samplesDelayHist2D[idelay][fpga][hyb]->Write();       
+        }
      }
+     
   }
 
 
   for (int fpga = 0;fpga<MAX_FEB;fpga++) {
-     for (int hyb = 0;hyb<MAX_HYB;hyb++) {        
-        for(int sample=0; sample<6; ++sample) {
-           c2->Clear();            
-           c2->cd();
-           sprintf(name,"%s_baselinesamples_F%d_H%d_S%d.png",inname.Data(),fpga,hyb,sample);
-           printf("Drawing %s\n",name);
-          baselineSamplesHist2D[fpga][hyb][sample]->Draw("colz");
-          //c2->SaveAs(name);
-          sprintf(name,"%s_baselinesamples.ps",inname.Data());
-          c2->Print(name);
-        }
+    for (int hyb = 0;hyb<MAX_HYB;hyb++) {        
+      for(int sample=0; sample<6; ++sample) {
+        c2->Clear();            
+        c2->cd();
+        sprintf(name,"%s_baselinesamples_F%d_H%d_S%d.png",inname.Data(),fpga,hyb,sample);
+        printf("Drawing %s\n",name);
+        baselineSamplesHist2D[fpga][hyb][sample]->Draw("colz");
+        //c2->SaveAs(name);
+        sprintf(name,"%s_baselinesamples.ps",inname.Data());
+        c2->Print(name);
+        outputFile->cd();
+        baselineSamplesHist2D[fpga][hyb][sample]->Write();
       }
     }
+  }
   
   sprintf(name,"%s_baselinesamples.ps]",inname.Data());
   c1->Print(name);
+  
+
+  outputFile->Close();
+  
+
 
   return 0;
   
