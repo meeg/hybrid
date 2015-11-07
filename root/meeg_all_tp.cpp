@@ -47,7 +47,6 @@ using namespace std;
 #define MAX_HYB 4
 
 #define N_ROCS 14
-#define EVENTS_PER_DELAY 100
 
 #define N_TIME_CONSTS 2
 
@@ -93,6 +92,7 @@ int main ( int argc, char **argv ) {
     TString outdir = "";
     int cal_grp = -1;
     int cal_delay = 0;
+    int events_per_delay = 1000;
     double delay_step = SAMPLE_INTERVAL/8;
     TCanvas         *c1;
     bool hybridFound[MAX_RCE][MAX_FEB][MAX_HYB];
@@ -118,7 +118,7 @@ int main ( int argc, char **argv ) {
     double chanChan[640];
     for (int i=0;i<640;i++) chanChan[i] = i;
 
-    while ((c = getopt(argc,argv,"hfrg:o:s:nt:H:F:e:EV")) !=-1)
+    while ((c = getopt(argc,argv,"hfrg:o:s:nt:H:F:e:EVN:")) !=-1)
         switch (c)
         {
             case 'h':
@@ -135,6 +135,8 @@ int main ( int argc, char **argv ) {
                 printf("-e: stop after specified number of events\n");
                 printf("-E: use EVIO file format\n");
                 printf("-V: use TriggerEvent event format\n");
+                printf("-S: use only specified cal group\n");
+                printf("-N: number of events per delay\n");
                 return(0);
                 break;
             case 'f':
@@ -179,6 +181,9 @@ int main ( int argc, char **argv ) {
                 break;
             case 'V':
                 triggerevent_format = true;
+                break;
+            case 'N':
+                events_per_delay = atoi(optarg);
                 break;
             case '?':
                 printf("Invalid option or missing option argument; -h to list options\n");
@@ -299,7 +304,7 @@ int main ( int argc, char **argv ) {
 
 
         bool found_calgroup = true;
-        bool checkedGroup[8];
+        //bool checkedGroup[8];
         // Process each event
         //eventCount = 0;
         do {
@@ -324,14 +329,18 @@ int main ( int argc, char **argv ) {
             }
             if (eventCount%1000==0) printf("Event %d\n",eventCount);
             if (num_events!=-1 && eventCount >= num_events) break;
-            for (int i=0;i<8;i++) {
-                checkedGroup[i] = false;
-            }
+            //for (int i=0;i<8;i++) {
+            //    checkedGroup[i] = false;
+            //}
             if (evio_format && triggerevent_format && eventCount%N_ROCS==0) {
                 //found_calgroup = false;
-                int run_stage = eventCount/N_ROCS/EVENTS_PER_DELAY;
-                cal_grp = run_stage%8;
-                cal_delay = ((run_stage/8)%8) + 1;
+                int run_stage = eventCount/N_ROCS/events_per_delay;
+                if (force_cal_grp) {
+                    cal_delay = (run_stage%8) + 1;
+                } else {
+                    cal_grp = run_stage%8;
+                    cal_delay = ((run_stage/8)%8) + 1;
+                }
             }
             for (int x=0; x < samplecount; x++) {
                 int hyb;
@@ -391,7 +400,7 @@ int main ( int argc, char **argv ) {
                 // Filter APVs
                 //if ( eventCount < 20 ) continue;
                 if (evio_format && triggerevent_format) {
-                    if (eventCount%(N_ROCS*EVENTS_PER_DELAY)<N_ROCS*8) continue;
+                    if (eventCount%(N_ROCS*events_per_delay)<N_ROCS*8) continue;
                 } else
                     if (eventCount<20) continue;
                 if (!hybridFound[rce][fpga][hyb]) {
@@ -425,12 +434,12 @@ int main ( int argc, char **argv ) {
                   printf("event %d, channel %d, sum=%d, %d %d %d %d %d %d\n",eventCount,apvch, sum,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
                   }*/
                 /*
-                if (!checkedGroup[apvch%8] && abs(sum)>5000 && !found_calgroup) {
-                    //if (!checkedGroup[apvch%8] && abs(sum)>4500 && abs(samples[5]-samples[0]) < abs(samples[2]-samples[0]) && !found_calgroup) {
-                    found_calgroup = true;
-                    if (checkedGroup[apvch%8]) printf("sample %d, apvch %d\n",x,apvch);
-                    if (apvch%8 != cal_grp)
-                        printf("event %d, found calgroup on channel %d, feb %d, hyb %d, apvch %d, sum=%d, %d %d %d %d %d %d\n",eventCount,channel,fpga,hyb,apvch, sum,samples[0],samples[1]-samples[0],samples[2]-samples[0],samples[3]-samples[0],samples[4]-samples[0],samples[5]-samples[0]);
+                   if (!checkedGroup[apvch%8] && abs(sum)>5000 && !found_calgroup) {
+                //if (!checkedGroup[apvch%8] && abs(sum)>4500 && abs(samples[5]-samples[0]) < abs(samples[2]-samples[0]) && !found_calgroup) {
+                found_calgroup = true;
+                if (checkedGroup[apvch%8]) printf("sample %d, apvch %d\n",x,apvch);
+                if (apvch%8 != cal_grp)
+                printf("event %d, found calgroup on channel %d, feb %d, hyb %d, apvch %d, sum=%d, %d %d %d %d %d %d\n",eventCount,channel,fpga,hyb,apvch, sum,samples[0],samples[1]-samples[0],samples[2]-samples[0],samples[3]-samples[0],samples[4]-samples[0],samples[5]-samples[0]);
                 }
                 checkedGroup[apvch%8] = true;
                 if (!found_calgroup) continue;*/
@@ -450,18 +459,18 @@ int main ( int argc, char **argv ) {
                     }
                     allVariances[rce][fpga][hyb][channel][bin] += delta*(samples[y]-allMeans[rce][fpga][hyb][channel][bin]);
                 }
-                }
-                /*
-                if (!found_calgroup && eventCount%N_ROCS!=9) {
-                    printf("event %d, didn't find cal group\n",eventCount);
-                }*/
-                eventCount++;
+        }
+        /*
+           if (!found_calgroup && eventCount%N_ROCS!=9) {
+           printf("event %d, didn't find cal group\n",eventCount);
+           }*/
+        eventCount++;
 
-                if (triggerevent_format) {
-                    readOK = dataRead->next(&triggerevent);
-                } else {
-                    readOK = dataRead->next(&event);
-                }
+        if (triggerevent_format) {
+            readOK = dataRead->next(&triggerevent);
+        } else {
+            readOK = dataRead->next(&event);
+        }
             } while (readOK);
             dataRead->close();
             if (eventCount != runCount)
@@ -517,7 +526,7 @@ int main ( int argc, char **argv ) {
                             int ni = 0;
                             TGraphErrors *fitcurve;
 
-                            double A, T0, Tp, A0, fit_start;
+                            double A, T0, A0, fit_start;
 
                             for (int bin=0;bin<48;bin++)
                             {
