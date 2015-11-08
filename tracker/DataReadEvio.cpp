@@ -26,7 +26,7 @@ using namespace std;
 
 // Constructor
 DataReadEvio::DataReadEvio ( ) {
-	debug_=false;
+    debug_=false;
 	//debug_=true;
 	fd_ = -1;
 	maxbuf=MAXEVIOBUF;
@@ -232,13 +232,15 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
     // Pointer to the TI data for this bank
     uint* tiDataPtr = NULL;
     uint tiDataLen = 0;
+    // Pointer to the config string
+    char* str = NULL;
     uint debug_local = 0;
     if(debug_local){
       cout<<"====\nparse SVT bank: bank length: "<<bank_length<<endl;
     }
 
     while (ptr<bank_length) {
-        if (debug_) printf("ptr = %d, bank_length = %d\n",ptr,bank_length);
+        if (debug_) printf("Parse bank at ptr = %d, bank_length = %d\n",ptr,bank_length);
         length      = buf[ptr]+1;
         tag         = (buf[ptr+1]>>16)&0xffff;
         type        = (buf[ptr+1]>>8)&0x3f;
@@ -252,68 +254,151 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
         }
         int fragType = getFragType(type);
         
+        // Found the different banks inside the SVT.
+        // This can be a SVT data, TI information or a config/status bank. 
+        // Combine all of these into a single Data structure in the end of this function.
         
         if (fragType==UINT32 && (!is_engrun || tag==svt_data_tag))
         {
-            if(debug_) {
-              printf("Got data\n");
-            }
+            if(debug_ || debug_local) printf("Got data (fpga_count %d)\n",fpga_count);
+          
+            // create the new data object
             tb=new Data();
+
             if (!is_engrun){
-                uint *data_  = (uint *)malloc((length-1) * sizeof(uint));
+              uint *data_  = (uint *)malloc((length-1) * sizeof(uint));
                 memcpy(data_+1,&buf[ptr+2],(length-2)*sizeof(uint));
                 data_[0] = tag;
                 if (tag==7) data_[0]+=0x80000000;
                 tb->copy(data_,length-1);
                 free(data_);
             } else {
+              
+                if(debug_ || debug_local) printf("copy %d data words into the data object buffer\n",length-2);
                 tb->copy(&buf[ptr+2],length-2);
+
+                if( debug_local ) {
+                  printf("the data words copied were:\n");
+                  for(int iw=0; iw < tb->size(); ++iw )  printf("0x%u\n",(tb->data()[iw]));                  
+                }
+
+
             }
             fpga_banks[fpga_count++] = tb;
         }
         else if (fragType==UINT32 && (!is_engrun || tag==svt_ti_data_tag))  {
+
+          if(debug_local) printf("Got TI data bank\n");
+
+          // get the length of the actual data in the bank
           tiDataLen = length-2;
+
+          if(debug_local) printf("TI data has %d words\n",tiDataLen);
+          
+          // Make sure it has the right format
           if(is_engrun && tiDataLen!=svt_ti_data_size) {
             printf("DataReadEvio: Error: TI data length is wrong!? (%d)\n",tiDataLen);
             exit(1);            
           }
-          if(debug_local) printf("Got TI data bank with data %d words\n",tiDataLen);
+          
+          // Allocate memory for the TI data
+          // Keep this around until the Data structure is done so that we can copy it in at the end.
+          
+          // Check that there is nothing at that memory pointer
+          if( tiDataPtr != NULL) {
+            cout << "the TI data pointer is not NULL?" << endl;
+            exit(1);
+          }
+          
           tiDataPtr = (uint*) malloc(tiDataLen * sizeof(uint));
-          if(debug_local) printf("Allocated TI data space at %p\n",tiDataPtr);
+          if(debug_local) printf("Allocated %d words of TI data space at %p\n",tiDataLen, tiDataPtr);
+          
+          // Actually do the copy
           memcpy(tiDataPtr,&buf[ptr+2],tiDataLen*sizeof(uint));
-          if(debug_local) printf("Done memcpy\n");
+          if(debug_local) printf("Done memcpy of the TI data\n");
+          
         }
         else if (fragType==CHARSTAR8 && tag==svt_config_tag)  {
-          printf("Found config/status bank %d in length(%lu %lu)\n",length,sizeof(uint),sizeof(char));
-           char* str = (char*) malloc((length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
-           memcpy(str,&buf[ptr+2],(length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
-           printf("Done copy\n");
-           printf("\"%s\"\n",str);
-           printf("Done\n");
-           free(str);
+          if(debug_local) {
+            printf("Found config/status bank\n");
+            printf("Actual config lengths: %d (%lu, %lu)\n",length-2,sizeof(uint),sizeof(char));
+          }
+
+          // allocate memory for the string
+          
+          // check first that it isn't set
+          if( str != NULL) {
+            cout << "The config string pointer is not NULL!?" << endl;
+            exit(1);
+          }
+          
+          str = (char*) malloc((length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+          
+          // Copy the string
+          if( debug_local ) printf("memcpy the config str to tmp place at %p\n",str);
+          
+          memcpy(str,&buf[ptr+2],(length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+          
+          if( debug_local ) {
+            printf("Done copy\n");
+            printf("\"%s\"\n",str);
+            printf("Done with the config bank\n");
+          }
+          
         } 
-        else if (debug_)
-            printf("data type of SVT bank should be UINT32 but was %d\n",type);
+        else if (debug_) {
+          printf("data type of SVT bank should be UINT32 but was %d\n",type);
+        }
+        
+        if( debug_local ) printf("go to next bank: from ptr %d to %d\n", ptr, ptr+length);
+        
         ptr+=length;
     }
 
     // Create a new Data structure that includes the TI data if it's found
     // way to complicated but whatever
+
+    if (debug_local) printf("Done parsing bank. Now add on the TI data and config string if found\n");
+
     if( tb!=NULL ) {
+      
+      if (debug_local) printf("There was a data structure built for this bank. \n");
+      
       if(tiDataPtr!=NULL) {
-        if(debug_local) printf("Copy the TI data to the data object");
-        uint len = tb->size()+tiDataLen;
-        uint *d  = (uint *)malloc(len * sizeof(uint));
-        if(debug_local) printf("Allocated %d for the new data\n", len);
-        memcpy(d,tb->data(),tb->size()*sizeof(uint));
-        memcpy(d+tb->size(),tiDataPtr,tiDataLen*sizeof(uint));
-        if(debug_local) printf("Done memcpy\n");
-        tb->copy(d,len);
-        if(debug_local) printf("Done copy the TI data to the data object");
+
+        if(debug_local) printf("Found TI data. Copy it to the data object");
         
-      } else {
+        // Attach the TI data to the "back" of the data already there
+        
+        // find the new size of the data
+        uint len = tb->size()+tiDataLen;
+
+        if(debug_local) printf("Allocate %d for the new data\n", len);
+        
+        // allocate memory to hold all of the data in a temporary location
+        uint *d  = (uint *)malloc(len * sizeof(uint));
+        
+        if(debug_local) printf("Copy the existing %d data words into the temporary buffer at %p\n", tb->size(),d);
+
+        memcpy(d,tb->data(),tb->size()*sizeof(uint));
+
+        if(debug_local) printf("Copy the TI %d data words from %p into the temporary buffer at %p\n", tiDataLen, tiDataPtr,d+tb->size());
+        
+        memcpy(d+tb->size(),tiDataPtr,tiDataLen*sizeof(uint));
+
+        if( debug_local ) printf(" Now copy the temporary %d data at %p to the data object, it should take care of space \n",len,d);
+        tb->copy(d,len);
+        
+        if(debug_local) printf("Done copy the TI data to the data object.");
+
+        // delete the temporary data
+        if(debug_local) printf("Free memory that held all the data temporarily at %p\n",d);
+        free(d);
+        
+        
+      } else {        
         if(is_engrun) {
-          if(debug_local) printf("Inject empty TI data");
+          if(debug_local) printf("Inject empty TI data.");
           uint len = tb->size()+svt_ti_data_size;
           uint *d  = (uint *)malloc(len * sizeof(uint));
           if(debug_local) printf("Allocated %d for the new data\n", len);
@@ -321,16 +406,30 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
           memset(d+tb->size(),0xff,svt_ti_data_size*sizeof(uint));
           if(debug_local) printf("Done memcpy\n");
           tb->copy(d,len);
-          if(debug_local) printf("Done copy the fake TI data to the data object");        
+          if(debug_local) printf("Done copy the fake TI data to the data object");      
+          // free temporary memory
+          free(d);
         }
       }
     } else {
-      if(debug_local) printf("No tb object built. free TI data if it's there\n");
-      if(tiDataPtr!=NULL) {
-        free(tiDataPtr);
-      }
+      if(debug_local) printf("No tb object built.\n");
+    }
+    
+    if( str != NULL) {
+      if( debug_local ) printf("delete memory for the config str\n");
+      free( str );
+    } else {
+      if( debug_local ) printf("no config str memory was allocated\n");
     }
 
+    if( tiDataPtr != NULL) {
+      if( debug_local ) printf("delete memory for the tiDataPtr\n");
+      free(tiDataPtr);
+    } else {
+      if( debug_local ) printf("no toDataPtr memory was allocated\n");
+    }
+    
+    
     if(debug_local) {
       cout<<"\n DONE parsing SVT bank\n===="<<endl;
     }
