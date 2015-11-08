@@ -29,7 +29,7 @@
 #include <stdarg.h>
 #include <DevboardEvent.h>
 #include <DevboardSample.h>
-#include <TriggerEvent.h>
+#include <TiTriggerEvent.h>
 #include <TriggerSample.h>
 #include <Data.h>
 #include <DataRead.h>
@@ -74,6 +74,7 @@ Double_t fitf(Double_t *x,Double_t *par)
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
     int c;
+    bool debug = false;
     bool plot_tp_fits = false;
     bool plot_fit_results = false;
     bool force_cal_grp = false;
@@ -107,7 +108,7 @@ int main ( int argc, char **argv ) {
 
     DataRead        *dataRead;
     DevboardEvent    event;
-    TriggerEvent    triggerevent;
+    TiTriggerEvent    triggerevent;
     TriggerSample   *triggersample = new TriggerSample();
     int		samples[6];
     int            eventCount=0;
@@ -341,6 +342,9 @@ int main ( int argc, char **argv ) {
                     cal_grp = run_stage%8;
                     cal_delay = ((run_stage/8)%8) + 1;
                 }
+
+                if( debug ) cout << "cal_grp " << cal_grp << " cal_delay " << cal_delay << " (eventCount " << eventCount << " events_per_delay " << events_per_delay << " run stage " << run_stage << ", N_ROCS " << N_ROCS << ")" << endl;
+
             }
             for (int x=0; x < samplecount; x++) {
                 int hyb;
@@ -387,22 +391,32 @@ int main ( int argc, char **argv ) {
 
                 /*if (rce==0 && fpga==6 && hyb==2 && channel==16) {
                   printf("calgrp %d, caldelay %d, ",cal_grp,cal_delay);
-                  printf("event %d\tx=%d\tR%d F%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,fpga,hyb,apv,apvch,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
-                  }*/
+                */
+                if( debug ) printf("event %8d\tx=%3d\tR%d F%d H%d A%d channel %3d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,fpga,hyb,apv,apvch,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
+            
                 if ( channel >= (5 * 128) ) {
                     cout << "Channel " << dec << channel << " out of range" << endl;
                     cout << "Apv = " << dec << apv << endl;
                     cout << "Chan = " << dec << apvch << endl;
                 }
 
-                if (found_calgroup && (apvch-cal_grp)%8!=0) continue;
+                if (found_calgroup && (apvch-cal_grp)%8!=0) {
+                  if( debug ) cout << "wrong apvch ( apvch " << apvch << " cal_grp " << cal_grp << ": " << (apvch-cal_grp)%8 << ")"  << endl;
+                  continue;
+                }
 
                 // Filter APVs
                 //if ( eventCount < 20 ) continue;
                 if (evio_format && triggerevent_format) {
-                    if (eventCount%(N_ROCS*events_per_delay)<N_ROCS*8) continue;
+                  //if (eventCount%(N_ROCS*events_per_delay)<N_ROCS*8) {
+                  //  cout << " filter out this event  (" << eventCount << ")" << endl;
+                  //  continue;
+                  //}
                 } else
-                    if (eventCount<20) continue;
+                  if (eventCount<20) {
+                    if( debug ) cout << " skip first events  (" << eventCount << ")" << endl;
+                    continue;
+                  }
                 if (!hybridFound[rce][fpga][hyb]) {
                     printf("found new hybrid: rce = %d, feb = %d, hyb = %d\n",rce,fpga,hyb);
                     //allCounts[rce][fpga][hyb] = new int[640][48];
@@ -471,9 +485,9 @@ int main ( int argc, char **argv ) {
         } else {
             readOK = dataRead->next(&event);
         }
-            } while (readOK);
-            dataRead->close();
-            if (eventCount != runCount)
+        } while (readOK);
+        dataRead->close();
+        if (eventCount != runCount)
             {
                 printf("ERROR: events read = %d, runCount = %d\n",eventCount, runCount);
             }
