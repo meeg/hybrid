@@ -1,11 +1,11 @@
 //-----------------------------------------------------------------------------
-// File          : linkerror_ana.cpp
+// File          : pelle_cal_ana.cpp
 // Author        : Per Hansson Adrian  <phansson@slac.stanford.edu>
 // Created       : 09/15/2015
 // Project       : Kpix Software Package
 //-----------------------------------------------------------------------------
 // Description :
-// File to look at link errors in data stream
+// Simple program to parse evio data from HPS
 //-----------------------------------------------------------------------------
 // Copyright (c) 2009 by SLAC. All rights reserved.
 // Proprietary and confidential to SLAC.
@@ -49,7 +49,7 @@ int feb;
 int debug;
 int errorCountAll;
 int errorCountHead;
-int delay;
+//int delay;
 ostringstream oss;
 char name[200];
 TH2F *baselineSamplesHist2D[MAX_FEB][MAX_HYB][6];
@@ -133,12 +133,12 @@ int main(int argc, char**argv ) {
              oss << "baselinesamples-fpga-"<<fpga<<"-hyb-"<<hyb<<"-sample-"<<sample;
              baselineSamplesHist2D[fpga][hyb][sample] = new TH2F(oss.str().c_str(),oss.str().c_str(),640,0,640,50,0., 10000.0);
           }        
-          for(int idelay=0;idelay<MAX_DELAY;++idelay) {
-            oss.str("");        
-            oss << "samples-delay-"<< idelay <<"-fpga-"<<fpga<<"-hyb-"<<hyb;
-            samplesDelayHist2D[idelay][fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),6,0.0,6.0,50,0.,10000.0);
+          // for(int idelay=0;idelay<MAX_DELAY;++idelay) {
+          //   oss.str("");        
+          //   oss << "samples-delay-"<< idelay <<"-fpga-"<<fpga<<"-hyb-"<<hyb;
+          //   samplesDelayHist2D[idelay][fpga][hyb] = new TH2F(oss.str().c_str(),oss.str().c_str(),6,0.0,6.0,50,0.,10000.0);
             
-          }
+          // }
        }
     }
 
@@ -166,8 +166,8 @@ int main(int argc, char**argv ) {
     tiEventNumber = triggerEvent.tiEventNumber();
     if(tiEventNumber > tiEventNumberPrev) {
 
-      if( tiEvents % 100 == 0 && tiEvents > 0) delay++;
-      cout << "delay " << delay << " " << tiEvents << endl;
+      // if( tiEvents % 100 == 0 && tiEvents > 0) delay++;
+      // cout << "delay " << delay << " " << tiEvents << endl;
 
       tiEventNumberPrev = tiEventNumber;
       tiEvents++;
@@ -215,7 +215,7 @@ int main(int argc, char**argv ) {
         uint val = triggerSample->value( y );
         baselineSamplesHist2D[feb][hybrid][y]->Fill(channel,val);
         samplesHist2D[feb][hybrid]->Fill(y,val);
-        samplesDelayHist2D[delay][feb][hybrid]->Fill(y,val);
+        //samplesDelayHist2D[delay][feb][hybrid]->Fill(y,val);
         
         if( debug > 0) cout << " " << val;
       } 
@@ -281,18 +281,18 @@ int main(int argc, char**argv ) {
         c2->Print(name);
         outputFile->cd();
         samplesHist2D[fpga][hyb]->Write();
-
-        for (int idelay=0; idelay<MAX_DELAY; ++idelay) {
-          c2->Clear();            
-          c2->cd();
-          sprintf(name,"%s_samples_delay_D%d_F%d_H%d.png",inname.Data(),idelay,fpga,hyb);
-          printf("Drawing %s\n",name);
-          samplesDelayHist2D[idelay][fpga][hyb]->Draw("colz");
-          sprintf(name,"%s_baselinesamples.ps",inname.Data());
-          c2->Print(name);
-          outputFile->cd();
-          samplesDelayHist2D[idelay][fpga][hyb]->Write();       
-        }
+    
+        // for (int idelay=0; idelay<MAX_DELAY; ++idelay) {
+        //   c2->Clear();            
+        //   c2->cd();
+        //   sprintf(name,"%s_samples_delay_D%d_F%d_H%d.png",inname.Data(),idelay,fpga,hyb);
+        //   printf("Drawing %s\n",name);
+        //   samplesDelayHist2D[idelay][fpga][hyb]->Draw("colz");
+        //   sprintf(name,"%s_baselinesamples.ps",inname.Data());
+        //   c2->Print(name);
+        //   outputFile->cd();
+        //   samplesDelayHist2D[idelay][fpga][hyb]->Write();       
+        // }
      }
      
   }
