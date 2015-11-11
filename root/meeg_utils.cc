@@ -52,7 +52,7 @@ void doStats(int n, int nmin, int nmax, int *y, int &count, double &center, doub
 		{
 			count += y[i];
 			mean += i*y[i];
-			meansq += pow(i,2)*y[i];
+			meansq += i*i*y[i];
 		}
 	if (count==0)
 	{
@@ -105,7 +105,7 @@ void doStats_mean(int n, int nmin, int nmax, int *y, int &count, double &center,
 		{
 			count += y[i];
 			mean += i*y[i];
-			meansq += pow(i,2)*y[i];
+			meansq += i*i*y[i];
 		}
 	if (count==0)
 	{
