@@ -125,8 +125,12 @@ bool DataRead::open ( string file, bool compressed ) {
 
    // Attempt to open file
    else {
+#ifndef O_LARGEFILE
      if ( (fd_ = ::open (file.c_str(),O_RDONLY ) < 0 ) ) {
-	//if ( (fd_ = ::open (file.c_str(),O_RDONLY | O_LARGEFILE)) < 0 ) {
+#endif
+#ifdef O_LARGEFILE
+	 if ( (fd_ = ::open (file.c_str(),O_RDONLY | O_LARGEFILE)) < 0 ) {
+#endif
          cout << "DataRead::open -> Failed to open file: " << file << endl;
          return(false);
       }

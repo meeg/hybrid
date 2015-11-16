@@ -1,7 +1,7 @@
 OS := $(shell uname -s)
 
 # Variables
-CFLAGS  := -fpermissive -g -Wall -Wno-gnu-static-float-init `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I$(PWD)/../evio -I.
+CFLAGS  := -fpermissive -g -Wall `xml2-config --cflags` `root-config --cflags` -I$(PWD)/../tracker -I$(PWD)/../generic -I$(PWD)/../t0fit -I$(PWD)/../evio -I.
 LFLAGS  := `xml2-config --libs` `root-config --libs` -lMinuit -lbz2 -lgsl -lgslcblas
 
 ifeq ($(OS),Linux) #hack to make this compile on OS X
