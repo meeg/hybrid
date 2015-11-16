@@ -26,8 +26,8 @@ using namespace std;
 
 // Constructor
 DataReadEvio::DataReadEvio ( ) {
-    debug_=false;
-	//debug_=true;
+  debug_=false;
+  //debug_=true;
 	fd_ = -1;
 	maxbuf=MAXEVIOBUF;
 	fragment_offset[0] = 2;//BANK
@@ -234,6 +234,8 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
     uint tiDataLen = 0;
     // Pointer to the config string
     char* str = NULL;
+    uint str_length = 0;
+    char* more_str = NULL;
     uint debug_local = 0;
     if(debug_local){
       cout<<"====\nparse SVT bank: bank length: "<<bank_length<<endl;
@@ -277,10 +279,10 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
                 if(debug_ || debug_local) printf("copy %d data words into the data object buffer\n",length-2);
                 tb->copy(&buf[ptr+2],length-2);
 
-                if( debug_local ) {
-                  printf("the data words copied were:\n");
-                  for(int iw=0; iw < tb->size(); ++iw )  printf("0x%u\n",(tb->data()[iw]));                  
-                }
+                //if( debug_local ) {
+                //  printf("the data words copied were:\n");
+                //  for(int iw=0; iw < tb->size(); ++iw )  printf("0x%u\n",(tb->data()[iw]));                  
+                //}
 
 
             }
@@ -319,28 +321,31 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
           
         }
         else if (fragType==CHARSTAR8 && tag==svt_config_tag)  {
-          if(debug_local) {
+          //if(debug_local) {
             printf("Found config/status bank\n");
             printf("Actual config lengths: %d (%lu, %lu)\n",length-2,sizeof(uint),sizeof(char));
-          }
+            //}
 
           // allocate memory for the string
+          if(debug_local) cout << "The config string pointer is "  << (str == NULL ? "NULL " : "not NULL ") << endl;            
+
+          uint l_new_str = (length-2)*sizeof(uint);          
+          uint l_old_str = str_length;
+          str_length += l_new_str;
           
-          // check first that it isn't set
-          if( str != NULL) {
-            cout << "The config string pointer is not NULL!?" << endl;
-            exit(1);
-          }
-          
-          str = (char*) malloc((length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+          if( debug_local) printf("allocate %d memory for config str (existing str is %d long)\n",str_length,l_old_str);
+          more_str = (char*) realloc(str, str_length);
+          str = more_str;          
+          //str = (char*) malloc((length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
           
           // Copy the string
-          if( debug_local ) printf("memcpy the config str to tmp place at %p\n",str);
+          if(debug_local) printf("memcpy the config str of length %d to tmp place pointer at %p (offset from %p)\n",l_new_str,str+l_old_str,str);
           
-          memcpy(str,&buf[ptr+2],(length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+          //memcpy(str,&buf[ptr+2],(length-2)*sizeof(uint)*sizeof(uint)/sizeof(char));
+          memcpy(str+l_old_str, &buf[ptr+2], l_new_str);
           
           if( debug_local ) {
-            printf("Done copy\n");
+            printf("Config bank is:\n");
             printf("\"%s\"\n",str);
             printf("Done with the config bank\n");
           }
@@ -416,6 +421,10 @@ void DataReadEvio::parse_SVTBank(unsigned int *buf, int bank_length) {
     }
     
     if( str != NULL) {
+      //if( debug_local ) {
+        printf("Config bank is:\n");
+        printf("\"%s\"\n",str);
+        //}
       if( debug_local ) printf("delete memory for the config str\n");
       free( str );
     } else {
