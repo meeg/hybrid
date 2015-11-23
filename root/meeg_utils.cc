@@ -224,6 +224,27 @@ void plotResults2(const char *title, const char *name, const char *name2, const 
 	delete mg;
 }
 
+Double_t fitf_4pole_intnorm(Double_t *x,Double_t *par)
+{
+    Double_t amp = 0.0;
+    if (x[0]>par[2]) {
+        amp += (pow(par[3],2)/(pow(par[3]-par[4],3)))*(
+                exp((par[2]-x[0])/par[3])-
+                exp((par[2]-x[0])/par[4])*(1+
+                    (x[0]-par[2])*(par[3]-par[4])/(par[3]*par[4])+
+                    pow(((x[0]-par[2])*(par[3]-par[4])/(par[3]*par[4])),2)/2));
+    }
+    return amp;
+}
+
+Double_t fitf_4pole(Double_t *x,Double_t *par)
+{
+    Double_t x0[1];
+    x0[0] = 3.0*pow(par[3]*pow(par[4],3),0.25)+par[2];
+    return par[0]+par[1]*fitf_4pole_intnorm(x,par)/fitf_4pole_intnorm(x0,par);
+}
+
+
 ///===================================================
 /// myText
 ///===================================================

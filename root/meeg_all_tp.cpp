@@ -50,26 +50,6 @@ using namespace std;
 
 #define N_TIME_CONSTS 2
 
-Double_t fitf_intnorm(Double_t *x,Double_t *par)
-{
-    Double_t amp = 0.0;
-    if (x[0]>par[2]) {
-        amp += (pow(par[3],2)/(pow(par[3]-par[4],3)))*(
-                exp((par[2]-x[0])/par[3])-
-                exp((par[2]-x[0])/par[4])*(1+
-                    (x[0]-par[2])*(par[3]-par[4])/(par[3]*par[4])+
-                    pow(((x[0]-par[2])*(par[3]-par[4])/(par[3]*par[4])),2)/2));
-    }
-    return amp;
-}
-
-Double_t fitf(Double_t *x,Double_t *par)
-{
-    Double_t x0[1];
-    x0[0] = 3.0*pow(par[3]*pow(par[4],3),0.25)+par[2];
-    return par[0]+par[1]*fitf_intnorm(x,par)/fitf_intnorm(x0,par);
-}
-
 // Process the data
 // Pass root file to open as first and only arg.
 int main ( int argc, char **argv ) {
@@ -515,7 +495,7 @@ int main ( int argc, char **argv ) {
                (([3]-[4])*([3]-[4])/(2*[3]*[4]*[3]*[4]))*(x-[2])*(x-[2]))*exp(([2]-x)/[4]))",
                -1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
                */
-            TF1 *shapingFunction = new TF1("Shaping Function",fitf,-1.0*SAMPLE_INTERVAL,5.0*SAMPLE_INTERVAL,5);
+            TF1 *shapingFunction = new TF1("Shaping Function",fitf_4pole,-1.0*SAMPLE_INTERVAL,5.0*SAMPLE_INTERVAL,5);
 
             for (int rce = 0;rce<MAX_RCE;rce++)
                 for (int fpga = 0;fpga<MAX_FEB;fpga++)

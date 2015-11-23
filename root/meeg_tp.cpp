@@ -528,16 +528,17 @@ int main ( int argc, char **argv ) {
                 //((x-[2])/(([5]-[3])*([5]-[4])))*exp(([2]-x)/[5]))",
             //-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
 
-    TF1 *shapingFunction = new TF1("Shaping Function",
-            "[0]+\
-            [1]*(x>[2])*\
-            ([3]*[3]/(([3]-[4])*([3]-[4])*([3]-[4])))*(\
-                exp(([2]-x)/[3])-\
-                (1+\
-                 (([3]-[4])/([3]*[4]))*(x-[2])+\
-                 (([3]-[4])*([3]-[4])/(2*[3]*[4]*[3]*[4]))*(x-[2])*(x-[2]))*exp(([2]-x)/[4]))",
-            -1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
+    //TF1 *shapingFunction = new TF1("Shaping Function",
+            //"[0]+\
+            //[1]*(x>[2])*\
+            //([3]*[3]/(([3]-[4])*([3]-[4])*([3]-[4])))*(\
+                //exp(([2]-x)/[3])-\
+                //(1+\
+                 //(([3]-[4])/([3]*[4]))*(x-[2])+\
+                 //(([3]-[4])*([3]-[4])/(2*[3]*[4]*[3]*[4]))*(x-[2])*(x-[2]))*exp(([2]-x)/[4]))",
+            //-1.0*SAMPLE_INTERVAL,5*SAMPLE_INTERVAL);
             
+    TF1 *shapingFunction = new TF1("Shaping Function",fitf_4pole,-1.0*SAMPLE_INTERVAL,5.0*SAMPLE_INTERVAL,5);
             
     double chanNoise[2][640]={{0.0}};
     double chanChan[640];
