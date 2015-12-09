@@ -29,7 +29,7 @@
 #include <stdarg.h>
 #include <DevboardEvent.h>
 #include <DevboardSample.h>
-#include <TriggerEvent.h>
+#include <TiTriggerEvent.h>
 #include <TriggerSample.h>
 #include <Data.h>
 #include <DataRead.h>
@@ -81,7 +81,7 @@ int main ( int argc, char **argv ) {
     //TGraph          *sigma;
     DataRead        *dataRead;
     DevboardEvent    event;
-    TriggerEvent    triggerevent;
+    TiTriggerEvent    triggerevent;
     TriggerSample   *triggersample = new TriggerSample();
     int		samples[6];
     int            eventCount;
@@ -221,9 +221,12 @@ int main ( int argc, char **argv ) {
         hybrid_type = 1;
     }
 
-    if (evio_format)
-        dataRead = new DataReadEvio();
-    else 
+    if (evio_format) {
+        DataReadEvio *tmpDataRead = new DataReadEvio();
+        if (triggerevent_format)
+            tmpDataRead->set_engrun(true);
+        dataRead = tmpDataRead;
+    } else 
         dataRead = new DataRead();
 
     gROOT->SetStyle("Plain");
@@ -407,7 +410,7 @@ int main ( int argc, char **argv ) {
                         if (samples[y]==0) goodSample = false;
                     }
                 }
-                //printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,event.fpgaAddress(),sample->hybrid(),sample->apv(),sample->channel(),sample->value(0),sample->value(1),sample->value(2),sample->value(3),sample->value(4),sample->value(5));
+                //printf("event %d\tx=%d\tF%d H%d A%d channel %d, samples:\t%d\t%d\t%d\t%d\t%d\t%d\n",eventCount,x,rce,hyb,apv,channel,samples[0],samples[1],samples[2],samples[3],samples[4],samples[5]);
                 if (use_fpga!=-1 && fpga!=use_fpga) continue;
                 if (use_hybrid!=-1 && hyb!=use_hybrid) continue;
                 if (!goodSample) continue;
@@ -660,11 +663,11 @@ int main ( int argc, char **argv ) {
                         grTp[i][sgn][nChan[sgn]]=shapingFunction->GetParameter(3+i);
                     }
                 }
-                printf("%f, %f, %f",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2));
-                for (int i=0;i<N_TIME_CONSTS;i++) {
-                    printf(", %f",shapingFunction->GetParameter(3+i));
-                }
-                printf("\n");
+                //printf("%f, %f, %f",shapingFunction->GetParameter(0),shapingFunction->GetParameter(1),shapingFunction->GetParameter(2));
+                //for (int i=0;i<N_TIME_CONSTS;i++) {
+                    //printf(", %f",shapingFunction->GetParameter(3+i));
+                //}
+                //printf("\n");
                 grChan[sgn][nChan[sgn]]=channel;
                 grA[sgn][nChan[sgn]]=A;
                 if (sgn==1) grA[sgn][nChan[sgn]]*=-1;
