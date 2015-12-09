@@ -683,7 +683,7 @@ int main ( int argc, char **argv ) {
         if (plot_tp_fits)
         {
             fitcurve->SetLineWidth(3);
-            fitcurve->Draw();
+            fitcurve->Draw("SAME");
             if (move_fitstart)
             {
                 shapingFunction->SetLineStyle(1);
