@@ -27,7 +27,7 @@ TRK_OBJ := $(patsubst $(TRK_DIR)/%.cpp,$(OBJ)/%.o,$(TRK_SRC))
 
 # Fitter Sources
 FIT_DIR := $(PWD)/../t0fit
-FIT_SRC := $(FIT_DIR)/ShapingCurve.cc $(FIT_DIR)/Samples.cc $(FIT_DIR)/Event.cc $(FIT_DIR)/Fitter.cc $(FIT_DIR)/AnalyticFitter.cc $(FIT_DIR)/LinFitter.cc $(FIT_DIR)/SmoothShapingCurve.cc
+FIT_SRC := $(FIT_DIR)/ShapingCurve.cc $(FIT_DIR)/Samples.cc $(FIT_DIR)/Event.cc $(FIT_DIR)/Fitter.cc $(FIT_DIR)/AnalyticFitter.cc $(FIT_DIR)/LinFitter.cc $(FIT_DIR)/SmoothShapingCurve.cc $(FIT_DIR)/FourPoleShapingCurve.cc
 #FIT_HDR := $(FIT_DIR)/ShapingCurve.hh $(FIT_DIR)/Samples.hh $(FIT_DIR)/Event.hh $(FIT_DIR)/Fitter.hh $(FIT_DIR)/AnalyticFitter.hh $(FIT_DIR)/LinFitter.hh $(FIT_DIR)/SmoothShapingCurve.hh
 FIT_OBJ := $(patsubst $(FIT_DIR)/%.cc,$(OBJ)/%.o,$(FIT_SRC))
 
