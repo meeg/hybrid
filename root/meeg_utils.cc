@@ -51,8 +51,8 @@ void doStats(int n, int nmin, int nmax, int *y, int &count, double &center, doub
 		if (y[i])
 		{
 			count += y[i];
-			mean += i*y[i];
-			meansq += i*i*y[i];
+			mean += ((double)i)*y[i];
+			meansq += ((double)i)*i*y[i];
 		}
 	if (count==0)
 	{
@@ -104,8 +104,8 @@ void doStats_mean(int n, int nmin, int nmax, int *y, int &count, double &center,
 		if (y[i])
 		{
 			count += y[i];
-			mean += i*y[i];
-			meansq += i*i*y[i];
+			mean += ((double)i)*y[i];
+			meansq += ((double)i)*i*y[i];
 		}
 	if (count==0)
 	{
