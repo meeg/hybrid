@@ -32,7 +32,7 @@
 #include <stdarg.h>
 #include <DevboardEvent.h>
 #include <DevboardSample.h>
-#include <TriggerEvent.h>
+#include <TiTriggerEvent.h>
 #include <TriggerSample.h>
 #include <Data.h>
 #include <DataRead.h>
@@ -87,7 +87,7 @@ int main ( int argc, char **argv ) {
     DataRead        *dataRead;
     int svt_bank_num = -1;
     DevboardEvent    event;
-    TriggerEvent    triggerevent;
+    TiTriggerEvent    triggerevent;
     TriggerSample   *triggersample = new TriggerSample();
     int		samples[6];
     int            eventCount;
